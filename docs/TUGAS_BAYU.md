@@ -1,5 +1,5 @@
 # Panduan Pengerjaan Tugas Sprint 1 — Crystiano Bayu Satya Alves (24060124140130)
-## Role: UI Design System, Navigation & Praktikan Workflow
+## Role: UI Design System, Navigation Shell & Praktikan Session Explorer
 
 > Dokumen ini dirancang khusus sebagai instruksi dan PRD teknis untuk Crystiano Bayu Satya Alves (dan AI Coding Assistant Bayu).
 
@@ -8,14 +8,11 @@
 ## 1. Product Requirements Document (PRD) — Ruang Lingkup Bayu
 
 ### 1.1 Objektif Utama
-Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, struktur navigasi praktikan (Expo Router), halaman jadwal praktikum peserta, form presensi interaktif dengan validasi pencegahan presensi ganda (*anti-double attendance*), modal konfirmasi, serta halaman riwayat catatan kehadiran.
+Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, reusable component system, shell navigasi tab praktikan (Expo Router), daftar sesi praktikum peserta beserta indikator status keterbukaan sesi, serta penanganan status kosong (*empty state*).
 
 ### 1.2 User Stories & Pemetaan SRS
 - **Bayu - FR-02 :** Sebagai Praktikan, saya ingin melihat jadwal praktikum yang harus saya ikuti serta status keterbukaan sesi saat ini agar saya tahu kapan harus bersiap melakukan presensi.
-- **Bayu - FR-05 :** Sebagai Praktikan, saya ingin mengisi dan mengirim formulir presensi saat sesi berstatus dibuka agar kehadiran saya tercatat pada sesi praktikum tersebut.
-- **Bayu - FR-06 :** Sebagai Praktikan, saya ingin sistem memvalidasi dan mencegah saya melakukan presensi lebih dari satu kali pada sesi yang sama agar tidak terjadi duplikasi data absensi.
-- **Bayu - FR-07 :** Sebagai Praktikan, saya ingin menerima umpan balik berupa modal/bottom sheet konfirmasi saat presensi berhasil dikirim beserta info waktu hadir agar saya yakin kehadiran telah tercatat.
-- **Bayu - FR-09 :** Sebagai Praktikan, saya ingin melihat daftar riwayat dan catatan kehadiran saya sendiri pada praktikum yang telah diikuti agar saya dapat mengecek histori absensi pribadi.
+- **Bayu - FR-07 :** Sebagai Pengguna (Praktikan/Asisten), saya ingin menerima umpan balik berupa modal dialog responsif (*FeedbackModal*) saat terjadi tindakan penting agar mendapatkan konfirmasi visual yang jelas.
 - **Bayu - FR-10 :** Sebagai Pengguna (Praktikan/Asisten), saya ingin melihat tampilan status kosong (*empty state*) yang informatif ketika daftar jadwal, rekap, atau riwayat belum memiliki data.
 
 ---
@@ -26,7 +23,7 @@ Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, struktur nav
 - **Nama Branch:** `feat/bayu/ui-components-nav`
 - **Target Branch:** `dev`
 - **Judul PR:** `feat(ui): responsive common components and navigation shell`
-- **SRS Terkait:** `Bayu - FR-10`
+- **SRS Terkait:** `Bayu - FR-10`, `Bayu - FR-07`
 - **Ruang Lingkup Perubahan:**
   - `src/components/common/CustomButton.tsx` (Button varian primary, outline, disabled)
   - `src/components/common/Card.tsx` (Card container responsif Flexbox)
@@ -38,22 +35,20 @@ Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, struktur nav
   - [ ] Tab navigator praktikan dapat berpindah layar dengan lancar.
   - [ ] Lolos typecheck (`npx tsc --noEmit`).
 
-### 📌 PR 2 (Bayu) — Modul Presensi & Riwayat Praktikan
-- **Nama Branch:** `feat/bayu/praktikan-workflow`
+### 📌 PR 2 (Bayu) — Modul Jadwal & Detail Sesi Praktikan
+- **Nama Branch:** `feat/bayu/praktikan-session-explorer`
 - **Target Branch:** `dev`
-- **Judul PR:** `feat(praktikan): attendance form, anti-double validation, and history`
-- **SRS Terkait:** `Bayu - FR-02`, `Bayu - FR-05`, `Bayu - FR-06`, `Bayu - FR-07`, `Bayu - FR-09`
+- **Judul PR:** `feat(praktikan): session list screen and session card component`
+- **SRS Terkait:** `Bayu - FR-02`, `Bayu - FR-10`
 - **Ruang Lingkup Perubahan:**
-  - `src/app/praktikan/index.tsx` (Daftar sesi praktikum peserta)
-  - `src/app/praktikan/presensi/[id].tsx` (Halaman & form aksi presensi)
-  - `src/app/praktikan/riwayat.tsx` (Histori absensi akun praktikan aktif)
-  - `src/components/praktikan/AttendanceForm.tsx` (Formulir input kehadiran)
-  - `src/components/praktikan/HistoryItemCard.tsx` (Kartu catatan riwayat kehadiran)
+  - `src/app/praktikan/index.tsx` (Daftar sesi praktikum peserta yang disaring)
+  - `src/components/praktikan/SessionCard.tsx` (Kartu sesi praktikum untuk praktikan)
 - **Checklist PR:**
-  - [ ] Tombol presensi hanya aktif jika status sesi `DIBUKA`.
-  - [ ] Mencegah presensi ganda (tombol terkunci & bertuliskan "Sudah Hadir").
-  - [ ] Modal konfirmasi sukses muncul setelah submit presensi.
-  - [ ] Catatan kehadiran tersimpan dan muncul di halaman riwayat.
+  - [ ] Menampilkan daftar sesi praktikum secara interaktif dari data Context.
+  - [ ] Menampilkan status badge sesi (Belum Dimulai, Dibuka, Selesai).
+  - [ ] Integrasi navigasi dari kartu sesi menuju halaman presensi praktikan.
+  - [ ] Menampilkan `EmptyState` jika tidak ada sesi yang terjadwal.
+  - [ ] Lolos typecheck (`npx tsc --noEmit`).
 
 ---
 
@@ -65,10 +60,7 @@ src/
 ├── app/
 │   └── praktikan/
 │       ├── _layout.tsx               <-- Tab bar praktikan (Jadwal, Riwayat)
-│       ├── index.tsx                 <-- Daftar sesi praktikum aktif
-│       ├── presensi/
-│       │   └── [id].tsx              <-- Halaman form presensi & validasi
-│       └── riwayat.tsx               <-- Halaman riwayat kehadiran pribadi
+│       └── index.tsx                 <-- Daftar sesi praktikum aktif
 └── components/
     ├── common/
     │   ├── CustomButton.tsx          <-- Tombol reusable (Primary, Secondary, Disabled)
@@ -76,9 +68,7 @@ src/
     │   ├── EmptyState.tsx            <-- Komponen state kosong
     │   └── FeedbackModal.tsx         <-- Modal konfirmasi sukses/peringatan
     └── praktikan/
-        ├── AttendanceForm.tsx        <-- Form input presensi
-        ├── AttendanceSuccessCard.tsx <-- Kartu bukti kehadiran setelah presensi
-        └── HistoryItemCard.tsx       <-- Item list riwayat kehadiran
+        └── SessionCard.tsx           <-- Kartu sesi praktikum untuk praktikan
 ```
 
 ### 3.2 Integrasi dengan Context
@@ -88,10 +78,7 @@ import { useAttendance } from '@/context/AttendanceContext';
 
 const {
   currentUser,            // User profile praktikan yang aktif
-  sessions,               // Daftar sesi
-  submitAttendance,       // Fungsi submit presensi: (sessionId, student, notes)
-  isAlreadyAttended,      // Fungsi pengecekan duplikasi: (sessionId, studentId) => boolean
-  getAttendanceByStudent, // Fungsi mengambil riwayat: (studentId) => AttendanceRecord[]
+  sessions,               // Daftar sesi praktikum
   getSessionById          // Fungsi detail sesi
 } = useAttendance();
 ```
@@ -113,12 +100,9 @@ const {
 - [ ] **Langkah 2**: Buat komponen dasar di `src/components/common/` (`CustomButton.tsx`, `Card.tsx`, `EmptyState.tsx`, `FeedbackModal.tsx`).
 - [ ] **Langkah 3**: Setup rute navigasi tab di `src/app/praktikan/_layout.tsx` (Tab 1: Jadwal Sesi, Tab 2: Riwayat Presensi).
 - [ ] **Langkah 4**: Jalankan `npx tsc --noEmit` & ajukan **PR 1 Bayu** ke branch `dev`.
-- [ ] **Langkah 5**: Buat branch `feat/bayu/praktikan-workflow` dari `dev` terbaru.
-- [ ] **Langkah 6**: Buat halaman `src/app/praktikan/index.tsx` untuk menampilkan daftar sesi praktikum dari `sessions` di Context.
-- [ ] **Langkah 7**: Buat halaman `src/app/praktikan/presensi/[id].tsx` yang memuat form presensi praktikan.
-- [ ] **Langkah 8**: Terapkan logika tombol presensi:
-  - Cek `isAlreadyAttended(session.id, currentUser.id)`. Jika `true`, kunci tombol dengan label "Sudah Hadir".
-  - Cek `session.status !== 'DIBUKA'`. Jika sesi belum buka atau sudah tutup, nonaktifkan form.
-- [ ] **Langkah 9**: Sambungkan aksi klik tombol dengan `submitAttendance()` dan tampilkan `FeedbackModal.tsx`.
-- [ ] **Langkah 10**: Buat halaman `src/app/praktikan/riwayat.tsx` menggunakan `getAttendanceByStudent(currentUser.id)`. Tampilkan `EmptyState` jika belum ada riwayat.
-- [ ] **Langkah 11**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bayu** ke branch `dev`.
+- [ ] **Langkah 5**: Buat branch `feat/bayu/praktikan-session-explorer` dari `dev` terbaru.
+- [ ] **Langkah 6**: Buat komponen `SessionCard.tsx` di `src/components/praktikan/` untuk merepresentasikan detail sesi, badge status, dan tombol aksi menuju presensi.
+- [ ] **Langkah 7**: Buat halaman `src/app/praktikan/index.tsx` untuk menampilkan daftar sesi praktikum dari `sessions` di Context.
+- [ ] **Langkah 8**: Sambungkan kartu sesi dengan routing navigasi ke `/praktikan/presensi/[id]` (modul yang dikembangkan oleh Bahir).
+- [ ] **Langkah 9**: Tampilkan `EmptyState` jika daftar sesi praktikum kosong.
+- [ ] **Langkah 10**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bayu** ke branch `dev`.
