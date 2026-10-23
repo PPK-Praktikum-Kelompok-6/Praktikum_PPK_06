@@ -41,8 +41,9 @@ Setiap programmer (beserta AI coding assistant masing-masing) merujuk langsung k
 ## Aturan Kolaborasi & Branching Umum
 1. Base branch utama integrasi adalah `dev`. Jangan langsung push atau commit ke `main`.
 2. Format penamaan branch: `feat/<nama-programmer>/<nama-fitur>`.
-3. Sebelum membuat PR, pastikan kode lolos typecheck dengan perintah:
+3. Sebelum membuat PR, pastikan kode lolos typecheck dan lint (lint juga memeriksa aturan import di [ARCHITECTURE.md](ARCHITECTURE.md)):
    ```bash
    npx tsc --noEmit
+   npx expo lint
    ```
 4. Setelah seluruh PR dari Zaidan, Bayu, dan Bahir selesai dan teruji pada branch `dev`, lakukan demo integrasi end-to-end sebelum merge ke `main`.

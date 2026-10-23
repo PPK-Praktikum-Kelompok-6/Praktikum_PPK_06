@@ -71,6 +71,8 @@ flowchart TD
 
 Imports flow **one way**: `shared → features → app`. Never the reverse, and never sideways between features.
 
+Rules 2 and 3 are **enforced by ESLint** (`import/no-restricted-paths` in `eslint.config.js`). `npx expo lint` fails if a feature imports another feature, or if shared code imports from `features/` or `app/`. When you add a new feature folder, add its name to the `features` list in `eslint.config.js`.
+
 ---
 
 ## 3. Rules
@@ -178,7 +180,7 @@ sequenceDiagram
 
 **Merge order:** Zaidan (`types`, `store`) and Bayu (`components/ui`, `theme`) first, then feature PRs.
 
-**Branches:** base branch is `dev`. Name branches `feat/<name>/<feature>` or `chore/<name>/<task>`. Run `npx tsc --noEmit` before opening a PR.
+**Branches:** base branch is `dev`. Name branches `feat/<name>/<feature>` or `chore/<name>/<task>`. Run `npx tsc --noEmit` and `npx expo lint` before opening a PR.
 
 ---
 

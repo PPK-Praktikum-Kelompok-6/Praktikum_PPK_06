@@ -26,7 +26,8 @@ npx expo start      # scan QR dengan Expo Go, atau tekan "w" untuk web
 Sebelum membuat PR:
 
 ```bash
-npx tsc --noEmit
+npx tsc --noEmit    # typecheck
+npx expo lint       # lint + aturan import arsitektur
 ```
 
 ## Struktur
