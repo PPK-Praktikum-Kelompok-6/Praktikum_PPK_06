@@ -95,7 +95,7 @@ const VARIANT_CONFIG = {
   primary: {
     bg: Colors.primaryBg,
     text: Colors.primary,
-    border: '#DDD6FE',
+    border: Colors.primaryBorder,
     dot: Colors.primary,
   },
 };

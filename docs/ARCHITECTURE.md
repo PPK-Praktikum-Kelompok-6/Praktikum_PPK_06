@@ -86,6 +86,7 @@ Rules 2 and 3 are **enforced by ESLint** (`import/no-restricted-paths` in `eslin
 | 5 | Business rules are **pure functions** in `store/rules.ts`, with no React. The UI asks the rule and does not re-implement it. | `canAttend(session, records, studentId)` |
 | 6 | Use the `@/` alias with direct file imports. No `../../`, no barrel `index.ts`. | `import { Card } from '@/components/ui/Card'` |
 | 7 | Create a subfolder only when it has a file. Move code to shared only when **≥2 features** use it. | |
+| 8 | Use UI primitives from `components/ui/` and tokens from `constants/theme.ts` (see [DESIGN.md](DESIGN.md)). No hardcoded hex literals outside `theme.ts`. | ✅ `Colors.primary` |
 
 ### Naming
 
