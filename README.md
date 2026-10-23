@@ -8,14 +8,6 @@ Sprint 1 memakai data dummy dan state lokal (belum ada database).
 
 **Stack:** Expo SDK 57 · Expo Router · React Native · TypeScript
 
-## Tim (Kelompok 6)
-
-| Nama | NIM | Fokus |
-|---|---|---|
-| Muhammad Zaidan Alfarizi | 24060124130102 | Core state, role system, alur Asisten |
-| Crystiano Bayu Satya Alves | 24060124140130 | UI design system, navigasi, jadwal Praktikan |
-| Bahir Ananda Wibowo | 24060124140184 | Presensi, validasi anti-double, riwayat |
-
 ## Menjalankan
 
 ```bash
