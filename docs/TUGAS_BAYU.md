@@ -91,10 +91,10 @@ const { sessions, getSessionById } = useSessions(); // Daftar sesi & fungsi deta
 ### 3.3 Aturan Desain & Styling (Flexbox & Responsivitas)
 1. Gunakan `StyleSheet.create` React Native murni dengan Flexbox (`flex: 1`, `flexDirection: 'row'/'column'`, `justifyContent`, `alignItems`, `gap`).
 2. Hindari ukuran font atau padding yang hardcoded tanpa pertimbangan layar kecil (gunakan layout yang *stretch* dan *scrollable* dengan `ScrollView`).
-3. Warna tema konsisten:
-   - Primary: Biru `#1E40AF` / `#2563EB`
-   - Sukses/Dibuka: Hijau `#16A34A` / `#DCFCE7`
-   - Peringatan/Tutup: Abu-abu `#64748B` / Merah `#DC2626`
+3. Warna tema konsisten (Royal Violet & Cotap Midnight — lihat [DESIGN.md](DESIGN.md)):
+   - Primary: Royal Violet `#6D28D9` / Midnight `#1E1035`
+   - Sukses/Dibuka: Hijau `#166534` / `#DCFCE7` (WCAG AA)
+   - Peringatan/Tutup: Amber `#92400E` / Merah `#991B1B` / Slate `#64748B`
    - Background: `#F8FAFC`
 
 ---

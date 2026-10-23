@@ -39,5 +39,18 @@ module.exports = defineConfig([
       ],
     },
   },
+  {
+    // Enforces Design System tokens in docs/DESIGN.md: no hardcoded hex outside theme.ts.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/constants/theme.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message: "Use Colors from '@/constants/theme' instead of hardcoded hex literals (see docs/DESIGN.md).",
+        },
+      ],
+    },
+  },
 ]);
-

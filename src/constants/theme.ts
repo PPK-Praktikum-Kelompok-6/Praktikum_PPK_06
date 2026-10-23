@@ -10,7 +10,10 @@ export const Colors = {
   primaryDark: '#4C1D95',
   primaryLight: '#7C3AED',
   primaryBg: '#EDE9FE',
+  primaryBorder: '#DDD6FE',
   primaryGhost: '#F5F3FF',
+  rippleOuter: '#F3E8FF',
+  rippleMid: '#E9D5FF',
 
   // Dark Hero & Glass surfaces
   midnight: '#1E1035',
@@ -136,3 +139,13 @@ export const Shadows = {
     elevation: 10,
   },
 } as const;
+
+export const MinTouch = 48;
+
+export const StatusLabel = {
+  waiting: 'Belum Dimulai',
+  open: 'Dibuka',
+  closed: 'Ditutup',
+  attended: 'Sudah Hadir',
+} as const;
+

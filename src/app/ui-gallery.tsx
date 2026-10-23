@@ -1,4 +1,4 @@
-import { Href, router } from 'expo-router';
+import { Href, Redirect, router } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -10,8 +10,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { RippleCheckIn } from '@/components/ui/RippleCheckIn';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 
 export default function UIGalleryRoute() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -20,6 +21,10 @@ export default function UIGalleryRoute() {
   const [modalMessage, setModalMessage] = useState('');
   const [checkInState, setCheckInState] = useState(false);
   const [buttonLoading, setButtonLoading] = useState(false);
+
+  if (!__DEV__) {
+    return <Redirect href="/" />;
+  }
 
   const openFeedback = (type: FeedbackType, title: string, message: string) => {
     setModalType(type);
@@ -54,7 +59,7 @@ export default function UIGalleryRoute() {
               Midnight
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
-              #1E1035
+              {Colors.midnight}
             </AppText>
           </View>
           <View style={[styles.swatch, { backgroundColor: Colors.primary }]}>
@@ -62,39 +67,75 @@ export default function UIGalleryRoute() {
               Primary
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
-              #6D28D9
+              {Colors.primary}
             </AppText>
           </View>
-          <View style={[styles.swatch, { backgroundColor: Colors.primaryBg, borderWidth: 1, borderColor: '#DDD6FE' }]}>
+          <View
+            style={[
+              styles.swatch,
+              {
+                backgroundColor: Colors.primaryBg,
+                borderWidth: 1,
+                borderColor: Colors.primaryBorder,
+              },
+            ]}
+          >
             <AppText variant="caption" color={Colors.primary} weight="bold">
               PrimaryBg
             </AppText>
             <AppText variant="caption" color={Colors.textMuted}>
-              #EDE9FE
+              {Colors.primaryBg}
             </AppText>
           </View>
-          <View style={[styles.swatch, { backgroundColor: Colors.successBg, borderWidth: 1, borderColor: Colors.successBorder }]}>
+          <View
+            style={[
+              styles.swatch,
+              {
+                backgroundColor: Colors.successBg,
+                borderWidth: 1,
+                borderColor: Colors.successBorder,
+              },
+            ]}
+          >
             <AppText variant="caption" color={Colors.success} weight="bold">
               Success
             </AppText>
             <AppText variant="caption" color={Colors.success}>
-              #166534
+              {Colors.success}
             </AppText>
           </View>
-          <View style={[styles.swatch, { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder }]}>
+          <View
+            style={[
+              styles.swatch,
+              {
+                backgroundColor: Colors.warningBg,
+                borderWidth: 1,
+                borderColor: Colors.warningBorder,
+              },
+            ]}
+          >
             <AppText variant="caption" color={Colors.warning} weight="bold">
               Warning
             </AppText>
             <AppText variant="caption" color={Colors.warning}>
-              #92400E
+              {Colors.warning}
             </AppText>
           </View>
-          <View style={[styles.swatch, { backgroundColor: Colors.dangerBg, borderWidth: 1, borderColor: Colors.dangerBorder }]}>
+          <View
+            style={[
+              styles.swatch,
+              {
+                backgroundColor: Colors.dangerBg,
+                borderWidth: 1,
+                borderColor: Colors.dangerBorder,
+              },
+            ]}
+          >
             <AppText variant="caption" color={Colors.danger} weight="bold">
               Danger
             </AppText>
             <AppText variant="caption" color={Colors.danger}>
-              #991B1B
+              {Colors.danger}
             </AppText>
           </View>
         </View>
@@ -109,41 +150,15 @@ export default function UIGalleryRoute() {
           Diadopsi dari referensi Mobbins/Cotap untuk pengalaman presensi yang taktil.
         </AppText>
         <Card variant="flat" padding="lg" style={styles.rippleCard}>
-          <View style={styles.rippleOuter}>
-            <View style={styles.rippleMid}>
-              <Pressable
-                onPress={() => setCheckInState(!checkInState)}
-                style={({ pressed }) => [
-                  styles.rippleInner,
-                  checkInState && styles.rippleInnerSuccess,
-                  pressed && styles.rippleInnerPressed,
-                ]}
-              >
-                <Icon
-                  name={checkInState ? 'checkmark' : 'finger-print-outline'}
-                  size={36}
-                  color={Colors.textWhite}
-                />
-                <AppText
-                  variant="caption"
-                  weight="bold"
-                  color={Colors.textWhite}
-                  style={styles.rippleText}
-                >
-                  {checkInState ? 'TERPRESENSI' : 'TAP PRESENSI'}
-                </AppText>
-              </Pressable>
-            </View>
-          </View>
-          <AppText
-            variant="caption"
-            color={checkInState ? Colors.success : Colors.textMuted}
-            style={styles.rippleStatusText}
-          >
-            {checkInState
-              ? '✓ Presensi Selesai pada 08:31 WIB'
-              : 'Sentuh lingkaran untuk mencatat kehadiran'}
-          </AppText>
+          <RippleCheckIn
+            checkedIn={checkInState}
+            onPress={() => setCheckInState(!checkInState)}
+            helperText={
+              checkInState
+                ? '✓ Presensi Selesai pada 08:31 WIB'
+                : 'Sentuh lingkaran untuk mencatat kehadiran'
+            }
+          />
         </Card>
       </View>
 
@@ -244,12 +259,12 @@ export default function UIGalleryRoute() {
           5. Status Badges (WCAG AA Compliant)
         </AppText>
         <View style={styles.badgeRow}>
-          <Badge label="OPEN" variant="open" showDot />
-          <Badge label="CLOSED" variant="closed" />
-          <Badge label="ATTENDED" variant="attended" />
-          <Badge label="WAITING" variant="waiting" />
-          <Badge label="DANGER" variant="danger" />
-          <Badge label="PRIMARY" variant="primary" />
+          <Badge label={StatusLabel.open} variant="open" showDot />
+          <Badge label={StatusLabel.closed} variant="closed" />
+          <Badge label={StatusLabel.attended} variant="attended" />
+          <Badge label={StatusLabel.waiting} variant="waiting" />
+          <Badge label="Tidak Hadir" variant="danger" />
+          <Badge label="Praktikan" variant="primary" />
         </View>
       </View>
 
@@ -386,47 +401,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.xl,
   },
-  rippleOuter: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor: '#F3E8FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rippleMid: {
-    width: 135,
-    height: 135,
-    borderRadius: 67.5,
-    backgroundColor: '#E9D5FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rippleInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.md,
-  },
-  rippleInnerSuccess: {
-    backgroundColor: Colors.success,
-  },
-  rippleInnerPressed: {
-    transform: [{ scale: 0.95 }],
-    opacity: 0.9,
-  },
-  rippleText: {
-    marginTop: 4,
-    fontSize: 10,
-    letterSpacing: 0.5,
-  },
-  rippleStatusText: {
-    marginTop: Spacing.md,
-    textAlign: 'center',
-  },
   cardItem: {
     marginBottom: Spacing.md,
   },
@@ -459,4 +433,3 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
 });
-

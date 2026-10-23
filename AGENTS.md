@@ -53,3 +53,4 @@ Read `docs/ARCHITECTURE.md` before creating or moving any file. It is the source
 - Import with the `@/` alias and direct file paths. No `../../`, no barrel `index.ts`.
 - File, folder, route names and code identifiers are English. Text shown to users is Bahasa Indonesia.
 - Check the ownership table in `docs/ARCHITECTURE.md` §6 and only edit files owned by the current task.
+- Read `docs/DESIGN.md` before building UI: use primitives from `src/components/ui/` and tokens from `@/constants/theme` (no hardcoded hex literals).

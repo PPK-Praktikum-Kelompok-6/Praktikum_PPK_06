@@ -83,7 +83,7 @@ const VARIANT_STYLES = StyleSheet.create({
     backgroundColor: Colors.primaryBg,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: Colors.primaryBorder,
   },
   glass: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
