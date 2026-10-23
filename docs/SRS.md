@@ -96,34 +96,36 @@ Pencatatan kehadiran manual seringkali memakan waktu dan rentan kekeliruan. Asis
 ## 5. Arsitektur Informasi & Susunan Navigasi
 
 ### 5.1 Struktur Rute Aplikasi (Expo Router)
+> Detail lengkap, aturan import, dan kepemilikan file: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```
 src/
-├── app/
-│   ├── _layout.tsx               (Root Layout + Shared Role Context Provider)
-│   ├── index.tsx                 (Dashboard Utama / Role Switcher)
-│   ├── asisten/
-│   │   ├── _layout.tsx           (Tab Navigator Asisten)
-│   │   ├── index.tsx             (Daftar Jadwal & Manajemen Sesi)
-│   │   ├── sesi/[id].tsx         (Detail Sesi + Kontrol Buka/Tutup + Rekapitulasi)
-│   │   └── rekap.tsx             (Rekap Keseluruhan Praktikum)
-│   └── praktikan/
-│       ├── _layout.tsx           (Tab Navigator Praktikan)
-│       ├── index.tsx             (Jadwal Praktikum Aktif & Sesi Tersedia)
-│       ├── presensi/[id].tsx     (Detail Sesi + Form Aksi Presensi)
-│       └── riwayat.tsx           (Catatan/Riwayat Kehadiran Diri Sendiri)
-├── components/
-│   ├── common/                   (Badge, Button, Header, EmptyState, RoleSwitchModal)
-│   ├── asisten/                  (SessionActionModal, AttendanceTable, StatCard)
-│   └── praktikan/                (AttendanceSuccessModal, SessionCard)
-├── constants/
-│   └── Colors.ts
-├── context/
-│   └── AttendanceContext.tsx     (In-Memory State Management untuk Sesi & Presensi)
-├── types/
-│   └── attendance.ts             (Interface Session, Student, AttendanceRecord)
-└── data/
-    └── mockData.ts               (Dummy Data Sesi, Praktikan, dan Asisten)
+├── app/                              (RUTE saja, tanpa logika bisnis)
+│   ├── _layout.tsx                   (Root Stack + AppProvider)
+│   ├── index.tsx                     (Pilih Peran & Identitas)
+│   ├── assistant/
+│   │   ├── (tabs)/_layout.tsx        (Tab Navigator Asisten: Jadwal | Rekap)
+│   │   ├── (tabs)/index.tsx          (Daftar Jadwal & Manajemen Sesi)
+│   │   ├── (tabs)/recap.tsx          (Rekap Keseluruhan Praktikum)
+│   │   └── session/[id].tsx          (Detail Sesi + Kontrol Buka/Tutup + Rekapitulasi)
+│   └── student/
+│       ├── (tabs)/_layout.tsx        (Tab Navigator Praktikan: Jadwal | Riwayat)
+│       ├── (tabs)/index.tsx          (Jadwal Praktikum Aktif & Sesi Tersedia)
+│       ├── (tabs)/history.tsx        (Catatan/Riwayat Kehadiran Diri Sendiri)
+│       └── attendance/[id].tsx       (Detail Sesi + Form Aksi Presensi)
+├── features/
+│   ├── role/components/              (RoleSelectorModal)
+│   ├── sessions/components/          (SessionCard, StatusBadge, SessionControlModal)
+│   └── attendance/components/        (AttendanceForm, AttendanceSuccessCard, AttendanceTable, StatSummaryCard, HistoryItemCard)
+├── store/                            (AppProvider, reducer, rules, hooks: In-Memory State Sesi & Presensi)
+├── components/ui/                    (CustomButton, Card, EmptyState, FeedbackModal)
+├── constants/theme.ts
+├── types/attendance.ts               (UserProfile, PracticalSession, AttendanceRecord)
+├── data/mockData.ts                  (Dummy Data Sesi, Praktikan, dan Asisten)
+└── utils/
 ```
+
+Layar detail (`session/[id]`, `attendance/[id]`) berada di luar `(tabs)` agar tombol kembali berfungsi benar (pola resmi Expo Router).
 
 ---
 
