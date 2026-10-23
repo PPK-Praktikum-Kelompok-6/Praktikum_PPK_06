@@ -39,3 +39,17 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+
+## Project architecture
+
+Read `docs/ARCHITECTURE.md` before creating or moving any file. It is the source of truth; the summary below is only a reminder.
+
+- `src/app/` holds routes only: read params, call store hooks, compose components. No business logic.
+- Feature components live in `src/features/<role|sessions|attendance>/components/`. Features never import each other; combine them in the route file.
+- Shared code (`src/store`, `src/types`, `src/components/ui`, `src/constants`, `src/utils`, `src/data`) never imports from `src/features` or `src/app`.
+- Never call `useContext` directly; use `useCurrentUser`, `useSessions`, `useAttendance` from `@/store/hooks`.
+- Business rules (can open/close/attend) are pure functions in `src/store/rules.ts`.
+- Import with the `@/` alias and direct file paths. No `../../`, no barrel `index.ts`.
+- File, folder, route names and code identifiers are English. Text shown to users is Bahasa Indonesia.
+- Check the ownership table in `docs/ARCHITECTURE.md` §6 and only edit files owned by the current task.

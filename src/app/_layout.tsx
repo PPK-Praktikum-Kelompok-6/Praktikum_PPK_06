@@ -1,18 +1,8 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
-  );
+// Root stack. Zaidan wraps this with <AppProvider> (src/store/AppProvider.tsx).
+// Detail screens (assistant/session/[id], student/attendance/[id]) are pushed
+// from this stack, outside the tabs, so the back button returns correctly.
+export default function RootLayout() {
+  return <Stack />;
 }

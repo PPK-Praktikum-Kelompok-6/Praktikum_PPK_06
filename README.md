@@ -1,56 +1,55 @@
-# Welcome to your Expo app 👋
+# Praktikum PPK 06: Aplikasi Presensi Praktikum
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplikasi mobile untuk mencatat kehadiran praktikum dengan dua peran:
+- **Asisten** membuka dan menutup sesi, lalu melihat rekap kehadiran.
+- **Praktikan** melihat jadwal, melakukan presensi saat sesi dibuka, dan melihat riwayat kehadirannya.
 
-## Get started
+Sprint 1 memakai data dummy dan state lokal (belum ada database).
 
-1. Install dependencies
+**Stack:** Expo SDK 57 · Expo Router · React Native · TypeScript
 
-   ```bash
-   npm install
-   ```
+## Tim (Kelompok 6)
 
-2. Start the app
+| Nama | NIM | Fokus |
+|---|---|---|
+| Muhammad Zaidan Alfarizi | 24060124130102 | Core state, role system, alur Asisten |
+| Crystiano Bayu Satya Alves | 24060124140130 | UI design system, navigasi, jadwal Praktikan |
+| Bahir Ananda Wibowo | 24060124140184 | Presensi, validasi anti-double, riwayat |
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Menjalankan
 
 ```bash
-npm run reset-project
+npm install
+npx expo start      # scan QR dengan Expo Go, atau tekan "w" untuk web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Sebelum membuat PR:
 
-### Other setup steps
+```bash
+npx tsc --noEmit    # typecheck
+npx expo lint       # lint + aturan import arsitektur
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Struktur
 
-## Learn more
+```
+src/
+├── app/          # rute (Expo Router): assistant/, student/
+├── features/     # komponen per domain: role, sessions, attendance
+├── store/        # state global, aturan bisnis, hooks
+├── components/ui # komponen UI reusable
+├── types/  data/  constants/  utils/
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Detail struktur, aturan kode, dan kepemilikan file ada di **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Dokumentasi
 
-## Join the community
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): struktur & aturan arsitektur
+- [docs/SRS.md](docs/SRS.md): spesifikasi kebutuhan
+- [docs/PEMBAGIAN_TUGAS.md](docs/PEMBAGIAN_TUGAS.md): pembagian tugas Sprint 1
+- [docs/TUGAS_ZAIDAN.md](docs/TUGAS_ZAIDAN.md) · [docs/TUGAS_BAYU.md](docs/TUGAS_BAYU.md) · [docs/TUGAS_BAHIR.md](docs/TUGAS_BAHIR.md)
 
-Join our community of developers creating universal apps.
+## Alur Git
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Base branch adalah `dev`; jangan push langsung ke `main`. Nama branch: `feat/<nama>/<fitur>`.
