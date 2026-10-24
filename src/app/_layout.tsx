@@ -4,5 +4,5 @@ import { Stack } from 'expo-router';
 // Detail screens (assistant/session/[id], student/attendance/[id]) are pushed
 // from this stack, outside the tabs, so the back button returns correctly.
 export default function RootLayout() {
-  return <Stack />;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

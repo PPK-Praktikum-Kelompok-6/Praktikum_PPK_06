@@ -1,6 +1,6 @@
 import { Href, router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -65,9 +65,14 @@ export default function StudentScheduleRoute() {
             Halo, Praktikan 👋
           </AppText>
         </View>
-        <View style={styles.avatar}>
+        <Pressable
+          onPress={() => router.replace('/')}
+          accessibilityRole="button"
+          accessibilityLabel="Ganti peran"
+          style={styles.avatar}
+        >
           <Icon name="person" size={20} color={Colors.primary} />
-        </View>
+        </Pressable>
       </View>
 
       {PREVIEW_SESSIONS.length === 0 ? (

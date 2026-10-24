@@ -1,10 +1,9 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 
@@ -44,17 +43,37 @@ function parseDayAndNumber(dateStr: string): { dayLabel: string; dateNum: string
 function resolveBadge(
   status: SessionCardStatus,
   attended?: boolean
-): { label: string; variant: BadgeVariant; showDot: boolean } {
+): { label: string; variant: BadgeVariant; dotColor: string; showDot: boolean } {
   if (attended) {
-    return { label: StatusLabel.attended, variant: 'attended', showDot: false };
+    return {
+      label: StatusLabel.attended,
+      variant: 'attended',
+      dotColor: Colors.info,
+      showDot: true,
+    };
   }
   switch (status) {
     case 'OPEN':
-      return { label: StatusLabel.open, variant: 'open', showDot: true };
+      return {
+        label: StatusLabel.open,
+        variant: 'open',
+        dotColor: Colors.success,
+        showDot: true,
+      };
     case 'NOT_STARTED':
-      return { label: StatusLabel.waiting, variant: 'waiting', showDot: false };
+      return {
+        label: StatusLabel.waiting,
+        variant: 'waiting',
+        dotColor: Colors.warning,
+        showDot: true,
+      };
     case 'CLOSED':
-      return { label: StatusLabel.closed, variant: 'closed', showDot: false };
+      return {
+        label: StatusLabel.closed,
+        variant: 'closed',
+        dotColor: Colors.textMuted,
+        showDot: false,
+      };
   }
 }
 
@@ -68,51 +87,107 @@ export function SessionCard({
 
   if (variant === 'hero') {
     return (
-      <Card variant="hero" padding="lg" onPress={onPress} style={styles.heroCard}>
+      <Card variant="hero" padding="lg" style={styles.heroCard}>
+        {/* Top White Status Pill (Cotap Reference) */}
         <View style={styles.heroHeader}>
-          <Badge
-            label={badge.label}
-            variant={badge.variant}
-            size="sm"
-            showDot={badge.showDot}
-          />
-          <AppText variant="caption" color={Colors.textWhiteMuted}>
-            {session.room} · Kelas {session.classCode}
-          </AppText>
+          <View style={styles.whiteStatusPill}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: badge.dotColor },
+              ]}
+            />
+            <AppText variant="caption" weight="semibold" color={Colors.text}>
+              {badge.label}
+            </AppText>
+          </View>
         </View>
 
-        <AppText variant="hero" color={Colors.textWhite} style={styles.heroTitle}>
-          {session.courseName}
-        </AppText>
-        {session.assistantName ? (
-          <AppText variant="bodySm" color={Colors.textWhiteMuted}>
-            Asisten: {session.assistantName}
-          </AppText>
-        ) : null}
-
-        <View style={styles.heroDivider} />
-
-        <View style={styles.heroFooter}>
-          <View style={styles.timeInfo}>
-            <Icon name="time-outline" size={16} color={Colors.textWhiteMuted} />
+        {/* Main Row: White Rounded-Square Icon Box + Title & Assistant */}
+        <View style={styles.heroMainRow}>
+          <View style={styles.heroIconBox}>
+            <Icon name="time-outline" size={24} color={Colors.primary} />
+          </View>
+          <View style={styles.heroTitleCol}>
             <AppText
-              variant="caption"
-              color={Colors.textWhiteMuted}
-              style={styles.timeText}
+              variant="h2"
+              weight="bold"
+              color={Colors.textWhite}
+              numberOfLines={2}
+              style={styles.heroTitle}
             >
+              {session.courseName}
+            </AppText>
+            {session.assistantName ? (
+              <AppText variant="caption" color={Colors.textWhiteMuted}>
+                Asisten: {session.assistantName}
+              </AppText>
+            ) : null}
+          </View>
+        </View>
+
+        {/* 3-Column Metadata Row with Vertical Dividers (Cotap Reference) */}
+        <View style={styles.heroStatsRow}>
+          <View style={styles.heroStatCol}>
+            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+              Waktu Sesi
+            </AppText>
+            <AppText variant="caption" color={Colors.textWhiteMuted}>
               {session.timeSlot}
             </AppText>
           </View>
-          {onPress ? (
-            <CustomButton
-              title={attended ? 'Lihat Bukti' : 'Presensi'}
-              onPress={onPress}
-              variant="secondary"
-              size="sm"
-              fullWidth={false}
-            />
-          ) : null}
+
+          <View style={styles.heroVerticalDivider} />
+
+          <View style={styles.heroStatCol}>
+            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+              Ruangan
+            </AppText>
+            <View style={styles.statValueRow}>
+              <Icon name="location-outline" size={12} color={Colors.textWhiteMuted} />
+              <AppText
+                variant="caption"
+                color={Colors.textWhiteMuted}
+                numberOfLines={1}
+                style={styles.statValueText}
+              >
+                {session.room}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.heroVerticalDivider} />
+
+          <View style={styles.heroStatCol}>
+            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+              Kelas
+            </AppText>
+            <AppText variant="caption" color={Colors.textWhiteMuted}>
+              Kelas {session.classCode}
+            </AppText>
+          </View>
         </View>
+
+        {/* Full-Width Frosted Glass Pill Action Button (Cotap Reference) */}
+        {onPress ? (
+          <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+              styles.glassPillButton,
+              pressed && styles.glassPillButtonPressed,
+            ]}
+          >
+            <AppText variant="bodySm" weight="semibold" color={Colors.textWhite}>
+              {attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang'}
+            </AppText>
+            <Icon
+              name="play"
+              size={13}
+              color={Colors.textWhite}
+              style={styles.glassPillIcon}
+            />
+          </Pressable>
+        ) : null}
       </Card>
     );
   }
@@ -167,30 +242,83 @@ const styles = StyleSheet.create({
   },
   heroHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
+  whiteStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: Spacing.xs + 2,
+  },
+  heroMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  heroIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  heroTitleCol: {
+    flex: 1,
+  },
   heroTitle: {
-    marginBottom: Spacing.xs,
-    fontSize: 24,
+    marginBottom: 2,
+    lineHeight: 24,
   },
-  heroDivider: {
-    height: 1,
-    backgroundColor: Colors.midnightBorder,
-    marginVertical: Spacing.md,
-  },
-  heroFooter: {
+  heroStatsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: Spacing.lg,
   },
-  timeInfo: {
+  heroStatCol: {
+    flex: 1,
+    gap: 2,
+  },
+  heroVerticalDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.midnightBorder,
+    marginHorizontal: Spacing.sm,
+  },
+  statValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  timeText: {
-    marginLeft: Spacing.xs,
+  statValueText: {
+    marginLeft: 3,
+  },
+  glassPillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.glassOverlay,
+    borderWidth: 1,
+    borderColor: Colors.glassHighlight,
+  },
+  glassPillButtonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
+  },
+  glassPillIcon: {
+    marginLeft: Spacing.sm,
   },
   card: {
     marginBottom: Spacing.md,
@@ -221,4 +349,3 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
 });
-

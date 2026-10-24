@@ -1,26 +1,28 @@
 /**
  * Design System Tokens (owner: Bayu)
- * Royal Violet & Midnight Cotap Theme with WCAG AA compliance.
+ * Royal Indigo-Violet & Cotap Midnight Theme with WCAG AA compliance.
  * Import from here instead of hardcoding raw values.
  */
 
 export const Colors = {
-  // Brand - Royal & Midnight Violet (Cotap aesthetic)
-  primary: '#6D28D9',
-  primaryDark: '#4C1D95',
-  primaryLight: '#7C3AED',
+  // Brand - Royal Indigo-Violet (Cotap aesthetic)
+  primary: '#5838DF',
+  primaryDark: '#371C96',
+  primaryLight: '#7C5CFF',
   primaryBg: '#EDE9FE',
   primaryBorder: '#DDD6FE',
   primaryGhost: '#F5F3FF',
   rippleOuter: '#F3E8FF',
   rippleMid: '#E9D5FF',
 
-  // Dark Hero & Glass surfaces
-  midnight: '#1E1035',
-  midnightSurface: '#2E1065',
-  midnightBorder: 'rgba(255, 255, 255, 0.16)',
-  glassHighlight: 'rgba(255, 255, 255, 0.22)',
-  glassOverlay: 'rgba(255, 255, 255, 0.08)',
+  // Dark Hero & Glass surfaces (Cotap gradient + top-left radial glow)
+  midnight: '#210F63',
+  midnightSurface: '#391E9E',
+  midnightBorder: 'rgba(255, 255, 255, 0.18)',
+  glassHighlight: 'rgba(255, 255, 255, 0.24)',
+  glassOverlay: 'rgba(255, 255, 255, 0.09)',
+  heroGradient:
+    'radial-gradient(circle at 16% 14%, rgba(196, 181, 253, 0.55) 0%, rgba(124, 92, 255, 0.28) 38%, transparent 70%), linear-gradient(135deg, #5B3BE8 0%, #391E9E 52%, #210F63 100%)',
 
   // Neutral Backgrounds & Surfaces
   background: '#F8FAFC',
@@ -34,12 +36,12 @@ export const Colors = {
   textMuted: '#64748B',
   textLight: '#94A3B8',
   textWhite: '#FFFFFF',
-  textWhiteMuted: 'rgba(255, 255, 255, 0.75)',
+  textWhiteMuted: 'rgba(255, 255, 255, 0.76)',
 
   // Borders & Dividers
   border: '#E2E8F0',
   borderLight: '#F1F5F9',
-  borderFocus: '#6D28D9',
+  borderFocus: '#5838DF',
 
   // Status & Badges (WCAG AA compliant contrast ratios >= 4.5:1)
   success: '#166534',
@@ -61,9 +63,10 @@ export const Colors = {
   // Floating tab bar
   tabBarBg: '#FFFFFF',
   tabBarBorder: '#E2E8F0',
-  tabBarActiveBg: '#6D28D9',
+  tabBarActiveBg: '#5838DF',
+  tabBarInactiveBg: '#F1F5F9',
   tabBarActiveTint: '#FFFFFF',
-  tabBarInactiveTint: '#64748B',
+  tabBarInactiveTint: '#334155',
 } as const;
 
 export const Typography = {
@@ -125,18 +128,18 @@ export const Shadows = {
     elevation: 3,
   },
   lg: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
+    shadowColor: '#210F63',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
     shadowRadius: 20,
     elevation: 6,
   },
   floatingNav: {
-    shadowColor: '#1E1035',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
   },
 } as const;
 
@@ -148,4 +151,3 @@ export const StatusLabel = {
   closed: 'Ditutup',
   attended: 'Sudah Hadir',
 } as const;
-
