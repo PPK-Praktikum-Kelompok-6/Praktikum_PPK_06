@@ -34,6 +34,18 @@ export function Card({
     style,
   ];
 
+  const content = (
+    <>
+      {variant === 'hero' ? (
+        <>
+          <View pointerEvents="none" style={styles.heroGlowPrimary} />
+          <View pointerEvents="none" style={styles.heroGlowHighlight} />
+        </>
+      ) : null}
+      {children}
+    </>
+  );
+
   if (onPress) {
     return (
       <Pressable
@@ -43,12 +55,12 @@ export function Card({
           pressed && styles.pressed,
         ]}
       >
-        {children}
+        {content}
       </Pressable>
     );
   }
 
-  return <View style={containerStyle}>{children}</View>;
+  return <View style={containerStyle}>{content}</View>;
 }
 
 const PADDING_STYLES = {
@@ -74,6 +86,7 @@ const VARIANT_STYLES = StyleSheet.create({
   },
   hero: {
     backgroundColor: Colors.midnight,
+    experimental_backgroundImage: Colors.heroGradient,
     borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: Colors.midnightBorder,
@@ -97,10 +110,28 @@ const VARIANT_STYLES = StyleSheet.create({
 const styles = StyleSheet.create({
   base: {
     overflow: 'hidden',
+    position: 'relative',
+  },
+  heroGlowPrimary: {
+    position: 'absolute',
+    top: -70,
+    left: -50,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(109, 72, 255, 0.42)',
+  },
+  heroGlowHighlight: {
+    position: 'absolute',
+    top: -35,
+    left: -20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(221, 214, 254, 0.22)',
   },
   pressed: {
     opacity: 0.92,
     transform: [{ scale: 0.99 }],
   },
 });
-

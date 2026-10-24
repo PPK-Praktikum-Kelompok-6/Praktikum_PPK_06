@@ -33,10 +33,12 @@ Dokumen ini merupakan panduan dan spesifikasi standar visual untuk seluruh anggo
 
 | Token | Hex / Nilai | Peruntukan |
 | :--- | :--- | :--- |
-| `Colors.midnight` | `#1E1035` | Background hero banner aktif, header gelap Cotap |
-| `Colors.midnightSurface`| `#2E1065` | Surface sekunder pada hero card |
-| `Colors.primary` | `#6D28D9` | Warna utama brand (Royal Violet 700), tombol aksi utama |
-| `Colors.primaryLight` | `#7C3AED` | Aksen terang (Violet 600), highlight interaktif |
+| `Colors.midnight` | `#210F63` | Background hero banner aktif (Cotap Deep Indigo) |
+| `Colors.midnightSurface`| `#391E9E` | Surface sekunder pada hero card |
+| `Colors.primary` | `#5838DF` | Warna utama brand (Electric Royal Indigo-Violet), tombol aksi utama |
+| `Colors.primaryDark` | `#371C96` | Aksen ungu-indigo pekat |
+| `Colors.primaryLight` | `#7C5CFF` | Aksen terang, highlight interaktif |
+| `Colors.heroGradient` | `radial-gradient(...) + linear-gradient(...)` | Gradasi Hero Card Cotap dengan spotlight glow di kiri atas |
 | `Colors.primaryBg` | `#EDE9FE` | Latar belakang tombol sekunder & badge lavender halus |
 | `Colors.primaryGhost` | `#F5F3FF` | Latar selang-seling item list |
 | `Colors.background` | `#F8FAFC` | Latar belakang utama aplikasi (Slate 50) |
@@ -179,12 +181,13 @@ import { Icon } from '@/components/ui/Icon';
 
 ---
 
-## 4. Pola Navigasi Floating Pill (`src/app/student/(tabs)/_layout.tsx`)
+## 4. Pola Navigasi Compact Floating Pill (`src/components/ui/FloatingTabBar.tsx`)
 
-Tab bar praktikan menggunakan spesifikasi kapsul melayang:
-- **Posisi:** `absolute`, `bottom: 24`, `left: 24`, `right: 24`, `height: 64`.
-- **Indikator Tab Aktif:** Lingkaran ungu penuh (`width: 44, height: 44, borderRadius: 22, backgroundColor: #6D28D9`) dengan ikon putih di dalamnya.
-- **Indikator Tab Tidak Aktif:** Ikon slate muted (`#64748B`) tanpa label teks berlebih demi tampilan modern dan ramping.
+Tab bar menggunakan komponen `FloatingTabBar` yang lebarnya otomatis mengikuti jumlah menu:
+- **Posisi:** `position: 'absolute'`, `bottom: Math.max(insets.bottom, 16)`, `alignItems: 'center'`.
+- **Lebar Kapsul:** Otomatis membungkus jumlah item menu (`flexDirection: 'row'`, `padding: 6`, `gap: 8`, `borderRadius: 999`), tidak melebar penuh satu layar.
+- **Indikator Tab Aktif:** Lingkaran ungu solid (`48×48`, `borderRadius: 24`, `backgroundColor: #5838DF`) dengan ikon putih di tengahnya.
+- **Indikator Tab Tidak Aktif:** Lingkaran abu lembut (`48×48`, `backgroundColor: #F1F5F9`) dengan ikon slate gelap (`#334155`).
 
 ---
 
