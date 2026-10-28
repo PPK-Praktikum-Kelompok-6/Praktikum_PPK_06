@@ -6,24 +6,23 @@ import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
+import { PracticalSession, SessionStatus } from '@/types/attendance';
 
-export type SessionCardStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
+export type SessionCardStatus = SessionStatus;
 
-export interface SessionCardData {
-  id: string;
-  courseName: string;
-  classCode: string;
-  room: string;
-  timeSlot: string;
-  date: string; // ISO string or "YYYY-MM-DD"
-  status: SessionCardStatus;
+export type SessionCardData = Pick<
+  PracticalSession,
+  'id' | 'courseName' | 'classCode' | 'room' | 'timeSlot' | 'date' | 'status'
+> & {
   assistantName?: string;
-}
+  totalStudents?: number;
+};
 
 export interface SessionCardProps {
   session: SessionCardData;
   attended?: boolean;
   variant?: 'default' | 'hero';
+  actionLabel?: string;
   onPress?: () => void;
 }
 
@@ -81,9 +80,12 @@ export function SessionCard({
   session,
   attended = false,
   variant = 'default',
+  actionLabel,
   onPress,
 }: SessionCardProps) {
   const badge = resolveBadge(session.status, attended);
+  const resolvedActionLabel =
+    actionLabel ?? (attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang');
 
   if (variant === 'hero') {
     return (
@@ -106,7 +108,11 @@ export function SessionCard({
         {/* Main Row: White Rounded-Square Icon Box + Title & Assistant */}
         <View style={styles.heroMainRow}>
           <View style={styles.heroIconBox}>
-            <Icon name="time-outline" size={24} color={Colors.primary} />
+            <Icon
+              name={attended ? 'checkmark-done-outline' : 'time-outline'}
+              size={24}
+              color={Colors.primary}
+            />
           </View>
           <View style={styles.heroTitleCol}>
             <AppText
@@ -178,7 +184,7 @@ export function SessionCard({
             ]}
           >
             <AppText variant="bodySm" weight="semibold" color={Colors.textWhite}>
-              {attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang'}
+              {resolvedActionLabel}
             </AppText>
             <Icon
               name="play"

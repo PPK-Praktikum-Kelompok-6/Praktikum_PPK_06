@@ -32,9 +32,9 @@ Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, reusable com
   - `src/constants/theme.ts` (Design tokens: warna, spacing, radius)
   - `src/app/student/(tabs)/_layout.tsx` (Tab navigation shell praktikan)
 - **Checklist PR:**
-  - [ ] Seluruh komponen responsif menggunakan Flexbox di berbagai ukuran layar.
-  - [ ] Tab navigator praktikan dapat berpindah layar dengan lancar.
-  - [ ] Lolos typecheck (`npx tsc --noEmit`).
+  - [x] Seluruh komponen responsif menggunakan Flexbox di berbagai ukuran layar.
+  - [x] Tab navigator praktikan dapat berpindah layar dengan lancar.
+  - [x] Lolos typecheck (`npx tsc --noEmit`).
 
 ### 📌 PR 2 (Bayu) — Modul Jadwal & Detail Sesi Praktikan
 - **Nama Branch:** `feat/bayu/student-session-explorer`
@@ -45,11 +45,11 @@ Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, reusable com
   - `src/app/student/(tabs)/index.tsx` (Daftar sesi praktikum peserta yang disaring)
   - `src/features/sessions/components/SessionCard.tsx` (Kartu sesi praktikum untuk praktikan)
 - **Checklist PR:**
-  - [ ] Menampilkan daftar sesi praktikum secara interaktif dari data Context.
-  - [ ] Menampilkan status badge sesi (Belum Dimulai, Dibuka, Selesai).
-  - [ ] Integrasi navigasi dari kartu sesi menuju halaman presensi praktikan.
-  - [ ] Menampilkan `EmptyState` jika tidak ada sesi yang terjadwal.
-  - [ ] Lolos typecheck (`npx tsc --noEmit`).
+  - [x] Menampilkan daftar sesi praktikum secara interaktif dari data Context.
+  - [x] Menampilkan status badge sesi (Belum Dimulai, Dibuka, Selesai).
+  - [x] Integrasi navigasi dari kartu sesi menuju halaman presensi praktikan.
+  - [x] Menampilkan `EmptyState` jika tidak ada sesi yang terjadwal.
+  - [x] Lolos typecheck (`npx tsc --noEmit`).
 
 ---
 
@@ -101,13 +101,13 @@ const { sessions, getSessionById } = useSessions(); // Daftar sesi & fungsi deta
 
 ## 4. Checklist Eksekusi Step-by-Step
 
-- [ ] **Langkah 1**: Buat branch `feat/bayu/ui-components-nav` dari `dev`.
-- [ ] **Langkah 2**: Buat komponen dasar di `src/components/ui/` (`CustomButton.tsx`, `Card.tsx`, `EmptyState.tsx`, `FeedbackModal.tsx`) dan lengkapi `src/constants/theme.ts`.
-- [ ] **Langkah 3**: Setup rute navigasi tab di `src/app/student/(tabs)/_layout.tsx` (Tab 1: Jadwal Sesi, Tab 2: Riwayat Presensi).
-- [ ] **Langkah 4**: Jalankan `npx tsc --noEmit` & ajukan **PR 1 Bayu** ke branch `dev`.
-- [ ] **Langkah 5**: Buat branch `feat/bayu/student-session-explorer` dari `dev` terbaru.
-- [ ] **Langkah 6**: Buat komponen `SessionCard.tsx` di `src/features/sessions/components/` untuk merepresentasikan detail sesi, badge status, dan tombol aksi menuju presensi.
-- [ ] **Langkah 7**: Buat halaman `src/app/student/(tabs)/index.tsx` untuk menampilkan daftar sesi praktikum dari `useSessions()`.
-- [ ] **Langkah 8**: Sambungkan kartu sesi dengan routing navigasi ke `/student/attendance/[id]` (modul yang dikembangkan oleh Bahir).
-- [ ] **Langkah 9**: Tampilkan `EmptyState` jika daftar sesi praktikum kosong.
-- [ ] **Langkah 10**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bayu** ke branch `dev`.
+- [x] **Langkah 1**: Buat branch `feat/bayu/ui-components-nav` dari `dev`.
+- [x] **Langkah 2**: Buat komponen dasar di `src/components/ui/` (`CustomButton.tsx`, `Card.tsx`, `EmptyState.tsx`, `FeedbackModal.tsx`) dan lengkapi `src/constants/theme.ts`.
+- [x] **Langkah 3**: Setup rute navigasi tab di `src/app/student/(tabs)/_layout.tsx` (Tab 1: Jadwal Sesi, Tab 2: Riwayat Presensi).
+- [x] **Langkah 4**: Jalankan `npx tsc --noEmit` & ajukan **PR 1 Bayu** ke branch `dev`.
+- [x] **Langkah 5**: Buat branch `feat/bayu/student-session-explorer` dari `dev` terbaru.
+- [x] **Langkah 6**: Buat komponen `SessionCard.tsx` di `src/features/sessions/components/` untuk merepresentasikan detail sesi, badge status, dan tombol aksi menuju presensi.
+- [x] **Langkah 7**: Buat halaman `src/app/student/(tabs)/index.tsx` untuk menampilkan daftar sesi praktikum dari `useSessions()`.
+- [x] **Langkah 8**: Sambungkan kartu sesi dengan routing navigasi ke `/student/attendance/[id]` (modul yang dikembangkan oleh Bahir).
+- [x] **Langkah 9**: Tampilkan `EmptyState` jika daftar sesi praktikum kosong.
+- [x] **Langkah 10**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bayu** ke branch `dev`.

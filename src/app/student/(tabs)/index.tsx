@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -7,106 +7,163 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import {
-  SessionCard,
-  SessionCardData,
-} from '@/features/sessions/components/SessionCard';
+import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
+import { SessionCard } from '@/features/sessions/components/SessionCard';
+import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+import { SessionStatus, UserProfile } from '@/types/attendance';
 
-// Preview sessions until Zaidan's store hooks (useSessions) are merged into dev.
-const PREVIEW_SESSIONS: SessionCardData[] = [
-  {
-    id: 'session-1',
-    courseName: 'Pemrograman Web & Mobile',
-    classCode: 'C1',
-    room: 'Lab Komputer 2',
-    timeSlot: '08.00 - 10.00 WIB',
-    date: '2026-10-23T08:00:00.000Z',
-    status: 'OPEN',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-  },
-  {
-    id: 'session-2',
-    courseName: 'Struktur Data & Algoritma',
-    classCode: 'B2',
-    room: 'Lab Komputer 1',
-    timeSlot: '13.00 - 15.00 WIB',
-    date: '2026-10-26T13:00:00.000Z',
-    status: 'NOT_STARTED',
-    assistantName: 'Crystiano Bayu',
-  },
-  {
-    id: 'session-3',
-    courseName: 'Basis Data Lanjut',
-    classCode: 'A1',
-    room: 'Lab Basis Data',
-    timeSlot: '10.00 - 12.00 WIB',
-    date: '2026-10-21T10:00:00.000Z',
-    status: 'CLOSED',
-    assistantName: 'Bahir Ananda',
-  },
-];
+type FilterOption = 'ALL' | SessionStatus;
 
 export default function StudentScheduleRoute() {
-  const activeSession = PREVIEW_SESSIONS.find((s) => s.status === 'OPEN');
-  const otherSessions = PREVIEW_SESSIONS.filter((s) => s.id !== activeSession?.id);
+  const { currentUser } = useCurrentUser();
+  const { sessions } = useSessions();
+  const { isAlreadyAttended } = useAttendance();
+
+  const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
+  const [roleModalVisible, setRoleModalVisible] = useState(false);
+
+  const filteredSessions = sessions.filter((s) => {
+    if (activeFilter === 'ALL') return true;
+    return s.status === activeFilter;
+  });
+
+  const activeSession = filteredSessions.find((s) => s.status === 'OPEN');
+  const otherSessions = filteredSessions.filter(
+    (s) => s.id !== activeSession?.id
+  );
 
   const handleOpenSession = (sessionId: string) => {
     router.push(`/student/attendance/${sessionId}` as Href);
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 350);
+  };
+
+  const handleUserSelected = (user: UserProfile) => {
+    if (user.role === 'ASSISTANT') {
+      router.replace('/assistant' as Href);
+    }
+  };
+
   return (
-    <Screen withBottomNavPadding>
+    <Screen
+      withBottomNavPadding
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+      {/* Header Greeting */}
       <View style={styles.header}>
-        <View>
-          <AppText variant="caption" color={Colors.textMuted}>
+        <View style={styles.headerInfo}>
+          <AppText variant="caption" color={Colors.textMuted} weight="semibold">
             JADWAL PRAKTIKUM
           </AppText>
-          <AppText variant="h1" style={styles.title}>
-            Halo, Praktikan 👋
+          <AppText variant="h1" numberOfLines={1} style={styles.title}>
+            Halo, {currentUser.name.split(' ')[0]} 👋
+          </AppText>
+          <AppText variant="caption" color={Colors.primary} weight="semibold">
+            Praktikan • {currentUser.identifier}
           </AppText>
         </View>
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => setRoleModalVisible(true)}
           accessibilityRole="button"
-          accessibilityLabel="Ganti peran"
+          accessibilityLabel="Ganti profil atau peran"
           style={styles.avatar}
         >
           <Icon name="person" size={20} color={Colors.primary} />
         </Pressable>
       </View>
 
-      {PREVIEW_SESSIONS.length === 0 ? (
+      {/* Filter Chips */}
+      <View style={styles.filterRow}>
+        {(
+          [
+            { key: 'ALL', label: 'Semua' },
+            { key: 'OPEN', label: 'Dibuka' },
+            { key: 'NOT_STARTED', label: 'Belum Mulai' },
+            { key: 'CLOSED', label: 'Ditutup' },
+          ] as const
+        ).map((item) => {
+          const isActive = activeFilter === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => setActiveFilter(item.key)}
+            >
+              <AppText
+                variant="caption"
+                weight={isActive ? 'semibold' : 'regular'}
+                color={isActive ? Colors.textWhite : Colors.textSecondary}
+              >
+                {item.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {filteredSessions.length === 0 ? (
         <EmptyState
           title="Belum Ada Sesi"
-          message="Saat ini belum ada jadwal sesi praktikum yang terdaftar."
+          message={
+            activeFilter === 'ALL'
+              ? 'Saat ini belum ada jadwal sesi praktikum yang terdaftar.'
+              : 'Tidak ada sesi praktikum dengan status ini.'
+          }
           iconName="calendar-outline"
+          actionLabel={activeFilter !== 'ALL' ? 'Lihat Semua' : undefined}
+          onAction={
+            activeFilter !== 'ALL' ? () => setActiveFilter('ALL') : undefined
+          }
         />
       ) : (
         <>
           {activeSession ? (
             <SessionCard
               session={activeSession}
+              attended={isAlreadyAttended(activeSession.id, currentUser.id)}
               variant="hero"
               onPress={() => handleOpenSession(activeSession.id)}
             />
           ) : null}
 
-          <View style={styles.sectionHeader}>
-            <AppText variant="title">Semua Jadwal Sesi</AppText>
-            <AppText variant="caption" color={Colors.primary}>
-              {PREVIEW_SESSIONS.length} Sesi
-            </AppText>
-          </View>
+          {otherSessions.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <AppText variant="title">Semua Jadwal Sesi</AppText>
+                <AppText
+                  variant="caption"
+                  color={Colors.primary}
+                  weight="semibold"
+                >
+                  {filteredSessions.length} Sesi
+                </AppText>
+              </View>
 
-          {otherSessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              onPress={() => handleOpenSession(session.id)}
-            />
-          ))}
+              {otherSessions.map((session) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  attended={isAlreadyAttended(session.id, currentUser.id)}
+                  onPress={() => handleOpenSession(session.id)}
+                />
+              ))}
+            </>
+          ) : null}
         </>
       )}
+
+      <RoleSelectorModal
+        visible={roleModalVisible}
+        onClose={() => setRoleModalVisible(false)}
+        onUserSelected={handleUserSelected}
+      />
     </Screen>
   );
 }
@@ -116,11 +173,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     paddingTop: Spacing.xs,
+  },
+  headerInfo: {
+    flex: 1,
+    marginRight: Spacing.sm,
   },
   title: {
     marginTop: 2,
+    marginBottom: 2,
   },
   avatar: {
     width: 44,
@@ -129,6 +191,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryBg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginBottom: Spacing.lg,
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary,
   },
   sectionHeader: {
     flexDirection: 'row',
