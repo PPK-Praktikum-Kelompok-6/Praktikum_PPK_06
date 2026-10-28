@@ -3,7 +3,7 @@
 > Single source of truth for project structure and code rules. `README.md` and `AGENTS.md` only point here.
 > If you want to change the structure, update this file in the same PR.
 
-**Stack:** Expo SDK 57 · Expo Router · React Native 0.86 · TypeScript (strict)
+**Stack:** Expo SDK 58 · Expo Router · React Native 0.88 · TypeScript (strict)
 **Approach:** pragmatic feature-based (Bulletproof React) + thin routes (Expo Router). Not full Clean Architecture; see [§8 Why](#8-why-this-structure).
 
 ---
