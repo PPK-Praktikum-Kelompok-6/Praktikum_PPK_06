@@ -19,5 +19,5 @@ export function Icon({
   color = Colors.text,
   style,
 }: IconProps) {
-  return <Ionicons name={name} size={size} color={color} style={style} />;
+  return <Ionicons name={name} size={size} color={color as string} style={style} />;
 }
