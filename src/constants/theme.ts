@@ -1,6 +1,6 @@
 /**
  * Design System Tokens (owner: Bayu)
- * Royal Indigo-Violet & Cotap Midnight Theme with WCAG AA compliance.
+ * Royal Indigo-Violet & Cotap Midnight Theme with Frosted Glassmorphism & WCAG AA compliance.
  * Import from here instead of hardcoding raw values.
  */
 
@@ -19,13 +19,23 @@ export const Colors = {
   midnight: '#210F63',
   midnightSurface: '#391E9E',
   midnightBorder: 'rgba(255, 255, 255, 0.18)',
-  glassHighlight: 'rgba(255, 255, 255, 0.24)',
-  glassOverlay: 'rgba(255, 255, 255, 0.09)',
+  glassHighlight: 'rgba(255, 255, 255, 0.28)',
+  glassOverlay: 'rgba(255, 255, 255, 0.10)',
   heroGradient:
     'radial-gradient(circle at 16% 14%, rgba(196, 181, 253, 0.55) 0%, rgba(124, 92, 255, 0.28) 38%, transparent 70%), linear-gradient(135deg, #5B3BE8 0%, #391E9E 52%, #210F63 100%)',
 
+  // Light Frosted Glassmorphism tokens
+  glassSurface: 'rgba(255, 255, 255, 0.72)',
+  glassSurfaceStrong: 'rgba(255, 255, 255, 0.84)',
+  glassBorder: 'rgba(255, 255, 255, 0.88)',
+  glassPillTint: 'rgba(255, 255, 255, 0.54)',
+  glassInactiveCircle: 'rgba(255, 255, 255, 0.52)',
+  glassActiveBorder: 'rgba(255, 255, 255, 0.36)',
+  ambientViolet: 'rgba(124, 92, 255, 0.13)',
+  ambientIndigo: 'rgba(88, 56, 223, 0.09)',
+
   // Neutral Backgrounds & Surfaces
-  background: '#F8FAFC',
+  background: '#F4F3FA',
   surface: '#FFFFFF',
   surfaceSecondary: '#F1F5F9',
   surfaceMuted: '#E2E8F0',
@@ -36,7 +46,7 @@ export const Colors = {
   textMuted: '#64748B',
   textLight: '#94A3B8',
   textWhite: '#FFFFFF',
-  textWhiteMuted: 'rgba(255, 255, 255, 0.76)',
+  textWhiteMuted: 'rgba(255, 255, 255, 0.78)',
 
   // Borders & Dividers
   border: '#E2E8F0',
@@ -60,13 +70,13 @@ export const Colors = {
   infoBg: '#DBEAFE',
   infoBorder: '#93C5FD',
 
-  // Floating tab bar
-  tabBarBg: '#FFFFFF',
-  tabBarBorder: '#E2E8F0',
+  // Floating tab bar (Frosted Glass)
+  tabBarBg: 'rgba(255, 255, 255, 0.58)',
+  tabBarBorder: 'rgba(255, 255, 255, 0.90)',
   tabBarActiveBg: '#5838DF',
-  tabBarInactiveBg: '#F1F5F9',
+  tabBarInactiveBg: 'rgba(255, 255, 255, 0.55)',
   tabBarActiveTint: '#FFFFFF',
-  tabBarInactiveTint: '#334155',
+  tabBarInactiveTint: '#1E293B',
 } as const;
 
 export const Typography = {
@@ -114,17 +124,17 @@ export const Shadows = {
     elevation: 0,
   },
   sm: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#210F63',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 6,
     elevation: 1,
   },
   md: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#210F63',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowRadius: 14,
     elevation: 3,
   },
   lg: {
@@ -135,11 +145,11 @@ export const Shadows = {
     elevation: 6,
   },
   floatingNav: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowColor: '#210F63',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 10,
   },
 } as const;
 

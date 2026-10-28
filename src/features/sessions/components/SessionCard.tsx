@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -132,10 +133,10 @@ export function SessionCard({
           </View>
         </View>
 
-        {/* 3-Column Metadata Row with Vertical Dividers (Cotap Reference) */}
-        <View style={styles.heroStatsRow}>
+        {/* 3-Column Frosted Glass Metadata Panel (Cotap Reference) */}
+        <View style={styles.heroGlassStatsPanel}>
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Waktu Sesi
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
@@ -146,7 +147,7 @@ export function SessionCard({
           <View style={styles.heroVerticalDivider} />
 
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Ruangan
             </AppText>
             <View style={styles.statValueRow}>
@@ -165,7 +166,7 @@ export function SessionCard({
           <View style={styles.heroVerticalDivider} />
 
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Kelas
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
@@ -183,6 +184,12 @@ export function SessionCard({
               pressed && styles.glassPillButtonPressed,
             ]}
           >
+            <BlurView
+              intensity={28}
+              tint="light"
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+            />
             <AppText variant="bodySm" weight="semibold" color={Colors.textWhite}>
               {resolvedActionLabel}
             </AppText>
@@ -286,10 +293,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     lineHeight: 24,
   },
-  heroStatsRow: {
+  heroGlassStatsPanel: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: Colors.glassOverlay,
+    borderWidth: 1,
+    borderColor: Colors.midnightBorder,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
     marginBottom: Spacing.lg,
   },
   heroStatCol: {
@@ -313,11 +326,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    height: 46,
     borderRadius: Radius.full,
     backgroundColor: Colors.glassOverlay,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: Colors.glassHighlight,
+    overflow: 'hidden',
   },
   glassPillButtonPressed: {
     opacity: 0.85,
@@ -338,6 +352,8 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,

@@ -184,6 +184,14 @@ export default function UIGalleryRoute() {
           </AppText>
         </Card>
 
+        {/* Glass Card */}
+        <Card variant="glass" padding="md" style={styles.cardItem}>
+          <AppText variant="title">Frosted Glass Card (BlurView)</AppText>
+          <AppText variant="bodySm" color={Colors.textSecondary}>
+            Permukaan kaca buram (native BlurView) dengan specular white border highlight.
+          </AppText>
+        </Card>
+
         {/* Default Card */}
         <Card variant="default" padding="md" style={styles.cardItem}>
           <AppText variant="title">Default Surface Card</AppText>

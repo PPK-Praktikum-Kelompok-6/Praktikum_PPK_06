@@ -22,8 +22,8 @@ export interface ScreenProps {
   onRefresh?: () => void;
 }
 
-// 80px clearance accounts for floating tab bar height (64px) + bottom gap (16px)
-const FLOATING_NAV_HEIGHT = 80;
+// 84px clearance accounts for floating tab bar height (64px) + bottom gap (20px)
+const FLOATING_NAV_HEIGHT = 84;
 
 export function Screen({
   children,
@@ -40,12 +40,20 @@ export function Screen({
     ? FLOATING_NAV_HEIGHT + insets.bottom
     : insets.bottom;
 
+  const ambientBackground = (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={styles.ambientOrbTopRight} />
+      <View style={styles.ambientOrbMiddleLeft} />
+    </View>
+  );
+
   if (scroll) {
     return (
       <SafeAreaView
         edges={['top', 'left', 'right']}
         style={[styles.container, { backgroundColor }, style]}
       >
+        {ambientBackground}
         <ScrollView
           style={styles.container}
           contentContainerStyle={[
@@ -80,6 +88,7 @@ export function Screen({
         style,
       ]}
     >
+      {ambientBackground}
       <View style={[styles.staticContent, contentContainerStyle]}>
         {children}
       </View>
@@ -91,6 +100,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  ambientOrbTopRight: {
+    position: 'absolute',
+    top: -60,
+    right: -70,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: Colors.ambientViolet,
+  },
+  ambientOrbMiddleLeft: {
+    position: 'absolute',
+    top: 260,
+    left: -90,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: Colors.ambientIndigo,
+  },
   scrollContent: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
@@ -101,4 +128,3 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
   },
 });
-

@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import {
   Pressable,
@@ -42,6 +43,14 @@ export function Card({
           <View pointerEvents="none" style={styles.heroGlowHighlight} />
         </>
       ) : null}
+      {variant === 'glass' ? (
+        <BlurView
+          intensity={55}
+          tint="light"
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       {children}
     </>
   );
@@ -72,10 +81,10 @@ const PADDING_STYLES = {
 
 const VARIANT_STYLES = StyleSheet.create({
   default: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glassSurfaceStrong,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
     ...Shadows.sm,
   },
   flat: {
@@ -99,11 +108,11 @@ const VARIANT_STYLES = StyleSheet.create({
     borderColor: Colors.primaryBorder,
   },
   glass: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: Colors.glassSurface,
     borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    ...Shadows.sm,
+    borderWidth: 1.2,
+    borderColor: Colors.glassBorder,
+    ...Shadows.md,
   },
 });
 

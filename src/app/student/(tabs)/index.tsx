@@ -6,7 +6,7 @@ import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
@@ -188,9 +188,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryBg,
+    backgroundColor: Colors.glassSurface,
+    borderWidth: 1.2,
+    borderColor: Colors.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.sm,
   },
   filterRow: {
     flexDirection: 'row',
@@ -199,12 +202,15 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.xs + 2,
     borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.glassSurface,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   sectionHeader: {
     flexDirection: 'row',

@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import {
   Modal,
@@ -46,6 +47,12 @@ export function FeedbackModal({
       onRequestClose={onClose || onPrimary}
     >
       <View style={styles.backdrop}>
+        <BlurView
+          intensity={35}
+          tint="dark"
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose || onPrimary}
@@ -122,7 +129,7 @@ const TYPE_CONFIG: Record<
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.lg,
@@ -130,8 +137,10 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glassSurfaceStrong,
     borderRadius: Radius.xl,
+    borderWidth: 1.2,
+    borderColor: Colors.glassBorder,
     padding: Spacing.xl,
     alignItems: 'center',
     ...Shadows.lg,
@@ -159,4 +168,3 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
 });
-

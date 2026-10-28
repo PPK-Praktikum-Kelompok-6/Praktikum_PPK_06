@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,8 +11,8 @@ export type FloatingTabBarProps = Parameters<
 >[0];
 
 /**
- * Compact Floating Pill Navbar (auto-width hugging the number of menu items).
- * Properly offsets iOS home indicator outside the capsule so icons stay centered.
+ * Compact Frosted-Glass Floating Pill Navbar (auto-width hugging the number of menu items).
+ * Uses native BlurView + specular glass border so content scrolling underneath blurs smoothly.
  */
 export function FloatingTabBar({
   state,
@@ -27,48 +28,56 @@ export function FloatingTabBar({
       pointerEvents="box-none"
       style={[styles.wrapper, { bottom: bottomOffset }]}
     >
-      <View style={styles.pill}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const focused = state.index === index;
+      <View style={styles.shadowContainer}>
+        <BlurView intensity={70} tint="light" style={styles.blurCapsule}>
+          <View style={styles.pillInner}>
+            {state.routes.map((route, index) => {
+              const { options } = descriptors[route.key];
+              const focused = state.index === index;
 
-          const onPress = () => {
-            const event = emitter.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
+              const onPress = () => {
+                const event = emitter.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
 
-            if (!focused && !event.defaultPrevented) {
-              navigateToTab(route.key);
-            }
-          };
+                if (!focused && !event.defaultPrevented) {
+                  navigateToTab(route.key);
+                }
+              };
 
-          const iconColor = focused
-            ? Colors.tabBarActiveTint
-            : Colors.tabBarInactiveTint;
+              const iconColor = focused
+                ? Colors.tabBarActiveTint
+                : Colors.tabBarInactiveTint;
 
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? options.title ?? route.name}
-              onPress={onPress}
-              style={({ pressed }) => [
-                styles.circle,
-                focused ? styles.circleActive : styles.circleInactive,
-                pressed && styles.circlePressed,
-              ]}
-            >
-              {options.tabBarIcon?.({
-                focused,
-                color: iconColor,
-                size: 22,
-              })}
-            </Pressable>
-          );
-        })}
+              return (
+                <Pressable
+                  key={route.key}
+                  accessibilityRole="button"
+                  accessibilityState={focused ? { selected: true } : {}}
+                  accessibilityLabel={
+                    options.tabBarAccessibilityLabel ??
+                    options.title ??
+                    route.name
+                  }
+                  onPress={onPress}
+                  style={({ pressed }) => [
+                    styles.circle,
+                    focused ? styles.circleActive : styles.circleInactive,
+                    pressed && styles.circlePressed,
+                  ]}
+                >
+                  {options.tabBarIcon?.({
+                    focused,
+                    color: iconColor,
+                    size: 22,
+                  })}
+                </Pressable>
+              );
+            })}
+          </View>
+        </BlurView>
       </View>
     </View>
   );
@@ -82,16 +91,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pill: {
+  shadowContainer: {
+    borderRadius: Radius.full,
+    ...Shadows.floatingNav,
+  },
+  blurCapsule: {
+    borderRadius: Radius.full,
+    overflow: 'hidden',
+  },
+  pillInner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.tabBarBg,
     borderRadius: Radius.full,
     padding: 6,
     gap: Spacing.sm,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: Colors.tabBarBorder,
-    ...Shadows.floatingNav,
   },
   circle: {
     width: 48,
@@ -99,16 +115,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   circleActive: {
     backgroundColor: Colors.tabBarActiveBg,
+    borderColor: Colors.glassActiveBorder,
   },
   circleInactive: {
     backgroundColor: Colors.tabBarInactiveBg,
+    borderColor: Colors.glassBorder,
   },
   circlePressed: {
     opacity: 0.85,
     transform: [{ scale: 0.94 }],
   },
 });
-
