@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Image,
   RefreshControl,
   ScrollView,
   StyleProp,
@@ -9,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, GradientMeshes, Spacing } from '@/constants/theme';
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -42,8 +43,16 @@ export function Screen({
 
   const ambientBackground = (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={styles.ambientOrbTopRight} />
-      <View style={styles.ambientOrbMiddleLeft} />
+      <Image
+        source={GradientMeshes.pastel}
+        resizeMode="contain"
+        style={styles.ambientMeshTopRight}
+      />
+      <Image
+        source={GradientMeshes.indigo}
+        resizeMode="contain"
+        style={styles.ambientMeshBottom}
+      />
     </View>
   );
 
@@ -100,23 +109,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  ambientOrbTopRight: {
+  ambientMeshTopRight: {
     position: 'absolute',
-    top: -60,
+    top: -70,
     right: -70,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: Colors.ambientViolet,
+    width: 320,
+    height: 320,
+    opacity: 0.42,
   },
-  ambientOrbMiddleLeft: {
+  ambientMeshBottom: {
     position: 'absolute',
-    top: 260,
-    left: -90,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: Colors.ambientIndigo,
+    bottom: -60,
+    alignSelf: 'center',
+    width: 320,
+    height: 320,
+    opacity: 0.34,
   },
   scrollContent: {
     paddingHorizontal: Spacing.md,

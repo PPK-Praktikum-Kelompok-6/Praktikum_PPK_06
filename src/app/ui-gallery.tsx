@@ -1,6 +1,6 @@
 import { Href, Redirect, router } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -8,11 +8,26 @@ import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
-import { Icon } from '@/components/ui/Icon';
+import { GestureIcon, Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { RippleCheckIn } from '@/components/ui/RippleCheckIn';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
+import {
+  Colors,
+  GradientMeshes,
+  GradientMeshName,
+  GradientShapeName,
+  GradientShapes,
+  HandGestureIcons,
+  HandGestureName,
+  Radius,
+  Spacing,
+  StatusLabel,
+} from '@/constants/theme';
+
+const MESH_KEYS = Object.keys(GradientMeshes) as GradientMeshName[];
+const SHAPE_KEYS = Object.keys(GradientShapes) as GradientShapeName[];
+const GESTURE_KEYS = Object.keys(HandGestureIcons) as HandGestureName[];
 
 export default function UIGalleryRoute() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -147,7 +162,7 @@ export default function UIGalleryRoute() {
           2. Interactive Concentric Ripple Check-In
         </AppText>
         <AppText variant="caption" color={Colors.textMuted} style={styles.sectionDesc}>
-          Diadopsi dari referensi Mobbins/Cotap untuk pengalaman presensi yang taktil.
+          Diadopsi dari referensi Mobbins/Cotap dengan ikon gestur tangan (tapRing).
         </AppText>
         <Card variant="flat" padding="lg" style={styles.rippleCard}>
           <RippleCheckIn
@@ -346,6 +361,68 @@ export default function UIGalleryRoute() {
         </Card>
       </View>
 
+      {/* Section 9: Visual Assets (Grads Soft Mesh, Grads V2 Shapes & Hand-Gest Icons) */}
+      <View style={styles.section}>
+        <AppText variant="h2" style={styles.sectionTitle}>
+          9. Visual Assets & Gesture Icons
+        </AppText>
+        <AppText variant="caption" color={Colors.textMuted} style={styles.sectionDesc}>
+          Token GradientMeshes, GradientShapes (Grads V2), dan HandGestureIcons (Hand-Gest).
+        </AppText>
+
+        <AppText variant="bodySm" weight="semibold" style={styles.subAssetTitle}>
+          A. Soft Mesh Gradients (GradientMeshes)
+        </AppText>
+        <View style={styles.assetGrid}>
+          {MESH_KEYS.map((key) => (
+            <View key={key} style={styles.assetCard}>
+              <Image
+                source={GradientMeshes[key]}
+                style={styles.assetThumb}
+                resizeMode="cover"
+              />
+              <AppText variant="caption" weight="medium">
+                {key}
+              </AppText>
+            </View>
+          ))}
+        </View>
+
+        <AppText variant="bodySm" weight="semibold" style={styles.subAssetTitle}>
+          B. Grainy 2D Shapes (GradientShapes - Grads V2)
+        </AppText>
+        <View style={styles.assetGrid}>
+          {SHAPE_KEYS.map((key) => (
+            <View key={key} style={styles.assetCard}>
+              <Image
+                source={GradientShapes[key]}
+                style={styles.assetThumb}
+                resizeMode="contain"
+              />
+              <AppText variant="caption" weight="medium">
+                {key}
+              </AppText>
+            </View>
+          ))}
+        </View>
+
+        <AppText variant="bodySm" weight="semibold" style={styles.subAssetTitle}>
+          C. Hand Gesture Icons (GestureIcon - Hand-Gest)
+        </AppText>
+        <View style={styles.gestureGrid}>
+          {GESTURE_KEYS.map((key) => (
+            <View key={key} style={styles.gestureItem}>
+              <View style={styles.gestureIconBox}>
+                <GestureIcon name={key} size={28} color={Colors.primary} />
+              </View>
+              <AppText variant="caption" color={Colors.textSecondary}>
+                {key}
+              </AppText>
+            </View>
+          ))}
+        </View>
+      </View>
+
       {/* Feedback Modal Instance */}
       <FeedbackModal
         visible={modalVisible}
@@ -439,5 +516,54 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     marginBottom: Spacing.xs,
+  },
+  subAssetTitle: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  assetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  assetCard: {
+    width: '31%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.xs,
+    alignItems: 'center',
+  },
+  assetThumb: {
+    width: 68,
+    height: 68,
+    borderRadius: Radius.sm,
+    marginBottom: 4,
+  },
+  gestureGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  gestureItem: {
+    width: '31%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    alignItems: 'center',
+  },
+  gestureIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
 });

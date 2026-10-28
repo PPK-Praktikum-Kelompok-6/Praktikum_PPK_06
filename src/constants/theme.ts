@@ -15,14 +15,14 @@ export const Colors = {
   rippleOuter: '#F3E8FF',
   rippleMid: '#E9D5FF',
 
-  // Dark Hero & Glass surfaces (Cotap gradient + top-left radial glow)
+  // Dark Hero & Glass surfaces (Cotap gradient + smooth non-black radial stops)
   midnight: '#210F63',
   midnightSurface: '#391E9E',
   midnightBorder: 'rgba(255, 255, 255, 0.18)',
   glassHighlight: 'rgba(255, 255, 255, 0.28)',
   glassOverlay: 'rgba(255, 255, 255, 0.10)',
   heroGradient:
-    'radial-gradient(circle at 16% 14%, rgba(196, 181, 253, 0.55) 0%, rgba(124, 92, 255, 0.28) 38%, transparent 70%), linear-gradient(135deg, #5B3BE8 0%, #391E9E 52%, #210F63 100%)',
+    'radial-gradient(circle at 14% 12%, rgba(221, 214, 254, 0.62) 0%, rgba(167, 139, 250, 0.36) 32%, rgba(109, 40, 217, 0.14) 58%, rgba(52, 25, 150, 0) 82%), linear-gradient(135deg, #4C2BE0 0%, #341996 52%, #1E0E5C 100%)',
 
   // Light Frosted Glassmorphism tokens
   glassSurface: 'rgba(255, 255, 255, 0.72)',
@@ -161,3 +161,36 @@ export const StatusLabel = {
   closed: 'Ditutup',
   attended: 'Sudah Hadir',
 } as const;
+
+export const GradientMeshes = {
+  violet: require('../../assets/images/gradients/mesh-violet-v2.png'),
+  indigo: require('../../assets/images/gradients/mesh-indigo.png'),
+  pastel: require('../../assets/images/gradients/mesh-pastel.png'),
+  emerald: require('../../assets/images/gradients/mesh-emerald.png'),
+} as const;
+
+export const GradientShapes = {
+  heroBlob: require('../../assets/images/shapes/grad-01-hero-v2.png'),
+  warningBean: require('../../assets/images/shapes/grad-03-warning.png'),
+  droplet: require('../../assets/images/shapes/grad-04-droplet.png'),
+  spark: require('../../assets/images/shapes/grad-10-spark.png'),
+  sphere: require('../../assets/images/shapes/grad-15-sphere.png'),
+  successWave: require('../../assets/images/shapes/grad-16-success.png'),
+} as const;
+
+export const HandGestureIcons = {
+  raiseHand: require('../../assets/images/gestures/hand-gestures-01.png'),
+  tapRing: require('../../assets/images/gestures/hand-gestures-04.png'),
+  swipeDown: require('../../assets/images/gestures/hand-gestures-10.png'),
+  tapBurst: require('../../assets/images/gestures/hand-gestures-25.png'),
+  peace: require('../../assets/images/gestures/hand-gestures-26.png'),
+  palmScan: require('../../assets/images/gestures/hand-gestures-38.png'),
+  handTimer: require('../../assets/images/gestures/hand-gestures-41.png'),
+  handLocked: require('../../assets/images/gestures/hand-gestures-42.png'),
+  thumbsUp: require('../../assets/images/gestures/hand-gestures-43.png'),
+  handBlocked: require('../../assets/images/gestures/hand-gestures-50.png'),
+} as const;
+
+export type GradientMeshName = keyof typeof GradientMeshes;
+export type GradientShapeName = keyof typeof GradientShapes;
+export type HandGestureName = keyof typeof HandGestureIcons;

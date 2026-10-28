@@ -6,13 +6,25 @@ import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import {
+  Colors,
+  HandGestureName,
+  Radius,
+  Shadows,
+  Spacing,
+} from '@/constants/theme';
 import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { SessionStatus, UserProfile } from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
+
+function resolveEmptyGesture(filter: FilterOption): HandGestureName {
+  if (filter === 'NOT_STARTED') return 'handTimer';
+  if (filter === 'CLOSED') return 'handLocked';
+  return 'peace';
+}
 
 export default function StudentScheduleRoute() {
   const { currentUser } = useCurrentUser();
@@ -116,7 +128,7 @@ export default function StudentScheduleRoute() {
               ? 'Saat ini belum ada jadwal sesi praktikum yang terdaftar.'
               : 'Tidak ada sesi praktikum dengan status ini.'
           }
-          iconName="calendar-outline"
+          gestureName={resolveEmptyGesture(activeFilter)}
           actionLabel={activeFilter !== 'ALL' ? 'Lihat Semua' : undefined}
           onAction={
             activeFilter !== 'ALL' ? () => setActiveFilter('ALL') : undefined

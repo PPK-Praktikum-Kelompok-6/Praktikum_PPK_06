@@ -1,6 +1,7 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import {
+  Image,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -8,7 +9,14 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import {
+  Colors,
+  GradientMeshes,
+  GradientShapes,
+  Radius,
+  Shadows,
+  Spacing,
+} from '@/constants/theme';
 
 export type CardVariant = 'default' | 'flat' | 'hero' | 'accent' | 'glass';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
@@ -39,8 +47,18 @@ export function Card({
     <>
       {variant === 'hero' ? (
         <>
-          <View pointerEvents="none" style={styles.heroGlowPrimary} />
-          <View pointerEvents="none" style={styles.heroGlowHighlight} />
+          <Image
+            source={GradientMeshes.violet}
+            pointerEvents="none"
+            resizeMode="contain"
+            style={styles.heroMeshGlow}
+          />
+          <Image
+            source={GradientShapes.heroBlob}
+            pointerEvents="none"
+            resizeMode="contain"
+            style={styles.heroCornerBlob}
+          />
         </>
       ) : null}
       {variant === 'glass' ? (
@@ -94,11 +112,9 @@ const VARIANT_STYLES = StyleSheet.create({
     borderColor: Colors.border,
   },
   hero: {
-    backgroundColor: Colors.midnight,
+    backgroundColor: Colors.midnightSurface,
     experimental_backgroundImage: Colors.heroGradient,
     borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.midnightBorder,
     ...Shadows.lg,
   },
   accent: {
@@ -121,23 +137,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
-  heroGlowPrimary: {
+  heroMeshGlow: {
     position: 'absolute',
-    top: -70,
-    left: -50,
+    top: -65,
+    left: -55,
+    width: 290,
+    height: 290,
+    opacity: 0.62,
+  },
+  heroCornerBlob: {
+    position: 'absolute',
+    bottom: -65,
+    right: -45,
     width: 240,
     height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(109, 72, 255, 0.42)',
-  },
-  heroGlowHighlight: {
-    position: 'absolute',
-    top: -35,
-    left: -20,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(221, 214, 254, 0.22)',
+    opacity: 0.58,
   },
   pressed: {
     opacity: 0.92,

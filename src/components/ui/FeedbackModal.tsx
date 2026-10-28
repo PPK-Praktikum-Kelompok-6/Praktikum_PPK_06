@@ -1,16 +1,24 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import {
+  Colors,
+  GradientMeshes,
+  HandGestureName,
+  Radius,
+  Shadows,
+  Spacing,
+} from '@/constants/theme';
 import { AppText } from './AppText';
 import { CustomButton } from './CustomButton';
-import { Icon, IconName } from './Icon';
+import { GestureIcon } from './Icon';
 
 export type FeedbackType = 'success' | 'error' | 'warning' | 'info';
 
@@ -58,13 +66,23 @@ export function FeedbackModal({
           onPress={onClose || onPrimary}
         />
         <View style={styles.sheet}>
+          <Image
+            source={GradientMeshes.pastel}
+            pointerEvents="none"
+            resizeMode="cover"
+            style={styles.sheetMeshGlow}
+          />
           <View
             style={[
               styles.iconWrapper,
               { backgroundColor: config.iconBg },
             ]}
           >
-            <Icon name={config.iconName} size={32} color={config.iconColor} />
+            <GestureIcon
+              name={config.gestureName}
+              size={32}
+              color={config.iconColor}
+            />
           </View>
 
           <AppText variant="h2" align="center" style={styles.title}>
@@ -102,25 +120,25 @@ export function FeedbackModal({
 
 const TYPE_CONFIG: Record<
   FeedbackType,
-  { iconName: IconName; iconColor: string; iconBg: string }
+  { gestureName: HandGestureName; iconColor: string; iconBg: string }
 > = {
   success: {
-    iconName: 'checkmark-circle',
+    gestureName: 'thumbsUp',
     iconColor: Colors.success,
     iconBg: Colors.successBg,
   },
   error: {
-    iconName: 'alert-circle',
+    gestureName: 'handBlocked',
     iconColor: Colors.danger,
     iconBg: Colors.dangerBg,
   },
   warning: {
-    iconName: 'warning',
+    gestureName: 'handTimer',
     iconColor: Colors.warning,
     iconBg: Colors.warningBg,
   },
   info: {
-    iconName: 'information-circle',
+    gestureName: 'raiseHand',
     iconColor: Colors.info,
     iconBg: Colors.infoBg,
   },
@@ -143,7 +161,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.glassBorder,
     padding: Spacing.xl,
     alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
     ...Shadows.lg,
+  },
+  sheetMeshGlow: {
+    position: 'absolute',
+    top: -70,
+    right: -60,
+    width: 220,
+    height: 220,
+    opacity: 0.42,
   },
   iconWrapper: {
     width: 64,

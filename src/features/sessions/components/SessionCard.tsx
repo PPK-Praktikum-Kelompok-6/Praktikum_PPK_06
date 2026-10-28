@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
+import { GestureIcon, Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 import { PracticalSession, SessionStatus } from '@/types/attendance';
 
@@ -109,9 +109,9 @@ export function SessionCard({
         {/* Main Row: White Rounded-Square Icon Box + Title & Assistant */}
         <View style={styles.heroMainRow}>
           <View style={styles.heroIconBox}>
-            <Icon
-              name={attended ? 'checkmark-done-outline' : 'time-outline'}
-              size={24}
+            <GestureIcon
+              name={attended ? 'raiseHand' : 'tapRing'}
+              size={26}
               color={Colors.primary}
             />
           </View>
