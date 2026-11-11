@@ -108,42 +108,18 @@ export default function RoleSelectRoute() {
           }
         />
 
-        <CustomButton
-          title={
-            isAssistant
-              ? 'Beralih Lihat Tampilan Praktikan'
-              : 'Beralih Lihat Tampilan Asisten'
-          }
-          onPress={() => {
-            if (isAssistant) {
+        {/* Hanya Asisten yang memiliki opsi pratinjau antarmuka praktikan. Praktikan dibatasi hanya dapat mengakses jadwal praktikan. */}
+        {isAssistant ? (
+          <CustomButton
+            title="Pratinjau Tampilan Praktikan"
+            onPress={() => {
               router.push('/student' as Href);
-            } else {
-              router.push('/assistant' as Href);
-            }
-          }}
-          variant="secondary"
-          size="md"
-        />
+            }}
+            variant="secondary"
+            size="md"
+          />
+        ) : null}
       </View>
-
-      {/* Design System & UI Gallery Card */}
-      <Card variant="hero" padding="md" style={styles.heroPreview}>
-        <AppText variant="caption" color={Colors.textWhiteMuted} weight="semibold">
-          DESIGN SYSTEM
-        </AppText>
-        <AppText variant="title" color={Colors.textWhite} style={styles.heroTitle}>
-          UI Component Gallery
-        </AppText>
-        <AppText variant="bodySm" color={Colors.textWhiteMuted} style={styles.heroSubtitle}>
-          Eksplorasi tema Royal Violet, Cotap Midnight, badge, dan modal feedback.
-        </AppText>
-        <CustomButton
-          title="Buka UI Gallery"
-          onPress={() => router.push('/ui-gallery')}
-          variant="secondary"
-          size="sm"
-        />
-      </Card>
 
       {/* Role Selector Modal */}
       <RoleSelectorModal
@@ -218,15 +194,5 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     marginBottom: Spacing.xxs,
-  },
-  heroPreview: {
-    marginBottom: Spacing.lg,
-  },
-  heroTitle: {
-    marginTop: Spacing.xxs,
-    marginBottom: Spacing.xxs,
-  },
-  heroSubtitle: {
-    marginBottom: Spacing.sm,
   },
 });

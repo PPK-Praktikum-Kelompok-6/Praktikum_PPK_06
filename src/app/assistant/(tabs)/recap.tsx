@@ -17,8 +17,23 @@ export default function AssistantRecapRoute() {
   const { sessions } = useSessions();
   const { attendanceRecords } = useAttendance();
 
+  // Batasan peran: Praktikan tidak boleh mengakses rekapitulasi asisten
+  if (currentUser.role !== 'ASSISTANT') {
+    return (
+      <Screen withBottomNavPadding>
+        <EmptyState
+          title="Akses Ditolak"
+          message="Halaman rekapitulasi ini khusus untuk Asisten Praktikum. Praktikan tidak memiliki izin untuk melihat rekap kelas."
+          iconName="lock-closed-outline"
+          actionLabel="Buka Jadwal Praktikan"
+          onAction={() => router.replace('/student' as Href)}
+        />
+      </Screen>
+    );
+  }
+
   const mySessions = sessions.filter(
-    (s) => s.assistantId === currentUser.id || currentUser.role !== 'ASSISTANT'
+    (s) => s.assistantId === currentUser.id
   );
 
   const totalSessions = mySessions.length;

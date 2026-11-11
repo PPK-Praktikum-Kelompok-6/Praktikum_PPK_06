@@ -59,7 +59,7 @@ export function AppProvider({ children }: AppProviderProps) {
 
   const openSession = (sessionId: string): boolean => {
     const session = getSessionById(sessionId);
-    const rule = canOpen(session);
+    const rule = canOpen(session, state.currentUser.role);
     if (!rule.allowed) {
       return false;
     }
@@ -69,7 +69,7 @@ export function AppProvider({ children }: AppProviderProps) {
 
   const closeSession = (sessionId: string): boolean => {
     const session = getSessionById(sessionId);
-    const rule = canClose(session);
+    const rule = canClose(session, state.currentUser.role);
     if (!rule.allowed) {
       return false;
     }

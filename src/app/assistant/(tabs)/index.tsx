@@ -18,9 +18,24 @@ export default function AssistantScheduleRoute() {
   const { sessions } = useSessions();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
 
+  // Batasan peran: Praktikan tidak boleh mengakses jadwal asisten
+  if (currentUser.role !== 'ASSISTANT') {
+    return (
+      <Screen withBottomNavPadding>
+        <EmptyState
+          title="Akses Ditolak"
+          message="Halaman ini khusus untuk Asisten Praktikum. Anda terdaftar sebagai Praktikan dan tidak memiliki izin mengakses tampilan ini."
+          iconName="lock-closed-outline"
+          actionLabel="Buka Jadwal Praktikan"
+          onAction={() => router.replace('/student' as Href)}
+        />
+      </Screen>
+    );
+  }
+
   // Filter sesi yang diampu oleh asisten yang sedang aktif
   const mySessions = sessions.filter(
-    (s) => s.assistantId === currentUser.id || currentUser.role !== 'ASSISTANT'
+    (s) => s.assistantId === currentUser.id
   );
 
   const displayedSessions = mySessions.filter((s) => {

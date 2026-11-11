@@ -1,10 +1,18 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 
 import { FloatingTabBar } from '@/components/ui/FloatingTabBar';
 import { Icon } from '@/components/ui/Icon';
+import { useCurrentUser } from '@/store/hooks';
 
 export default function AssistantTabsLayout() {
+  const { currentUser } = useCurrentUser();
+
+  // Batasan Keamanan & Peran: Praktikan dilarang keras mengakses tampilan asisten
+  if (currentUser.role !== 'ASSISTANT') {
+    return <Redirect href="/student" />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
