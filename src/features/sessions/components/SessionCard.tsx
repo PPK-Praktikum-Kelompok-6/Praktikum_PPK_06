@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { GestureIcon, Icon } from '@/components/ui/Icon';
+import { GestureIcon, Icon, IconName } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 import { PracticalSession, SessionStatus } from '@/types/attendance';
 
@@ -24,6 +24,7 @@ export interface SessionCardProps {
   attended?: boolean;
   variant?: 'default' | 'hero';
   actionLabel?: string;
+  actionIcon?: IconName;
   onPress?: () => void;
 }
 
@@ -82,6 +83,7 @@ export function SessionCard({
   attended = false,
   variant = 'default',
   actionLabel,
+  actionIcon = 'play',
   onPress,
 }: SessionCardProps) {
   const badge = resolveBadge(session.status, attended);
@@ -194,7 +196,7 @@ export function SessionCard({
               {resolvedActionLabel}
             </AppText>
             <Icon
-              name="play"
+              name={actionIcon}
               size={13}
               color={Colors.textWhite}
               style={styles.glassPillIcon}

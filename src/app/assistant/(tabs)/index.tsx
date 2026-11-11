@@ -112,6 +112,8 @@ export default function AssistantScheduleRoute() {
               key={session.id}
               session={session}
               variant={session.status === 'OPEN' ? 'hero' : 'default'}
+              actionLabel="Kelola Sesi"
+              actionIcon="arrow-forward"
               onPress={() => handleOpenDetail(session.id)}
             />
           ))}
