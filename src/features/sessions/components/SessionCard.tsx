@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, IconName } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 
 export type SessionCardStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
@@ -24,6 +24,8 @@ export interface SessionCardProps {
   session: SessionCardData;
   attended?: boolean;
   variant?: 'default' | 'hero';
+  actionLabel?: string;
+  actionIcon?: IconName;
   onPress?: () => void;
 }
 
@@ -81,6 +83,8 @@ export function SessionCard({
   session,
   attended = false,
   variant = 'default',
+  actionLabel,
+  actionIcon = 'play',
   onPress,
 }: SessionCardProps) {
   const badge = resolveBadge(session.status, attended);
@@ -178,10 +182,10 @@ export function SessionCard({
             ]}
           >
             <AppText variant="bodySm" weight="semibold" color={Colors.textWhite}>
-              {attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang'}
+              {actionLabel ?? (attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang')}
             </AppText>
             <Icon
-              name="play"
+              name={actionIcon}
               size={13}
               color={Colors.textWhite}
               style={styles.glassPillIcon}
