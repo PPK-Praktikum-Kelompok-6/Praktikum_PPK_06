@@ -17,6 +17,7 @@ export type SessionCardData = Pick<
 > & {
   assistantName?: string;
   totalStudents?: number;
+  description?: string;
 };
 
 export interface SessionCardProps {

@@ -59,7 +59,7 @@ export const MOCK_SESSIONS: PracticalSession[] = [
     room: 'Lab Komputer 2',
     timeSlot: '08.00 - 10.00 WIB',
     date: '2026-10-25T08:00:00.000Z',
-    status: 'OPEN',
+    status: 'NOT_STARTED',
     assistantId: 'ast-1',
     assistantName: 'Muhammad Zaidan Alfarizi',
     totalStudents: 30,
@@ -91,23 +91,6 @@ export const MOCK_SESSIONS: PracticalSession[] = [
 ];
 
 export const MOCK_ATTENDANCE_RECORDS: AttendanceRecord[] = [
-  {
-    id: 'att-1',
-    sessionId: 'session-1',
-    studentId: 'std-2',
-    studentName: 'Ahmad Dahlan',
-    studentNim: '24060124140101',
-    timestamp: '2026-10-25T08:15:32.000Z',
-    notes: 'Hadir tepat waktu',
-  },
-  {
-    id: 'att-2',
-    sessionId: 'session-1',
-    studentId: 'std-3',
-    studentName: 'Siti Nurhaliza',
-    studentNim: '24060124140102',
-    timestamp: '2026-10-25T08:18:10.000Z',
-  },
   {
     id: 'att-3',
     sessionId: 'session-3',

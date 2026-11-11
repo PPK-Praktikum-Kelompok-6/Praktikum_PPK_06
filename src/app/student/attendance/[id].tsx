@@ -199,6 +199,20 @@ export default function StudentAttendanceDetailRoute() {
               </View>
             </View>
           </View>
+
+          {session.description ? (
+            <View style={styles.descriptionContainer}>
+              <Icon name="document-text-outline" size={16} color={Colors.primary} />
+              <View style={styles.descriptionContent}>
+                <AppText variant="caption" color={Colors.textMuted} weight="bold">
+                  DESKRIPSI / TOPIK
+                </AppText>
+                <AppText variant="bodySm" color={Colors.textSecondary}>
+                  {session.description}
+                </AppText>
+              </View>
+            </View>
+          ) : null}
         </View>
       </Card>
 
@@ -296,6 +310,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  descriptionContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  descriptionContent: {
+    flex: 1,
+    gap: 2,
   },
   contentSection: {
     marginBottom: Spacing.xl,

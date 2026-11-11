@@ -3,20 +3,49 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { useCurrentUser, useSessions } from '@/store/hooks';
-import { SessionStatus } from '@/types/attendance';
+import { CreateSessionInput, SessionStatus } from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
 
 export default function AssistantScheduleRoute() {
   const { currentUser } = useCurrentUser();
-  const { sessions } = useSessions();
+  const { sessions, addSession } = useSessions();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
+
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [feedbackState, setFeedbackState] = useState<{
+    visible: boolean;
+    type: FeedbackType;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
+
+  const handleCreateSession = (input: CreateSessionInput) => {
+    const res = addSession(input);
+    if (res.success) {
+      setFeedbackState({
+        visible: true,
+        type: 'success',
+        title: 'Praktikum Ditambahkan!',
+        message: `Sesi ${input.courseName} (${input.classCode || 'A1'}) berhasil dijadwalkan di ${input.room}.`,
+      });
+    }
+    return res;
+  };
 
   // Batasan peran: Praktikan tidak boleh mengakses jadwal asisten
   if (currentUser.role !== 'ASSISTANT') {
@@ -102,6 +131,26 @@ export default function AssistantScheduleRoute() {
         })}
       </View>
 
+      {/* Section Header with Add Practical Button */}
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleGroup}>
+          <AppText variant="title">Daftar Sesi Praktikum</AppText>
+          <AppText variant="caption" color={Colors.textMuted}>
+            {displayedSessions.length} Sesi Terdaftar
+          </AppText>
+        </View>
+
+        <CustomButton
+          title="Tambah Sesi"
+          size="sm"
+          variant="primary"
+          fullWidth={false}
+          style={styles.addButton}
+          icon={<Icon name="add" size={16} color={Colors.textWhite} />}
+          onPress={() => setCreateModalVisible(true)}
+        />
+      </View>
+
       {/* Session List / Empty State */}
       {displayedSessions.length === 0 ? (
         <EmptyState
@@ -112,16 +161,11 @@ export default function AssistantScheduleRoute() {
               : 'Tidak ada sesi praktikum dengan status ini.'
           }
           iconName="calendar-outline"
+          actionLabel="Tambah Sesi Praktikum Baru"
+          onAction={() => setCreateModalVisible(true)}
         />
       ) : (
         <View style={styles.sessionList}>
-          <View style={styles.sectionHeader}>
-            <AppText variant="title">Daftar Sesi Praktikum</AppText>
-            <AppText variant="caption" color={Colors.primary} weight="semibold">
-              {displayedSessions.length} Sesi
-            </AppText>
-          </View>
-
           {displayedSessions.map((session) => (
             <SessionCard
               key={session.id}
@@ -134,6 +178,24 @@ export default function AssistantScheduleRoute() {
           ))}
         </View>
       )}
+
+      {/* Create Session Modal */}
+      <CreateSessionModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateSession}
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={feedbackState.visible}
+        type={feedbackState.type}
+        title={feedbackState.title}
+        message={feedbackState.message}
+        primaryLabel="Mengerti"
+        onPrimary={() => setFeedbackState((prev) => ({ ...prev, visible: false }))}
+        onClose={() => setFeedbackState((prev) => ({ ...prev, visible: false }))}
+      />
     </Screen>
   );
 }
@@ -181,6 +243,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
+  },
+  sectionTitleGroup: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  addButton: {
+    flexShrink: 0,
   },
   sessionList: {
     paddingBottom: Spacing.xl,

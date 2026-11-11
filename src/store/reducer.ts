@@ -14,6 +14,7 @@ export type AppAction =
   | { type: 'SET_CURRENT_USER'; payload: UserProfile }
   | { type: 'OPEN_SESSION'; payload: string }
   | { type: 'CLOSE_SESSION'; payload: string }
+  | { type: 'ADD_SESSION'; payload: PracticalSession }
   | { type: 'SUBMIT_ATTENDANCE'; payload: AttendanceRecord };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -22,6 +23,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         currentUser: action.payload,
+      };
+
+    case 'ADD_SESSION':
+      return {
+        ...state,
+        sessions: [action.payload, ...state.sessions],
       };
 
     case 'OPEN_SESSION':

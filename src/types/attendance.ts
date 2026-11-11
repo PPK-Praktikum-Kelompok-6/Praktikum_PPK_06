@@ -29,4 +29,15 @@ export interface PracticalSession {
   assistantId: string;
   assistantName: string;
   totalStudents: number;
+  description?: string;
+}
+
+export interface CreateSessionInput {
+  courseName: string;
+  classCode?: string;
+  room: string;
+  startTime: string;
+  endTime: string;
+  description?: string;
+  totalStudents?: number;
 }

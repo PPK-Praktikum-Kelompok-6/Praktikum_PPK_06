@@ -185,6 +185,15 @@ export default function AssistantSessionDetailRoute() {
               {session.assistantName}
             </AppText>
           </View>
+
+          {session.description ? (
+            <View style={styles.descriptionRow}>
+              <Icon name="document-text-outline" size={16} color={Colors.textWhiteMuted} />
+              <AppText variant="caption" color={Colors.textWhiteMuted} style={styles.descriptionText}>
+                {session.description}
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </Card>
 
@@ -318,6 +327,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  descriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    paddingTop: Spacing.xs,
+    marginTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.midnightBorder,
+  },
+  descriptionText: {
+    flex: 1,
+    lineHeight: 18,
   },
   controlCard: {
     marginBottom: Spacing.lg,

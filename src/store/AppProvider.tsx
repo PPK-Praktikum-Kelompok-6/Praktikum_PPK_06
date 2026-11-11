@@ -7,11 +7,14 @@ import {
 } from '@/data/mockData';
 import {
   AttendanceRecord,
+  CreateSessionInput,
   PracticalSession,
   UserProfile,
 } from '@/types/attendance';
 import { appReducer, AppState } from './reducer';
 import { canAttend, canClose, canOpen, isAlreadyAttended as checkAttended } from './rules';
+
+export { CreateSessionInput };
 
 export interface AppStoreContextType {
   currentUser: UserProfile;
@@ -21,6 +24,9 @@ export interface AppStoreContextType {
   attendanceRecords: AttendanceRecord[];
   openSession: (sessionId: string) => boolean;
   closeSession: (sessionId: string) => boolean;
+  addSession: (
+    input: CreateSessionInput
+  ) => { success: boolean; message: string; session?: PracticalSession };
   submitAttendance: (
     sessionId: string,
     student: UserProfile,
@@ -112,6 +118,48 @@ export function AppProvider({ children }: AppProviderProps) {
     };
   };
 
+  const addSession = (
+    input: CreateSessionInput
+  ): { success: boolean; message: string; session?: PracticalSession } => {
+    if (state.currentUser.role !== 'ASSISTANT') {
+      return {
+        success: false,
+        message: 'Hanya asisten yang memiliki wewenang untuk menambahkan sesi praktikum.',
+      };
+    }
+
+    if (!input.courseName.trim()) {
+      return { success: false, message: 'Nama mata kuliah wajib diisi.' };
+    }
+    if (!input.room.trim()) {
+      return { success: false, message: 'Ruangan Lab wajib diisi.' };
+    }
+    if (!input.startTime.trim() || !input.endTime.trim()) {
+      return { success: false, message: 'Waktu mulai dan selesai praktikum wajib diisi.' };
+    }
+
+    const newSession: PracticalSession = {
+      id: `session-${Date.now()}`,
+      courseName: input.courseName.trim(),
+      classCode: (input.classCode || 'A1').trim(),
+      room: input.room.trim(),
+      timeSlot: `${input.startTime.trim()} - ${input.endTime.trim()} WIB`,
+      date: new Date().toISOString(),
+      status: 'NOT_STARTED',
+      assistantId: state.currentUser.id,
+      assistantName: state.currentUser.name,
+      totalStudents: input.totalStudents ?? 30,
+      description: input.description?.trim() || undefined,
+    };
+
+    dispatch({ type: 'ADD_SESSION', payload: newSession });
+    return {
+      success: true,
+      message: 'Sesi praktikum berhasil ditambahkan dan siap dimulai!',
+      session: newSession,
+    };
+  };
+
   const getAttendanceBySession = (sessionId: string): AttendanceRecord[] => {
     return state.attendanceRecords.filter((rec) => rec.sessionId === sessionId);
   };
@@ -135,6 +183,7 @@ export function AppProvider({ children }: AppProviderProps) {
     attendanceRecords: state.attendanceRecords,
     openSession,
     closeSession,
+    addSession,
     submitAttendance,
     isAlreadyAttended,
     getSessionById,

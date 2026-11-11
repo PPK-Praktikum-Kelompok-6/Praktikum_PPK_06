@@ -32,6 +32,7 @@ export function useSessions() {
     getSessionById: store.getSessionById,
     openSession: store.openSession,
     closeSession: store.closeSession,
+    addSession: store.addSession,
   };
 }
 
