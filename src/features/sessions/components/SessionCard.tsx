@@ -1,24 +1,23 @@
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { Icon, IconName } from '@/components/ui/Icon';
+import { GestureIcon, Icon, IconName } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
+import { PracticalSession, SessionStatus } from '@/types/attendance';
 
-export type SessionCardStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
+export type SessionCardStatus = SessionStatus;
 
-export interface SessionCardData {
-  id: string;
-  courseName: string;
-  classCode: string;
-  room: string;
-  timeSlot: string;
-  date: string; // ISO string or "YYYY-MM-DD"
-  status: SessionCardStatus;
+export type SessionCardData = Pick<
+  PracticalSession,
+  'id' | 'courseName' | 'classCode' | 'room' | 'timeSlot' | 'date' | 'status'
+> & {
   assistantName?: string;
-}
+  totalStudents?: number;
+};
 
 export interface SessionCardProps {
   session: SessionCardData;
@@ -88,6 +87,8 @@ export function SessionCard({
   onPress,
 }: SessionCardProps) {
   const badge = resolveBadge(session.status, attended);
+  const resolvedActionLabel =
+    actionLabel ?? (attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang');
 
   if (variant === 'hero') {
     return (
@@ -110,7 +111,11 @@ export function SessionCard({
         {/* Main Row: White Rounded-Square Icon Box + Title & Assistant */}
         <View style={styles.heroMainRow}>
           <View style={styles.heroIconBox}>
-            <Icon name="time-outline" size={24} color={Colors.primary} />
+            <GestureIcon
+              name={attended ? 'raiseHand' : 'tapRing'}
+              size={26}
+              color={Colors.primary}
+            />
           </View>
           <View style={styles.heroTitleCol}>
             <AppText
@@ -130,10 +135,10 @@ export function SessionCard({
           </View>
         </View>
 
-        {/* 3-Column Metadata Row with Vertical Dividers (Cotap Reference) */}
-        <View style={styles.heroStatsRow}>
+        {/* 3-Column Frosted Glass Metadata Panel (Cotap Reference) */}
+        <View style={styles.heroGlassStatsPanel}>
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Waktu Sesi
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
@@ -144,7 +149,7 @@ export function SessionCard({
           <View style={styles.heroVerticalDivider} />
 
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Ruangan
             </AppText>
             <View style={styles.statValueRow}>
@@ -163,7 +168,7 @@ export function SessionCard({
           <View style={styles.heroVerticalDivider} />
 
           <View style={styles.heroStatCol}>
-            <AppText variant="caption" weight="medium" color={Colors.textWhite}>
+            <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
               Kelas
             </AppText>
             <AppText variant="caption" color={Colors.textWhiteMuted}>
@@ -181,8 +186,14 @@ export function SessionCard({
               pressed && styles.glassPillButtonPressed,
             ]}
           >
+            <BlurView
+              intensity={28}
+              tint="light"
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+            />
             <AppText variant="bodySm" weight="semibold" color={Colors.textWhite}>
-              {actionLabel ?? (attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang')}
+              {resolvedActionLabel}
             </AppText>
             <Icon
               name={actionIcon}
@@ -284,10 +295,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     lineHeight: 24,
   },
-  heroStatsRow: {
+  heroGlassStatsPanel: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: Colors.glassOverlay,
+    borderWidth: 1,
+    borderColor: Colors.midnightBorder,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
     marginBottom: Spacing.lg,
   },
   heroStatCol: {
@@ -311,11 +328,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    height: 46,
     borderRadius: Radius.full,
     backgroundColor: Colors.glassOverlay,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: Colors.glassHighlight,
+    overflow: 'hidden',
   },
   glassPillButtonPressed: {
     opacity: 0.85,
@@ -336,6 +354,8 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,

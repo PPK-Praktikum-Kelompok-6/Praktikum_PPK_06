@@ -1,9 +1,15 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { Colors, Shadows, Spacing } from '@/constants/theme';
+import {
+  Colors,
+  GradientShapes,
+  HandGestureName,
+  Shadows,
+  Spacing,
+} from '@/constants/theme';
 import { AppText } from './AppText';
-import { Icon } from './Icon';
+import { GestureIcon, Icon } from './Icon';
 
 export interface RippleCheckInProps {
   onPress: () => void;
@@ -12,6 +18,7 @@ export interface RippleCheckInProps {
   label?: string;
   checkedLabel?: string;
   helperText?: string;
+  gestureName?: HandGestureName;
 }
 
 export function RippleCheckIn({
@@ -21,37 +28,50 @@ export function RippleCheckIn({
   label = 'TAP PRESENSI',
   checkedLabel = 'TERPRESENSI',
   helperText,
+  gestureName = 'tapRing',
 }: RippleCheckInProps) {
   return (
     <View style={styles.wrapper}>
-      <View style={styles.rippleOuter}>
-        <View style={styles.rippleMid}>
-          <Pressable
-            onPress={onPress}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={checkedIn ? checkedLabel : label}
-            style={({ pressed }) => [
-              styles.rippleInner,
-              checkedIn && styles.rippleInnerSuccess,
-              disabled && styles.rippleInnerDisabled,
-              pressed && !disabled && styles.rippleInnerPressed,
-            ]}
-          >
-            <Icon
-              name={checkedIn ? 'checkmark' : 'finger-print-outline'}
-              size={36}
-              color={Colors.textWhite}
-            />
-            <AppText
-              variant="caption"
-              weight="bold"
-              color={Colors.textWhite}
-              style={styles.rippleText}
+      <View style={styles.rippleContainer}>
+        <Image
+          source={GradientShapes.sphere}
+          pointerEvents="none"
+          resizeMode="contain"
+          style={styles.sphereBackdrop}
+        />
+        <View style={styles.rippleOuter}>
+          <View style={styles.rippleMid}>
+            <Pressable
+              onPress={onPress}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={checkedIn ? checkedLabel : label}
+              style={({ pressed }) => [
+                styles.rippleInner,
+                checkedIn && styles.rippleInnerSuccess,
+                disabled && styles.rippleInnerDisabled,
+                pressed && !disabled && styles.rippleInnerPressed,
+              ]}
             >
-              {checkedIn ? checkedLabel : label}
-            </AppText>
-          </Pressable>
+              {checkedIn ? (
+                <Icon name="checkmark" size={36} color={Colors.textWhite} />
+              ) : (
+                <GestureIcon
+                  name={gestureName}
+                  size={36}
+                  color={Colors.textWhite}
+                />
+              )}
+              <AppText
+                variant="caption"
+                weight="bold"
+                color={Colors.textWhite}
+                style={styles.rippleText}
+              >
+                {checkedIn ? checkedLabel : label}
+              </AppText>
+            </Pressable>
+          </View>
         </View>
       </View>
       {helperText ? (
@@ -71,6 +91,19 @@ const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rippleContainer: {
+    width: 210,
+    height: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  sphereBackdrop: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    opacity: 0.34,
   },
   rippleOuter: {
     width: 170,
@@ -113,8 +146,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   helperText: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
     textAlign: 'center',
   },
 });
-

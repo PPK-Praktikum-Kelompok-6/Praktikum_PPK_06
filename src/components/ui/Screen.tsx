@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Image,
   RefreshControl,
   ScrollView,
   StyleProp,
@@ -9,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, GradientMeshes, Spacing } from '@/constants/theme';
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -22,8 +23,8 @@ export interface ScreenProps {
   onRefresh?: () => void;
 }
 
-// 80px clearance accounts for floating tab bar height (64px) + bottom gap (16px)
-const FLOATING_NAV_HEIGHT = 80;
+// 84px clearance accounts for floating tab bar height (64px) + bottom gap (20px)
+const FLOATING_NAV_HEIGHT = 84;
 
 export function Screen({
   children,
@@ -40,12 +41,28 @@ export function Screen({
     ? FLOATING_NAV_HEIGHT + insets.bottom
     : insets.bottom;
 
+  const ambientBackground = (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Image
+        source={GradientMeshes.pastel}
+        resizeMode="contain"
+        style={styles.ambientMeshTopRight}
+      />
+      <Image
+        source={GradientMeshes.indigo}
+        resizeMode="contain"
+        style={styles.ambientMeshBottom}
+      />
+    </View>
+  );
+
   if (scroll) {
     return (
       <SafeAreaView
         edges={['top', 'left', 'right']}
         style={[styles.container, { backgroundColor }, style]}
       >
+        {ambientBackground}
         <ScrollView
           style={styles.container}
           contentContainerStyle={[
@@ -80,6 +97,7 @@ export function Screen({
         style,
       ]}
     >
+      {ambientBackground}
       <View style={[styles.staticContent, contentContainerStyle]}>
         {children}
       </View>
@@ -91,6 +109,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  ambientMeshTopRight: {
+    position: 'absolute',
+    top: -70,
+    right: -70,
+    width: 320,
+    height: 320,
+    opacity: 0.42,
+  },
+  ambientMeshBottom: {
+    position: 'absolute',
+    bottom: -60,
+    alignSelf: 'center',
+    width: 320,
+    height: 320,
+    opacity: 0.34,
+  },
   scrollContent: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
@@ -101,4 +135,3 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
   },
 });
-

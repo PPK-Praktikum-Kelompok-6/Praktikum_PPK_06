@@ -6,7 +6,7 @@ Aplikasi mobile untuk mencatat kehadiran praktikum dengan dua peran:
 
 Sprint 1 memakai data dummy dan state lokal (belum ada database).
 
-**Stack:** Expo SDK 57 · Expo Router · React Native · TypeScript
+**Stack:** Expo SDK 58 · Expo Router · React Native · TypeScript
 
 ## Menjalankan
 
