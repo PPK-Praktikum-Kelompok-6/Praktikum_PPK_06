@@ -1,6 +1,7 @@
 import {
   AttendanceRecord,
   PracticalSession,
+  UserRole,
 } from '@/types/attendance';
 
 export interface RuleResult {
@@ -10,9 +11,18 @@ export interface RuleResult {
 
 /**
  * Pure business rule: Memeriksa apakah suatu sesi dapat dibuka oleh asisten.
- * Sesi hanya dapat dibuka jika statusnya saat ini 'NOT_STARTED'.
+ * Sesi hanya dapat dibuka jika statusnya saat ini 'NOT_STARTED' dan wewenang pengguna adalah 'ASSISTANT'.
  */
-export function canOpen(session: PracticalSession | undefined): RuleResult {
+export function canOpen(
+  session: PracticalSession | undefined,
+  userRole?: UserRole
+): RuleResult {
+  if (userRole && userRole !== 'ASSISTANT') {
+    return {
+      allowed: false,
+      reason: 'Hanya Asisten Praktikum yang berwenang membuka sesi praktikum.',
+    };
+  }
   if (!session) {
     return { allowed: false, reason: 'Sesi praktikum tidak ditemukan.' };
   }
@@ -30,9 +40,18 @@ export function canOpen(session: PracticalSession | undefined): RuleResult {
 
 /**
  * Pure business rule: Memeriksa apakah suatu sesi dapat ditutup oleh asisten.
- * Sesi hanya dapat ditutup jika statusnya saat ini 'OPEN'.
+ * Sesi hanya dapat ditutup jika statusnya saat ini 'OPEN' dan wewenang pengguna adalah 'ASSISTANT'.
  */
-export function canClose(session: PracticalSession | undefined): RuleResult {
+export function canClose(
+  session: PracticalSession | undefined,
+  userRole?: UserRole
+): RuleResult {
+  if (userRole && userRole !== 'ASSISTANT') {
+    return {
+      allowed: false,
+      reason: 'Hanya Asisten Praktikum yang berwenang menutup sesi praktikum.',
+    };
+  }
   if (!session) {
     return { allowed: false, reason: 'Sesi praktikum tidak ditemukan.' };
   }

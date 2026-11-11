@@ -17,10 +17,11 @@ import {
   SessionControlModal,
 } from '@/features/sessions/components/SessionControlModal';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
-import { useAttendance, useSessions } from '@/store/hooks';
+import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
 export default function AssistantSessionDetailRoute() {
+  const { currentUser } = useCurrentUser();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getSessionById, openSession, closeSession } = useSessions();
   const { getAttendanceBySession } = useAttendance();
@@ -32,6 +33,31 @@ export default function AssistantSessionDetailRoute() {
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('success');
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  // Batasan peran: Praktikan tidak boleh mengakses detail dan kontrol sesi asisten
+  if (currentUser.role !== 'ASSISTANT') {
+    return (
+      <Screen style={styles.container}>
+        <View style={styles.topNav}>
+          <Pressable
+            onPress={() => router.replace('/student')}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <Icon name="arrow-back" size={22} color={Colors.text} />
+          </Pressable>
+        </View>
+        <EmptyState
+          title="Akses Ditolak"
+          message="Halaman detail dan kontrol sesi ini hanya diperuntukkan bagi Asisten Praktikum. Praktikan tidak memiliki izin."
+          iconName="lock-closed-outline"
+          actionLabel="Kembali ke Jadwal Praktikan"
+          onAction={() => router.replace('/student')}
+        />
+      </Screen>
+    );
+  }
 
   const session = id ? getSessionById(id) : undefined;
   const attendanceRecords = id ? getAttendanceBySession(id) : [];
