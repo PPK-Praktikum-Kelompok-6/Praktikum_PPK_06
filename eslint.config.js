@@ -2,8 +2,8 @@
 const { defineConfig, globalIgnores } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 
-const features = ['role', 'sessions', 'attendance'];
-const shared = ['store', 'types', 'components', 'constants', 'utils', 'data'].map((d) => `./src/${d}`);
+const features = ['role', 'sessions', 'attendance', 'permits'];
+const shared = ['store', 'types', 'components', 'constants', 'utils', 'data', 'services'].map((d) => `./src/${d}`);
 
 module.exports = defineConfig([
   globalIgnores(['dist/*', '.expo/*']),
