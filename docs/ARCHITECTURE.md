@@ -185,16 +185,55 @@ sequenceDiagram
 
 ---
 
-## 7. Moving to a database (later sprints)
+## 7. Sprint 2 — Firebase Integration
 
-| Layer | Sprint 1 | With database | UI changes? |
-|---|---|---|---|
-| `data/` | `mockData.ts` | `services/` (API / Supabase / Firebase client) | no |
-| `store/` | in-memory reducer | calls services, adds `loading` / `error` | no |
-| `store/rules.ts` | pure rules | unchanged (server validates too) | no |
-| feature components | – | show loading / error states | minimal |
+> Sprint 1 code is **complete and must not be edited**. Sprint 2 adds new files alongside existing ones.
 
-Rules 4 and 5 make this possible. Components only talk to store hooks, so swapping the data source does not touch them.
+### New folders (Sprint 2 only)
+
+```
+src/
+├── services/                         # Firebase client calls — owned by Sprint 2 members
+│   ├── firebase.ts                   # Firebase app init (Bayu)
+│   ├── auth.ts                       # signIn, signUp, signOut, onAuthChange (Bayu)
+│   ├── sessions.ts                   # Firestore CRUD for sessions (Bayu)
+│   ├── attendance.ts                 # Firestore write/query for attendance (Bahir)
+│   └── permits.ts                    # Firestore CRUD for permit requests (Ferdy)
+├── types/
+│   └── permit.ts                     # PermitRequest, PermitStatus, AIClassification (Ferdy)
+└── features/
+    └── permits/components/           # PermitForm, PermitStatusCard, PermitReviewCard (Ferdy)
+```
+
+### New routes (Sprint 2 only)
+
+| Route | Purpose | Owner |
+|---|---|---|
+| `app/assistant/(tabs)/permits.tsx` | Daftar izin praktikan + Review asisten | Ferdy |
+| `app/student/(tabs)/permit.tsx` | Form pengajuan izin + Status | Ferdy |
+
+### Data flow Sprint 2
+
+```mermaid
+sequenceDiagram
+    participant UI as Component
+    participant SVC as services/
+    participant FB as Firebase
+    UI->>SVC: call service function
+    SVC->>FB: Firestore read/write or Auth
+    FB-->>SVC: snapshot / result
+    SVC-->>UI: typed data / error
+```
+
+`store/` hooks from Sprint 1 remain untouched. Sprint 2 screens call `services/` directly or via new hooks added to `hooks.ts` only if needed.
+
+### Ownership Sprint 2
+
+| Member | Files |
+|---|---|
+| **Bayu** | `services/firebase.ts`, `services/auth.ts`, `services/sessions.ts`, `app/index.tsx` (login screen), `app/assistant/(tabs)/_layout.tsx` (auth guard), `app/student/(tabs)/_layout.tsx` (auth guard) |
+| **Bahir** | `services/attendance.ts`, `app/assistant/session/[id].tsx` (real-time listener), `app/assistant/(tabs)/recap.tsx` (real-time), Firebase Security Rules config |
+| **Ferdy** | `services/permits.ts`, `types/permit.ts`, `features/permits/components/*`, `app/assistant/(tabs)/permits.tsx`, `app/student/(tabs)/permit.tsx` |
 
 ---
 

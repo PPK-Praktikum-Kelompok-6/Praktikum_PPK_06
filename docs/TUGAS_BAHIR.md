@@ -1,103 +1,118 @@
-# Panduan Pengerjaan Tugas Sprint 1 — Bahir Ananda Wibowo (24060124140184)
-## Role: Praktikan Workflow, Presensi Logic, Anti-Double Validation & History Record
+# Panduan Tugas — Bahir Ananda Wibowo (24060124150184)
+## Modul: Presensi, Sinkronisasi Real-Time, dan Keamanan Firestore (Sprint 2)
 
-> Dokumen ini dirancang khusus sebagai instruksi dan PRD teknis untuk Bahir Ananda Wibowo (dan AI Coding Assistant Bahir).
+> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG:**  
+> ⚠️ **Sprint 1 SELESAI & FREEZE:** Komponen tampilan form presensi (`AttendanceForm.tsx`, `AttendanceSuccessCard.tsx`, `HistoryItemCard.tsx`) sudah selesai dan **JANGAN DIBONGKAR ULANG**.  
+> Fokus Anda **HANYA** pada modul baru Sprint 2: Integrasi Firestore untuk Buka/Tutup Sesi, Presensi Anti-Bocor (Atomic Check), Real-Time Listener (`onSnapshot`), dan Firebase Security Rules.
 
 ---
 
-## 1. Product Requirements Document (PRD) — Ruang Lingkup Bahir
+## 1. Product Requirements Document (PRD) — Sprint 2 Bahir
 
-### 1.1 Objektif Utama
-Membangun alur kerja praktikan secara lengkap, mencakup halaman detail presensi interaktif, validasi pencegahan presensi ganda (*anti-double attendance*), modal konfirmasi umpan balik presensi, serta halaman riwayat/catatan kehadiran pribadi praktikan beserta kartu bukti presensi.
+### 1.1 Objektif
+Mengubah alur presensi dari *in-memory* menjadi *cloud-synced* berbasis Cloud Firestore. Memastikan asisten dapat membuka/menutup sesi dengan status yang langsung tersinkron ke semua perangkat, presensi praktikan diverifikasi secara aman tanpa duplikasi (*anti-bocor*), rekap kehadiran ter-update seketika (*real-time* tanpa refresh), dan akses data terlindungi dengan Firebase Security Rules.
 
 ### 1.2 User Stories & Pemetaan SRS
-- **Bahir - FR-05 :** Sebagai Praktikan, saya ingin mengisi dan mengirim formulir presensi saat sesi berstatus dibuka agar kehadiran saya tercatat pada sesi praktikum tersebut.
-- **Bahir - FR-06 :** Sebagai Praktikan, saya ingin sistem memvalidasi dan mencegah saya melakukan presensi lebih dari satu kali pada sesi yang sama agar tidak terjadi duplikasi data absensi.
-- **Bahir - FR-07 :** Sebagai Praktikan, saya ingin menerima umpan balik berupa modal/bottom sheet konfirmasi saat presensi berhasil dikirim beserta info waktu hadir agar saya yakin kehadiran telah tercatat.
-- **Bahir - FR-09 :** Sebagai Praktikan, saya ingin melihat daftar riwayat dan catatan kehadiran saya sendiri pada praktikum yang telah diikuti agar saya dapat mengecek histori absensi pribadi.
+- **SRS-PRES-01 :** Sebagai Asisten, saya dapat membuka dan menutup sesi praktikum agar praktikan dapat mulai melakukan presensi (status tersimpan di Firestore).
+- **SRS-PRES-02 :** Sebagai Praktikan, saya dapat melakukan presensi pada sesi yang sedang dibuka dan sistem akan memblokir upaya presensi lebih dari satu kali (*anti-bocor* via Firestore transaction/unique ID).
+- **SRS-SYNC-01 :** Sebagai Asisten, saya dapat melihat rekap kehadiran praktikan secara otomatis dan real-time di layar tanpa perlu memuat ulang aplikasi menggunakan *real-time listener* (`onSnapshot`).
+- **SRS-SEC-01 :** Sebagai sistem, saya menerapkan Firebase Security Rules agar akses dan perubahan data wajib dibatasi sesuai identitas dan peran.
 
 ---
 
-## 2. Rencana Git Branch & Pull Request (PR)
+## 2. File yang Dikerjakan Bahir (Sprint 2)
 
-### 📌 PR 1 (Bahir) — Form Presensi, Validasi & Modal Konfirmasi
-- **Nama Branch:** `feat/bahir/attendance-validation`
-- **Target Branch:** `dev`
-- **Judul PR:** `feat(student): attendance form, anti-double attendance validation, and confirmation modal`
-- **SRS Terkait:** `Bahir - FR-05`, `Bahir - FR-06`, `Bahir - FR-07`
-- **Ruang Lingkup Perubahan:**
-  - `src/app/student/attendance/[id].tsx` (Halaman detail dan form presensi praktikan)
-  - `src/features/attendance/components/AttendanceForm.tsx` (Formulir input kehadiran dan tombol submit)
-  - `src/features/attendance/components/AttendanceSuccessCard.tsx` (Kartu/banner bukti kehadiran)
-- **Checklist PR:**
-  - [ ] Validasi status sesi: form hanya aktif dan dapat disubmit jika status sesi adalah `OPEN` (ditampilkan "Dibuka").
-  - [ ] Validasi anti-double attendance: jika praktikan aktif sudah tercatat hadir, tombol dikunci dengan status "Sudah Hadir".
-  - [ ] Menampilkan modal/feedback konfirmasi saat presensi berhasil disimpan ke Context.
-  - [ ] Lolos typecheck (`npx tsc --noEmit`).
-
-### 📌 PR 2 (Bahir) — Riwayat Presensi Praktikan
-- **Nama Branch:** `feat/bahir/student-history`
-- **Target Branch:** `dev`
-- **Judul PR:** `feat(student): personal attendance history list and item cards`
-- **SRS Terkait:** `Bahir - FR-09`
-- **Ruang Lingkup Perubahan:**
-  - `src/app/student/(tabs)/history.tsx` (Halaman riwayat presensi praktikan aktif)
-  - `src/features/attendance/components/HistoryItemCard.tsx` (Kartu catatan riwayat per sesi)
-- **Checklist PR:**
-  - [ ] Menampilkan riwayat kehadiran sesuai `currentUser.id` yang aktif.
-  - [ ] Menampilkan informasi detail pada tiap kartu: nama sesi, tanggal, ruang, dan jam presensi.
-  - [ ] Menampilkan `EmptyState` jika akun praktikan yang login belum pernah melakukan presensi.
-  - [ ] Lolos typecheck (`npx tsc --noEmit`).
-
----
-
-## 3. Spesifikasi Teknis & Struktur File
-
-### 3.1 File yang Menjadi Tanggung Jawab Bahir
-> Aturan struktur & import: [ARCHITECTURE.md](ARCHITECTURE.md). Aturan "boleh presensi" (`canAttend`) ada di `src/store/rules.ts` (dibuat Zaidan); UI cukup memanggilnya lewat hook, jangan menulis ulang logikanya.
 ```
 src/
+├── services/
+│   └── attendance.ts                       <-- Service utama presensi & real-time listener
 ├── app/
-│   └── student/
-│       ├── attendance/
-│       │   └── [id].tsx              <-- Halaman form presensi & validasi
-│       └── (tabs)/
-│           └── history.tsx           <-- Halaman riwayat kehadiran pribadi
-└── features/
-    └── attendance/
-        └── components/
-            ├── AttendanceForm.tsx        <-- Form input presensi
-            ├── AttendanceSuccessCard.tsx <-- Kartu bukti kehadiran setelah presensi
-            └── HistoryItemCard.tsx       <-- Item list riwayat kehadiran
+│   ├── assistant/session/[id].tsx          <-- Update: Real-time listener rekap hadir (onSnapshot)
+│   └── student/attendance/[id].tsx         <-- Update: Submit presensi ke Firestore & validasi status
+└── firestore.rules                         <-- File keamanan Firebase Security Rules di root repo
 ```
 
-### 3.2 Integrasi dengan Store
-Bahir mengonsumsi state dan method melalui hooks di `src/store/hooks.ts`:
-```typescript
-import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+> 💡 **File Lama yang TIDAK PERLU DIUBAH:** `src/features/attendance/components/*`, `src/store/*`.
 
-const { currentUser } = useCurrentUser();   // User profile praktikan yang aktif
-const { getSessionById } = useSessions();   // Fungsi ambil detail sesi
-const {
-  submitAttendance,       // Fungsi submit presensi: (sessionId, student, notes) => { success, message }
-  isAlreadyAttended,      // Fungsi validasi: (sessionId, studentId) => boolean
-  getAttendanceByStudent, // Fungsi mengambil riwayat: (studentId) => AttendanceRecord[]
-} = useAttendance();
+---
+
+## 3. Spesifikasi Teknis & Kontrak Data
+
+### 3.1 Service Presensi & Real-Time Sync (`src/services/attendance.ts`)
+```typescript
+import { AttendanceRecord } from '@/types/attendance';
+
+/**
+ * 1. Buka / Tutup Sesi di Firestore (SRS-PRES-01)
+ */
+export async function setSessionStatus(sessionId: string, status: 'OPEN' | 'CLOSED'): Promise<void>;
+
+/**
+ * 2. Submit Presensi dengan Proteksi Anti-Bocor (SRS-PRES-02)
+ * Gunakan document ID deterministik `attendance_${sessionId}_${studentId}`
+ * atau Firestore RunTransaction untuk mencegah race condition.
+ */
+export async function submitAttendanceToFirestore(
+  record: Omit<AttendanceRecord, 'id'>
+): Promise<{ success: boolean; message: string }>;
+
+/**
+ * 3. Real-Time Listener Rekap Kehadiran Sesi (SRS-SYNC-01)
+ * Menggunakan onSnapshot agar UI asisten update seketika saat ada praktikan absen.
+ */
+export function subscribeToSessionAttendance(
+  sessionId: string,
+  onUpdate: (records: AttendanceRecord[]) => void
+): () => void; // Unsubscribe function
+
+/**
+ * 4. Ambil Riwayat Kehadiran Praktikan
+ */
+export async function getStudentAttendanceHistory(
+  studentId: string
+): Promise<AttendanceRecord[]>;
+```
+
+### 3.2 Aturan Keamanan Firebase (`firestore.rules`)
+File `firestore.rules` wajib dibuat di root repository:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAssistant() {
+      return isSignedIn() && request.auth.token.role == 'ASSISTANT';
+    }
+
+    // Sessions: Siapapun yang login bisa baca; hanya asisten yang bisa update status
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAssistant();
+      allow update: if isAssistant();
+    }
+
+    // Attendance: Mahasiswa hanya bisa create data miliknya sendiri saat sesi OPEN
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && request.resource.data.studentId == request.auth.uid;
+      allow update, delete: if false; // Data presensi tidak boleh diubah/dihapus sembarangan
+    }
+  }
+}
 ```
 
 ---
 
-## 4. Checklist Eksekusi Step-by-Step
+## 4. Alur Kerja & Checklist Implementasi
 
-- [ ] **Langkah 1**: Pastikan branch `dev` sudah memuat komponen dasar dari Bayu dan store dari Zaidan.
-- [ ] **Langkah 2**: Buat branch `feat/bahir/attendance-validation` dari `dev`.
-- [ ] **Langkah 3**: Buat komponen `AttendanceForm.tsx` dan `AttendanceSuccessCard.tsx` di `src/features/attendance/components/`.
-- [ ] **Langkah 4**: Implementasikan halaman `src/app/student/attendance/[id].tsx` dengan logika:
-  - Cek apakah `isAlreadyAttended(session.id, currentUser.id) === true`.
-  - Cek apakah `session.status !== 'OPEN'`.
-  - Panggil `submitAttendance(...)` saat tombol ditekan.
-- [ ] **Langkah 5**: Jalankan `npx tsc --noEmit` & ajukan **PR 1 Bahir** ke branch `dev`.
-- [ ] **Langkah 6**: Buat branch `feat/bahir/student-history` dari `dev` terbaru.
-- [ ] **Langkah 7**: Buat komponen `HistoryItemCard.tsx` di `src/features/attendance/components/`.
-- [ ] **Langkah 8**: Buat halaman `src/app/student/(tabs)/history.tsx` yang memanggil `getAttendanceByStudent(currentUser.id)` dan menggunakan `EmptyState` (`@/components/ui/EmptyState`) jika data kosong.
-- [ ] **Langkah 9**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bahir** ke branch `dev`.
+- [ ] **Langkah 1**: Buat branch `feat/bahir/attendance-realtime-rules` dari `dev`.
+- [ ] **Langkah 2**: Buat `src/services/attendance.ts` yang mengimplementasikan method di atas menggunakan modul `db` dari `src/services/firebase.ts`.
+- [ ] **Langkah 3**: Buat file `firestore.rules` di root proyek.
+- [ ] **Langkah 4**: Hubungkan `subscribeToSessionAttendance` ke `src/app/assistant/session/[id].tsx` menggunakan `useEffect` (jangan lupa panggil fungsi *unsubscribe* saat komponen unmount).
+- [ ] **Langkah 5**: Hubungkan `submitAttendanceToFirestore` ke form presensi di `src/app/student/attendance/[id].tsx`.
+- [ ] **Langkah 6**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
+- [ ] **Langkah 7**: Ajukan Pull Request ke `dev`.

@@ -1,113 +1,107 @@
-# Panduan Pengerjaan Tugas Sprint 1 — Crystiano Bayu Satya Alves (24060124140130)
-## Role: UI Design System, Navigation Shell & Praktikan Session Explorer
+# Panduan Tugas — Crystiano Bayu Satya Alves (24060124140130)
+## Modul: Fondasi Autentikasi, RBAC, dan Manajemen Data Utama (Sprint 2)
 
-> Dokumen ini dirancang khusus sebagai instruksi dan PRD teknis untuk Crystiano Bayu Satya Alves (dan AI Coding Assistant Bayu).
+> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG:**  
+> ⚠️ **Sprint 1 SELESAI & FREEZE:** Komponen UI dasar (`CustomButton`, `Card`, `EmptyState`, `FeedbackModal`, `theme.ts`) sudah selesai dan **JANGAN DIUBAH**.  
+> Fokus Anda **HANYA** pada modul baru Sprint 2: Firebase Authentication, Routing RBAC, dan Firestore CRUD.
 
 ---
 
-## 1. Product Requirements Document (PRD) — Ruang Lingkup Bayu
+## 1. Product Requirements Document (PRD) — Sprint 2 Bayu
 
-### 1.1 Objektif Utama
-Membangun fondasi antarmuka visual yang responsif berbasis Flexbox, reusable component system, shell navigasi tab praktikan (Expo Router), daftar sesi praktikum peserta beserta indikator status keterbukaan sesi, serta penanganan status kosong (*empty state*).
+### 1.1 Objektif
+Menghubungkan aplikasi ke Firebase Authentication dan Cloud Firestore sehingga pengguna memiliki identitas resmi, login terarah sesuai peran (*Role-Based Access Control* / RBAC), serta asisten dapat mengelola data Kelas, Peserta, dan Jadwal secara persisten di database cloud.
 
 ### 1.2 User Stories & Pemetaan SRS
-- **Bayu - FR-02 :** Sebagai Praktikan, saya ingin melihat jadwal praktikum yang harus saya ikuti serta status keterbukaan sesi saat ini agar saya tahu kapan harus bersiap melakukan presensi.
-- **Bayu - FR-07 :** Sebagai Pengguna (Praktikan/Asisten), saya ingin menerima umpan balik berupa modal dialog responsif (*FeedbackModal*) saat terjadi tindakan penting agar mendapatkan konfirmasi visual yang jelas.
-- **Bayu - FR-10 :** Sebagai Pengguna (Praktikan/Asisten), saya ingin melihat tampilan status kosong (*empty state*) yang informatif ketika daftar jadwal, rekap, atau riwayat belum memiliki data.
+- **SRS-AUTH-01 :** Sebagai pengguna, saya dapat melakukan registrasi dan login menggunakan Firebase Authentication agar memiliki identitas yang valid di dalam sistem.
+- **SRS-AUTH-02 :** Sebagai sistem, saya dapat mengarahkan (*routing*) pengguna ke halaman yang tepat berdasarkan peran mereka (Asisten atau Praktikan) setelah berhasil login.
+- **SRS-CRUD-01 :** Sebagai Asisten, saya dapat melakukan operasi Create, Read, Update, dan Delete (CRUD) pada data Kelas, Peserta, dan Jadwal menggunakan Cloud Firestore.
+- **SRS-CRUD-02 :** Sebagai Praktikan, saya dapat melihat daftar jadwal dan informasi sesi praktikum yang hanya berkaitan dengan akun saya.
 
 ---
 
-## 2. Rencana Git Branch & Pull Request (PR)
+## 2. File yang Dikerjakan Bayu (Sprint 2)
 
-### 📌 PR 1 (Bayu) — Design System & Navigation Layout
-- **Nama Branch:** `feat/bayu/ui-components-nav`
-- **Target Branch:** `dev`
-- **Judul PR:** `feat(ui): responsive common components and navigation shell`
-- **SRS Terkait:** `Bayu - FR-10`, `Bayu - FR-07`
-- **Ruang Lingkup Perubahan:**
-  - `src/components/ui/CustomButton.tsx` (Button varian primary, outline, disabled)
-  - `src/components/ui/Card.tsx` (Card container responsif Flexbox)
-  - `src/components/ui/EmptyState.tsx` (Komponen visual empty state)
-  - `src/components/ui/FeedbackModal.tsx` (Modal feedback umum)
-  - `src/constants/theme.ts` (Design tokens: warna, spacing, radius)
-  - `src/app/student/(tabs)/_layout.tsx` (Tab navigation shell praktikan)
-- **Checklist PR:**
-  - [x] Seluruh komponen responsif menggunakan Flexbox di berbagai ukuran layar.
-  - [x] Tab navigator praktikan dapat berpindah layar dengan lancar.
-  - [x] Lolos typecheck (`npx tsc --noEmit`).
-
-### 📌 PR 2 (Bayu) — Modul Jadwal & Detail Sesi Praktikan
-- **Nama Branch:** `feat/bayu/student-session-explorer`
-- **Target Branch:** `dev`
-- **Judul PR:** `feat(student): session list screen and session card component`
-- **SRS Terkait:** `Bayu - FR-02`, `Bayu - FR-10`
-- **Ruang Lingkup Perubahan:**
-  - `src/app/student/(tabs)/index.tsx` (Daftar sesi praktikum peserta yang disaring)
-  - `src/features/sessions/components/SessionCard.tsx` (Kartu sesi praktikum untuk praktikan)
-- **Checklist PR:**
-  - [x] Menampilkan daftar sesi praktikum secara interaktif dari data Context.
-  - [x] Menampilkan status badge sesi (Belum Dimulai, Dibuka, Selesai).
-  - [x] Integrasi navigasi dari kartu sesi menuju halaman presensi praktikan.
-  - [x] Menampilkan `EmptyState` jika tidak ada sesi yang terjadwal.
-  - [x] Lolos typecheck (`npx tsc --noEmit`).
-
----
-
-## 3. Spesifikasi Teknis & Struktur File
-
-### 3.1 File yang Menjadi Tanggung Jawab Bayu
-> Aturan struktur & import: [ARCHITECTURE.md](ARCHITECTURE.md).
 ```
 src/
-├── app/
-│   └── student/
-│       └── (tabs)/
-│           ├── _layout.tsx           <-- Tab bar praktikan (Jadwal, Riwayat)
-│           └── index.tsx             <-- Daftar sesi praktikum aktif
-├── components/
-│   └── ui/
-│       ├── CustomButton.tsx          <-- Tombol reusable (Primary, Secondary, Disabled)
-│       ├── Card.tsx                  <-- Container kartu praktikum
-│       ├── EmptyState.tsx            <-- Komponen state kosong
-│       └── FeedbackModal.tsx         <-- Modal konfirmasi sukses/peringatan
-├── constants/
-│   └── theme.ts                      <-- Design tokens (Colors, Spacing, Radius)
-├── utils/                            <-- Helper murni (mis. formatTime.ts)
-└── features/
-    └── sessions/
-        └── components/
-            └── SessionCard.tsx       <-- Kartu sesi praktikum untuk praktikan
+├── services/                               <-- FOLDER BARU SPRINT 2
+│   ├── firebase.ts                         <-- Inisialisasi Firebase App, Auth, dan Firestore
+│   ├── auth.ts                             <-- signIn, signUp, signOut, getCurrentUser, getUserProfile
+│   └── sessions.ts                         <-- CRUD Firestore: Kelas, Peserta, Jadwal praktikum
+└── app/
+    ├── index.tsx                           <-- Update: Form login/registrasi + Auto-redirect RBAC
+    ├── assistant/(tabs)/_layout.tsx        <-- Update: Proteksi sesi login & guard asisten
+    └── student/(tabs)/_layout.tsx          <-- Update: Proteksi sesi login & guard praktikan
 ```
 
-### 3.2 Integrasi dengan Store
-Bayu akan mengonsumsi state dan method yang disediakan oleh Zaidan melalui hooks di `src/store/hooks.ts`:
-```typescript
-import { useCurrentUser, useSessions } from '@/store/hooks';
-
-const { currentUser } = useCurrentUser();           // User profile praktikan yang aktif
-const { sessions, getSessionById } = useSessions(); // Daftar sesi & fungsi detail sesi
-```
-
-### 3.3 Aturan Desain & Styling (Flexbox & Responsivitas)
-1. Gunakan `StyleSheet.create` React Native murni dengan Flexbox (`flex: 1`, `flexDirection: 'row'/'column'`, `justifyContent`, `alignItems`, `gap`).
-2. Hindari ukuran font atau padding yang hardcoded tanpa pertimbangan layar kecil (gunakan layout yang *stretch* dan *scrollable* dengan `ScrollView`).
-3. Warna tema konsisten (Royal Violet & Cotap Midnight — lihat [DESIGN.md](DESIGN.md)):
-   - Primary: Royal Violet `#6D28D9` / Midnight `#1E1035`
-   - Sukses/Dibuka: Hijau `#166534` / `#DCFCE7` (WCAG AA)
-   - Peringatan/Tutup: Amber `#92400E` / Merah `#991B1B` / Slate `#64748B`
-   - Background: `#F8FAFC`
+> 💡 **File Lama yang TIDAK PERLU DIUBAH:** `src/components/ui/*`, `src/constants/theme.ts`, `src/store/*`.
 
 ---
 
-## 4. Checklist Eksekusi Step-by-Step
+## 3. Spesifikasi Teknis & Kontrak Data
 
-- [x] **Langkah 1**: Buat branch `feat/bayu/ui-components-nav` dari `dev`.
-- [x] **Langkah 2**: Buat komponen dasar di `src/components/ui/` (`CustomButton.tsx`, `Card.tsx`, `EmptyState.tsx`, `FeedbackModal.tsx`) dan lengkapi `src/constants/theme.ts`.
-- [x] **Langkah 3**: Setup rute navigasi tab di `src/app/student/(tabs)/_layout.tsx` (Tab 1: Jadwal Sesi, Tab 2: Riwayat Presensi).
-- [x] **Langkah 4**: Jalankan `npx tsc --noEmit` & ajukan **PR 1 Bayu** ke branch `dev`.
-- [x] **Langkah 5**: Buat branch `feat/bayu/student-session-explorer` dari `dev` terbaru.
-- [x] **Langkah 6**: Buat komponen `SessionCard.tsx` di `src/features/sessions/components/` untuk merepresentasikan detail sesi, badge status, dan tombol aksi menuju presensi.
-- [x] **Langkah 7**: Buat halaman `src/app/student/(tabs)/index.tsx` untuk menampilkan daftar sesi praktikum dari `useSessions()`.
-- [x] **Langkah 8**: Sambungkan kartu sesi dengan routing navigasi ke `/student/attendance/[id]` (modul yang dikembangkan oleh Bahir).
-- [x] **Langkah 9**: Tampilkan `EmptyState` jika daftar sesi praktikum kosong.
-- [x] **Langkah 10**: Jalankan `npx tsc --noEmit` & ajukan **PR 2 Bayu** ke branch `dev`.
+### 3.1 Inisialisasi Firebase (`src/services/firebase.ts`)
+Gunakan konfigurasi Firebase Web SDK / React Native modular:
+```typescript
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+};
+
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+```
+
+### 3.2 Service Autentikasi (`src/services/auth.ts`)
+```typescript
+export interface AuthUser {
+  uid: string;
+  email: string;
+  name: string;
+  role: 'ASSISTANT' | 'STUDENT';
+  identifier: string; // NIM atau Kode Asisten
+}
+
+// Method yang harus disediakan:
+export async function signUpUser(email: string, password: string, profile: Omit<AuthUser, 'uid'>): Promise<AuthUser>;
+export async function signInUser(email: string, password: string): Promise<AuthUser>;
+export async function signOutUser(): Promise<void>;
+export async function getUserProfile(uid: string): Promise<AuthUser | null>;
+```
+
+### 3.3 Service CRUD Firestore (`src/services/sessions.ts`)
+Koleksi Firestore: `classes`, `sessions`, `users`.
+```typescript
+import { PracticalSession } from '@/types/attendance';
+
+// CRUD Jadwal & Sesi
+export async function createSession(sessionData: Omit<PracticalSession, 'id'>): Promise<string>;
+export async function getSessionsForAssistant(assistantId: string): Promise<PracticalSession[]>;
+export async function getSessionsForStudent(studentId: string, studentClasses: string[]): Promise<PracticalSession[]>;
+export async function updateSession(sessionId: string, updates: Partial<PracticalSession>): Promise<void>;
+export async function deleteSession(sessionId: string): Promise<void>;
+```
+
+---
+
+## 4. Alur Kerja & Checklist Implementasi
+
+- [ ] **Langkah 1**: Buat branch `feat/bayu/auth-firestore-crud` dari `dev`.
+- [ ] **Langkah 2**: Buat file konfigurasi `src/services/firebase.ts`.
+- [ ] **Langkah 3**: Buat file `src/services/auth.ts` (fungsi registrasi, login, dan pembacaan role user dari Firestore `users/{uid}`).
+- [ ] **Langkah 4**: Perbarui `src/app/index.tsx` dengan UI input Email & Password (tetap memakai komponen UI dari `@/components/ui/`).
+- [ ] **Langkah 5**: Implementasikan auto-routing di `index.tsx`:
+  - Jika `role === 'ASSISTANT'` $\rightarrow$ redirect ke `/assistant`.
+  - Jika `role === 'STUDENT'` $\rightarrow$ redirect ke `/student`.
+- [ ] **Langkah 6**: Buat `src/services/sessions.ts` untuk operasi CRUD data sesi di Firestore.
+- [ ] **Langkah 7**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
+- [ ] **Langkah 8**: Ajukan Pull Request ke `dev`.
