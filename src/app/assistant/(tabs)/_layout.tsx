@@ -46,6 +46,19 @@ export default function AssistantTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="permits"
+        options={{
+          title: 'Izin',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Icon
+              name={focused ? 'file-tray-full' : 'file-tray-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
