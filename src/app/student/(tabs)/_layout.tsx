@@ -38,6 +38,19 @@ export default function StudentTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="permit"
+        options={{
+          title: 'Izin',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Icon
+              name={focused ? 'document-text' : 'document-text-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
