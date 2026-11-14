@@ -15,7 +15,7 @@ Menyediakan fitur bagi praktikan yang berhalangan hadir untuk mengajukan permoho
 
 ### 1.2 User Stories & Pemetaan SRS
 - **SRS-IZIN-01 :** Sebagai Praktikan, saya dapat mengajukan form izin ketidakhadiran beserta alasannya untuk sesi tertentu dan melihat status pengajuannya (`PENDING`, `APPROVED`, `REJECTED`).
-- **SRS-AI-01 :** Sebagai sistem, saya dapat mengirimkan alasan izin praktikan ke eksternal API model AI dan menyimpan hasil klasifikasi alasan tersebut sebagai informasi pendukung (bukan penentu otomatis).
+- **SRS-AI-01 :** Sebagai sistem, saya dapat mengklasifikasikan alasan izin praktikan menggunakan model AI yang tercantum pada bahan panduan repository (.zip) — *tanpa API pengajar* — dan menyimpan hasil analisisnya sebagai informasi pendukung (bukan penentu otomatis).
 - **SRS-IZIN-02 :** Sebagai Asisten, saya dapat melihat daftar pengajuan izin beserta hasil klasifikasi AI-nya, lalu memberikan keputusan terima atau tolak secara manual.
 - **SRS-UI-01 :** Sebagai sistem, saya menangani kondisi kegagalan (input tidak valid, data kosong, belum login, atau layanan AI tidak merespons) dan memberikan feedback UI yang sesuai (graceful degradation).
 
@@ -28,12 +28,13 @@ src/
 ├── types/
 │   └── permit.ts                           <-- Model data izin dan hasil klasifikasi AI
 ├── services/
-│   └── permits.ts                          <-- Service Firestore untuk izin & integrasi API AI
+│   ├── ai.ts                               <-- [BARU] Client pemanggilan model AI sesuai panduan .zip
+│   └── permits.ts                          <-- Service Firestore untuk izin & integrasi fungsi AI
 ├── features/
 │   └── permits/components/
 │       ├── PermitForm.tsx                  <-- Form pengajuan izin praktikan
 │       ├── PermitStatusCard.tsx            <-- Tampilan status izin praktikan
-│       └── PermitReviewCard.tsx            <-- Kartu review asisten (termasuk badge AI & tombol aksi)
+│       └── PermitReviewCard.tsx            <-- Kartu review asisten (badge AI info & tombol aksi)
 └── app/
     ├── student/(tabs)/
     │   └── permit.tsx                      <-- Halaman tab pengajuan & status izin praktikan
@@ -44,6 +45,12 @@ src/
 ---
 
 ## 3. Spesifikasi Teknis & Kontrak Data
+
+> ⚠️ **CATATAN RESMI ASISTEN PRAKTIKUM TERKAIT AI:**  
+> Poin yang menyebutkan "API model AI dari pengajar" adalah **typo/ditiadakan**.  
+> Sebagai gantinya, implementasi AI dilakukan langsung oleh Ferdy dengan:
+> 1. Mengambil bahan dari file `.zip` panduan yang ada di repository / classroom.
+> 2. Menggunakan SDK model AI yang tercantum dalam panduan tersebut (misal: Gemini API SDK via Google Generative AI atau model LLM yang diinstruksikan).
 
 ### 3.1 Kontrak Data (`src/types/permit.ts`)
 ```typescript
@@ -74,44 +81,74 @@ export interface PermitRequest {
   reason: string;
   submittedAt: string;      // ISO String
   status: PermitStatus;
-  aiClassification?: AIClassificationResult; // Diisi oleh sistem AI
+  aiClassification?: AIClassificationResult; // Diisi oleh model AI
   decisionNote?: string;    // Catatan manual asisten
   reviewedBy?: string;      // Nama / ID asisten
   reviewedAt?: string;
 }
 ```
 
-### 3.2 Service Izin & Integrasi AI (`src/services/permits.ts`)
+### 3.2 Service Pemanggilan Model AI (`src/services/ai.ts`)
+Modul ini bertugas mengeksekusi model AI sesuai panduan bahan repository `.zip`:
 ```typescript
-import { PermitRequest, AIClassificationResult } from '@/types/permit';
+import { AIClassificationResult } from '@/types/permit';
+
+/**
+ * Prompt Template yang menginstruksikan model AI untuk mengklasifikasi
+ * alasan ketidakhadiran dan mengembalikan format JSON terstruktur.
+ */
+export async function classifyPermitReason(reasonText: string): Promise<AIClassificationResult> {
+  try {
+    // 1. Inisialisasi model sesuai panduan di file .zip (misal: Gemini API / SDK terkait)
+    // 2. Berikan system prompt agar output selalu berupa JSON valid:
+    //    {
+    //      "category": "SAKIT" | "KEDUKAAN_URGEN" | "TUGAS_AKADEMIK" | "KEPERLUAN_PRIBADI" | "LAINNYA",
+    //      "confidence": 0.95,
+    //      "urgencyLevel": "TINGGI" | "SEDANG" | "RENDAH",
+    //      "summary": "Ringkasan 1 kalimat"
+    //    }
+    // 3. Parse output JSON dan kembalikan AIClassificationResult
+    
+    // (Implementasikan pemanggilan SDK model di sini sesuai guide repository)
+    throw new Error('Not implemented yet');
+  } catch (error) {
+    console.warn('AI Model failed or offline:', error);
+    // Graceful degradation: Kembalikan fallback jika AI tidak merespons
+    return {
+      category: 'LAINNYA',
+      confidence: 0,
+      urgencyLevel: 'SEDANG',
+      summary: 'Analisis AI belum tersedia (Layanan sedang sibuk).',
+    };
+  }
+}
+```
+
+### 3.3 Service Izin & Integrasi Firestore (`src/services/permits.ts`)
+```typescript
+import { PermitRequest } from '@/types/permit';
+import { classifyPermitReason } from './ai';
 
 /**
  * 1. Mengajukan Izin Baru (SRS-IZIN-01 & SRS-AI-01)
- * Alur: Simpan status PENDING -> Panggil API AI secara async -> Simpan hasil AI ke Firestore.
- * Jika AI gagal / timeout, simpan izin dengan aiClassification: undefined (jangan batalkan submit).
+ * Alur: Simpan status PENDING -> Panggil classifyPermitReason() secara async -> Update hasil AI di Firestore.
  */
 export async function submitPermit(
   permitData: Omit<PermitRequest, 'id' | 'submittedAt' | 'status'>
 ): Promise<{ success: boolean; permitId: string; message: string }>;
 
 /**
- * 2. Klasifikasi Alasan Izin via AI API (SRS-AI-01)
- * Panggil API Gemini / external LLM endpoint.
- */
-export async function classifyReasonWithAI(reason: string): Promise<AIClassificationResult>;
-
-/**
- * 3. Ambil Izin untuk Praktikan Tertentu (SRS-IZIN-01)
+ * 2. Ambil Izin untuk Praktikan Tertentu (SRS-IZIN-01)
  */
 export async function getStudentPermits(studentId: string): Promise<PermitRequest[]>;
 
 /**
- * 4. Ambil Seluruh Izin Masuk untuk Asisten (SRS-IZIN-02)
+ * 3. Ambil Seluruh Izin Masuk untuk Asisten (SRS-IZIN-02)
  */
 export async function getIncomingPermits(): Promise<PermitRequest[]>;
 
 /**
- * 5. Keputusan Asisten (SRS-IZIN-02)
+ * 4. Keputusan Asisten (SRS-IZIN-02)
  */
 export async function reviewPermit(
   permitId: string,
@@ -133,13 +170,15 @@ Wajib menangani skenario berikut menggunakan komponen bawaan:
 ## 4. Alur Kerja & Checklist Implementasi
 
 - [ ] **Langkah 1**: Buat branch `feat/ferdy/permit-ai-handling` dari `dev`.
-- [ ] **Langkah 2**: Buat model data di `src/types/permit.ts`.
-- [ ] **Langkah 3**: Buat fungsi service di `src/services/permits.ts` (termasuk helper pemicu AI).
-- [ ] **Langkah 4**: Buat komponen `PermitForm.tsx` dan `PermitStatusCard.tsx` di `src/features/permits/components/`.
-- [ ] **Langkah 5**: Buat halaman `src/app/student/(tabs)/permit.tsx` dan daftarkan tab di `src/app/student/(tabs)/_layout.tsx`.
-- [ ] **Langkah 6**: Buat komponen `PermitReviewCard.tsx` (tampilkan kartu izin, chip hasil AI, dan tombol konfirmasi Terima/Tolak).
-- [ ] **Langkah 7**: Buat halaman `src/app/assistant/(tabs)/permits.tsx` dan daftarkan tab di `src/app/assistant/(tabs)/_layout.tsx`.
-- [ ] **Langkah 8**: Uji penanganan error (layanan AI offline, input kosong).
-- [ ] **Langkah 9**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
-- [ ] **Langkah 10**: Ajukan Pull Request ke `dev`.
+- [ ] **Langkah 2**: Periksa bahan panduan model AI dari file `.zip` di repositori praktikum / classroom.
+- [ ] **Langkah 3**: Buat model data di `src/types/permit.ts`.
+- [ ] **Langkah 4**: Buat client pemanggilan model AI di `src/services/ai.ts` sesuai model & panduan yang ada di file `.zip` tersebut.
+- [ ] **Langkah 5**: Buat service Firestore di `src/services/permits.ts` yang mengintegrasikan pemanggilan `classifyPermitReason()` dari `ai.ts`.
+- [ ] **Langkah 6**: Buat komponen `PermitForm.tsx` dan `PermitStatusCard.tsx` di `src/features/permits/components/`.
+- [ ] **Langkah 7**: Buat halaman `src/app/student/(tabs)/permit.tsx` dan daftarkan tab di `src/app/student/(tabs)/_layout.tsx`.
+- [ ] **Langkah 8**: Buat komponen `PermitReviewCard.tsx` (tampilkan kartu izin, chip hasil AI, dan tombol konfirmasi Terima/Tolak).
+- [ ] **Langkah 9**: Buat halaman `src/app/assistant/(tabs)/permits.tsx` dan daftarkan tab di `src/app/assistant/(tabs)/_layout.tsx`.
+- [ ] **Langkah 10**: Uji penanganan error (layanan AI offline/timeout, input kosong) untuk memastikan graceful degradation.
+- [ ] **Langkah 11**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
+- [ ] **Langkah 12**: Ajukan Pull Request ke `dev`.
 

@@ -119,7 +119,7 @@ Sprint 2 memperluas solusi dengan menghubungkan aplikasi ke backend nyata (Fireb
 | **SRS-SYNC-01** | Rekap Kehadiran Real-Time (Firestore Listener) | Asisten | Rekap hadir ter-update otomatis tanpa reload menggunakan `onSnapshot`. | Bahir |
 | **SRS-SEC-01** | Firebase Security Rules | Sistem | Semua baca/tulis ke Firestore dilindungi Rules berbasis identitas & peran. Tidak ada akses anonim. | Bahir |
 | **SRS-IZIN-01** | Form Pengajuan Izin Ketidakhadiran | Praktikan | Praktikan mengajukan izin dengan alasan untuk sesi tertentu dan melihat statusnya (`PENDING` / `APPROVED` / `REJECTED`). | Ferdy |
-| **SRS-AI-01** | Klasifikasi Alasan Izin via AI API | Sistem | Alasan izin dikirim ke external AI API; hasilnya disimpan di Firestore sebagai informasi pendukung (bukan keputusan otomatis). | Ferdy |
+| **SRS-AI-01** | Klasifikasi Alasan Izin via Model AI (Sesuai Guide Repo) | Sistem | Alasan izin dianalisis langsung menggunakan model AI yang tercantum pada bahan panduan repository (.zip). Hasil klasifikasi disimpan di Firestore sebagai informasi pendukung bagi asisten (bukan penentu otomatis). | Ferdy |
 | **SRS-IZIN-02** | Review Izin oleh Asisten + Keputusan Manual | Asisten | Asisten melihat daftar pengajuan izin beserta klasifikasi AI, lalu menerima atau menolak secara manual. | Ferdy |
 | **SRS-UI-01** | Penanganan Kondisi Kegagalan & Edge Cases | Sistem | Sistem menampilkan feedback UI yang tepat untuk: input tidak valid, data kosong, belum login, dan layanan AI tidak merespons. | Ferdy |
 

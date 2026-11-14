@@ -193,12 +193,13 @@ sequenceDiagram
 
 ```
 src/
-├── services/                         # Firebase client calls — owned by Sprint 2 members
+├── services/                         # Firebase & AI client calls — owned by Sprint 2 members
 │   ├── firebase.ts                   # Firebase app init (Bayu)
 │   ├── auth.ts                       # signIn, signUp, signOut, onAuthChange (Bayu)
 │   ├── sessions.ts                   # Firestore CRUD for sessions (Bayu)
 │   ├── attendance.ts                 # Firestore write/query for attendance (Bahir)
-│   └── permits.ts                    # Firestore CRUD for permit requests (Ferdy)
+│   ├── permits.ts                    # Firestore CRUD for permit requests (Ferdy)
+│   └── ai.ts                         # AI Model client according to repo guide (Ferdy)
 ├── types/
 │   └── permit.ts                     # PermitRequest, PermitStatus, AIClassification (Ferdy)
 └── features/

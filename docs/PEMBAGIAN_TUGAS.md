@@ -28,9 +28,10 @@ Proyek ini dikembangkan secara kolaboratif oleh 3 programmer + 1 anggota baru (S
 |---|---|---|---|
 | **Bayu** | Autentikasi Firebase, RBAC & Routing Login, CRUD Firestore (Kelas, Peserta, Jadwal) | SRS-AUTH-01, SRS-AUTH-02, SRS-CRUD-01, SRS-CRUD-02 | [TUGAS_BAYU.md](TUGAS_BAYU.md) |
 | **Bahir** | Presensi + Anti-Bocor ke Firestore, Rekap Real-Time (`onSnapshot`), Firebase Security Rules | SRS-PRES-01, SRS-PRES-02, SRS-SYNC-01, SRS-SEC-01 | [TUGAS_BAHIR.md](TUGAS_BAHIR.md) |
-| **Ferdy** | Form Izin Ketidakhadiran, Klasifikasi AI, Review Izin Asisten, Penanganan Edge Cases UI | SRS-IZIN-01, SRS-AI-01, SRS-IZIN-02, SRS-UI-01 | [TUGAS_FERDY.md](TUGAS_FERDY.md) |
+| **Ferdy** | Form Izin Ketidakhadiran, Klasifikasi AI (sesuai panduan repo .zip), Review Izin Asisten, Penanganan Edge Cases UI | SRS-IZIN-01, SRS-AI-01, SRS-IZIN-02, SRS-UI-01 | [TUGAS_FERDY.md](TUGAS_FERDY.md) |
 
-> **Zaidan** pada Sprint 2 berperan sebagai reviewer arsitektur dan membantu integrasi `services/` ke dalam `store/`. Tidak ada file baru Sprint 2 yang dikerjakan Zaidan secara mandiri.
+> 📌 **Catatan Update Asisten Praktikum:** Integrasi AI tidak menggunakan endpoint API dari pengajar, melainkan mengimplementasikan langsung model AI yang tercantum pada bahan panduan `.zip` di repositori praktikum.
+> **Zaidan** pada Sprint 2 berperan sebagai Project Manager (PM), System Architect, dan QA Lead.
 
 ---
 
