@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/constants/theme';
 import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
+import { signOutUser, syncAuthUserFromProfile } from '@/services/auth';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { SessionStatus, UserProfile } from '@/types/attendance';
 
@@ -34,6 +36,7 @@ export default function StudentScheduleRoute() {
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
   const [refreshing, setRefreshing] = useState(false);
   const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const filteredSessions = sessions.filter((s) => {
     if (activeFilter === 'ALL') return true;
@@ -57,9 +60,16 @@ export default function StudentScheduleRoute() {
   };
 
   const handleUserSelected = (user: UserProfile) => {
+    syncAuthUserFromProfile(user);
     if (user.role === 'ASSISTANT') {
       router.replace('/assistant' as Href);
     }
+  };
+
+  const handleConfirmLogout = async () => {
+    setLogoutModalVisible(false);
+    await signOutUser();
+    router.replace('/' as Href);
   };
 
   return (
@@ -81,14 +91,24 @@ export default function StudentScheduleRoute() {
             Praktikan • {currentUser.identifier}
           </AppText>
         </View>
-        <Pressable
-          onPress={() => setRoleModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Ganti profil atau peran"
-          style={styles.avatar}
-        >
-          <Icon name="person" size={20} color={Colors.primary} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => setRoleModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Ganti profil atau peran"
+            style={styles.avatar}
+          >
+            <Icon name="person" size={20} color={Colors.primary} />
+          </Pressable>
+          <Pressable
+            onPress={() => setLogoutModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Keluar dari akun"
+            style={styles.logoutButton}
+          >
+            <Icon name="log-out-outline" size={20} color={Colors.danger} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Filter Chips */}
@@ -176,6 +196,18 @@ export default function StudentScheduleRoute() {
         onClose={() => setRoleModalVisible(false)}
         onUserSelected={handleUserSelected}
       />
+
+      <FeedbackModal
+        visible={logoutModalVisible}
+        type="warning"
+        title="Keluar dari Akun?"
+        message={`Apakah Anda yakin ingin keluar dari sesi ${currentUser.name}?`}
+        primaryLabel="Ya, Keluar"
+        secondaryLabel="Batal"
+        onPrimary={handleConfirmLogout}
+        onSecondary={() => setLogoutModalVisible(false)}
+        onClose={() => setLogoutModalVisible(false)}
+      />
     </Screen>
   );
 }
@@ -192,6 +224,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.sm,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs + 2,
+  },
   title: {
     marginTop: 2,
     marginBottom: 2,
@@ -203,6 +240,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.glassSurface,
     borderWidth: 1.2,
     borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  logoutButton: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.dangerBg,
+    borderWidth: 1.2,
+    borderColor: Colors.dangerBorder,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
