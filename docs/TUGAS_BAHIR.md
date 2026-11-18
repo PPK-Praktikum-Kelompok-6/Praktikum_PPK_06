@@ -109,10 +109,10 @@ service cloud.firestore {
 
 ## 4. Alur Kerja & Checklist Implementasi
 
-- [ ] **Langkah 1**: Buat branch `feat/bahir/attendance-realtime-rules` dari `dev`.
-- [ ] **Langkah 2**: Buat `src/services/attendance.ts` yang mengimplementasikan method di atas menggunakan modul `db` dari `src/services/firebase.ts`.
-- [ ] **Langkah 3**: Buat file `firestore.rules` di root proyek.
-- [ ] **Langkah 4**: Hubungkan `subscribeToSessionAttendance` ke `src/app/assistant/session/[id].tsx` menggunakan `useEffect` (jangan lupa panggil fungsi *unsubscribe* saat komponen unmount).
-- [ ] **Langkah 5**: Hubungkan `submitAttendanceToFirestore` ke form presensi di `src/app/student/attendance/[id].tsx`.
-- [ ] **Langkah 6**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
-- [ ] **Langkah 7**: Ajukan Pull Request ke `dev`.
+- [x] **Langkah 1**: Buat branch `feat/bahir/attendance-realtime-rules` dari `main`.
+- [x] **Langkah 2**: Buat `src/services/attendance.ts` yang mengimplementasikan method presensi Firestore atomik & listener real-time.
+- [x] **Langkah 3**: Buat file `firestore.rules` di root proyek.
+- [x] **Langkah 4**: Hubungkan `subscribeToSessionAttendance` ke `src/app/assistant/session/[id].tsx` menggunakan `useEffect` (dengan fungsi *unsubscribe* saat unmount).
+- [x] **Langkah 5**: Hubungkan `submitAttendanceToFirestore` ke form presensi di `src/app/student/attendance/[id].tsx` dengan proteksi Anti-Bocor.
+- [x] **Langkah 6**: Sambungkan riwayat presensi di `src/app/student/(tabs)/history.tsx` dan rekap di `src/app/assistant/(tabs)/recap.tsx`.
+- [x] **Langkah 7**: Ajukan Pull Request ke `main`.

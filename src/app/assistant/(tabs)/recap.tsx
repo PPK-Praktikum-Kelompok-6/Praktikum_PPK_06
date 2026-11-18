@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -10,12 +10,36 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import { subscribeToSessionAttendance } from '@/services/attendance';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+import { AttendanceRecord } from '@/types/attendance';
 
 export default function AssistantRecapRoute() {
   const { currentUser } = useCurrentUser();
   const { sessions } = useSessions();
   const { attendanceRecords } = useAttendance();
+  const [realtimeMap, setRealtimeMap] = useState<Record<string, AttendanceRecord[]>>({});
+
+  const mySessions = useMemo(
+    () => sessions.filter((s) => s.assistantId === currentUser.id),
+    [sessions, currentUser.id]
+  );
+
+  // Subscribe real-time attendance untuk setiap sesi yang diampu
+  useEffect(() => {
+    if (currentUser.role !== 'ASSISTANT' || mySessions.length === 0) return;
+    const unsubscribes = mySessions.map((session) =>
+      subscribeToSessionAttendance(session.id, (records) => {
+        setRealtimeMap((prev) => ({
+          ...prev,
+          [session.id]: records,
+        }));
+      })
+    );
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
+  }, [currentUser.role, mySessions]);
 
   // Batasan peran: Praktikan tidak boleh mengakses rekapitulasi asisten
   if (currentUser.role !== 'ASSISTANT') {
@@ -32,13 +56,10 @@ export default function AssistantRecapRoute() {
     );
   }
 
-  const mySessions = sessions.filter(
-    (s) => s.assistantId === currentUser.id
-  );
-
   const totalSessions = mySessions.length;
   const totalAttended = mySessions.reduce((acc, session) => {
-    const count = attendanceRecords.filter((r) => r.sessionId === session.id).length;
+    const rt = realtimeMap[session.id];
+    const count = rt ? rt.length : attendanceRecords.filter((r) => r.sessionId === session.id).length;
     return acc + count;
   }, 0);
 
@@ -117,9 +138,10 @@ export default function AssistantRecapRoute() {
       ) : (
         <View style={styles.sessionList}>
           {mySessions.map((session) => {
-            const attendedCount = attendanceRecords.filter(
-              (r) => r.sessionId === session.id
-            ).length;
+            const rtRecords = realtimeMap[session.id];
+            const attendedCount = rtRecords
+              ? rtRecords.length
+              : attendanceRecords.filter((r) => r.sessionId === session.id).length;
             const progress =
               session.totalStudents > 0
                 ? attendedCount / session.totalStudents

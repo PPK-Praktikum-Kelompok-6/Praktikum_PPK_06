@@ -75,6 +75,13 @@ export function subscribeSessions(listener: SessionListener): () => void {
 }
 
 /**
+ * Mengambil sesi praktikum berdasarkan ID dari store lokal (fallback / lookup cepat).
+ */
+export function getSessionById(sessionId: string): PracticalSession | undefined {
+  return localSessionsStore.find((s) => s.id === sessionId);
+}
+
+/**
  * 1. Membuat jadwal sesi praktikum baru di koleksi Firestore `sessions` (SRS-CRUD-01).
  */
 export async function createSession(

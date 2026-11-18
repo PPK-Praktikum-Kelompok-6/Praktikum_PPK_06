@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -12,8 +12,13 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { AttendanceForm } from '@/features/attendance/components/AttendanceForm';
 import { AttendanceSuccessCard } from '@/features/attendance/components/AttendanceSuccessCard';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import {
+  submitAttendanceToFirestore,
+  subscribeToSessionAttendance,
+} from '@/services/attendance';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canAttend } from '@/store/rules';
+import { AttendanceRecord } from '@/types/attendance';
 import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
 
 export default function StudentAttendanceDetailRoute() {
@@ -25,6 +30,7 @@ export default function StudentAttendanceDetailRoute() {
   const { attendanceRecords, submitAttendance, isAlreadyAttended } = useAttendance();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
   const [feedbackState, setFeedbackState] = useState<{
     visible: boolean;
     type: 'success' | 'error';
@@ -39,44 +45,79 @@ export default function StudentAttendanceDetailRoute() {
 
   const session = sessionId ? getSessionById(sessionId) : undefined;
 
-  // Cek apakah praktikan aktif sudah tercatat hadir
-  const attended = session
+  // Real-time listener attendance record untuk sesi ini (SRS-SYNC-01)
+  useEffect(() => {
+    if (!sessionId) return;
+    const unsubscribe = subscribeToSessionAttendance(sessionId, (records) => {
+      setRealtimeRecords(records);
+    });
+    return () => unsubscribe();
+  }, [sessionId]);
+
+  // Cek apakah praktikan aktif sudah tercatat hadir (dari real-time atau store lokal)
+  const realtimeAttendedRecord = realtimeRecords.find(
+    (rec) => rec.studentId === currentUser.id
+  );
+  const localAttended = session
     ? isAlreadyAttended(session.id, currentUser.id)
     : false;
+  const attended = Boolean(realtimeAttendedRecord || localAttended);
 
   // Ambil record presensi praktikan untuk sesi ini jika sudah hadir
-  const attendedRecord = attended && session
-    ? attendanceRecords.find(
-        (rec) => rec.sessionId === session.id && rec.studentId === currentUser.id
-      )
-    : undefined;
+  const attendedRecord =
+    realtimeAttendedRecord ||
+    (attended && session
+      ? attendanceRecords.find(
+          (rec) => rec.sessionId === session.id && rec.studentId === currentUser.id
+        )
+      : undefined);
 
   // Evaluasi aturan bisnis murni dari store/rules.ts
   const rule = canAttend(session, attendanceRecords, currentUser.id);
 
-  const handleAttendanceSubmit = (notes: string) => {
+  const handleAttendanceSubmit = async (notes: string) => {
     if (!session) return;
 
     setIsSubmitting(true);
-    const result = submitAttendance(session.id, currentUser, notes);
-    setIsSubmitting(false);
-
-    if (result.success) {
-      const nowIso = new Date().toISOString();
-      const timeStr = formatTime(nowIso);
-      setFeedbackState({
-        visible: true,
-        type: 'success',
-        title: 'Presensi Berhasil!',
-        message: `Kehadiran Anda pada sesi ${session.courseName} (${session.classCode}) telah tercatat pada pukul ${timeStr}.`,
+    try {
+      // 1. Submit ke Firestore dengan proteksi Anti-Bocor (SRS-PRES-02)
+      const res = await submitAttendanceToFirestore({
+        sessionId: session.id,
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        studentNim: currentUser.identifier,
+        notes,
       });
-    } else {
+
+      // 2. Selaraskan juga ke store lokal Sprint 1
+      submitAttendance(session.id, currentUser, notes);
+
+      if (res.success) {
+        const nowIso = new Date().toISOString();
+        const timeStr = formatTime(nowIso);
+        setFeedbackState({
+          visible: true,
+          type: 'success',
+          title: 'Presensi Berhasil!',
+          message: `Kehadiran Anda pada sesi ${session.courseName} (${session.classCode}) telah tercatat pada pukul ${timeStr}.`,
+        });
+      } else {
+        setFeedbackState({
+          visible: true,
+          type: 'error',
+          title: 'Presensi Tidak Dapat Diproses',
+          message: res.message,
+        });
+      }
+    } catch (err: any) {
       setFeedbackState({
         visible: true,
         type: 'error',
-        title: 'Presensi Tidak Dapat Diproses',
-        message: result.message,
+        title: 'Kesalahan Sistem',
+        message: err?.message || 'Terjadi kesalahan saat memproses presensi.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

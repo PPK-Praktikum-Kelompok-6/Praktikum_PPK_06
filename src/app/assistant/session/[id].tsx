@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -17,7 +17,12 @@ import {
   SessionControlModal,
 } from '@/features/sessions/components/SessionControlModal';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import {
+  setSessionStatus,
+  subscribeToSessionAttendance,
+} from '@/services/attendance';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+import { AttendanceRecord } from '@/types/attendance';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
 export default function AssistantSessionDetailRoute() {
@@ -28,11 +33,21 @@ export default function AssistantSessionDetailRoute() {
 
   const [controlModalVisible, setControlModalVisible] = useState(false);
   const [controlAction, setControlAction] = useState<SessionControlAction>('OPEN');
+  const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
 
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('success');
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01)
+  useEffect(() => {
+    if (!id) return;
+    const unsubscribe = subscribeToSessionAttendance(id, (records) => {
+      setRealtimeRecords(records);
+    });
+    return () => unsubscribe();
+  }, [id]);
 
   // Batasan peran: Praktikan tidak boleh mengakses detail dan kontrol sesi asisten
   if (currentUser.role !== 'ASSISTANT') {
@@ -60,7 +75,11 @@ export default function AssistantSessionDetailRoute() {
   }
 
   const session = id ? getSessionById(id) : undefined;
-  const attendanceRecords = id ? getAttendanceBySession(id) : [];
+  // Gunakan record real-time jika ada, fallback ke store lokal
+  const attendanceRecords =
+    realtimeRecords.length > 0
+      ? realtimeRecords
+      : (id ? getAttendanceBySession(id) : []);
 
   if (!session) {
     return (
@@ -89,11 +108,14 @@ export default function AssistantSessionDetailRoute() {
     setControlModalVisible(true);
   };
 
-  const handleConfirmAction = () => {
+  const handleConfirmAction = async () => {
     setControlModalVisible(false);
-    if (controlAction === 'OPEN') {
-      const ok = openSession(session.id);
-      if (ok) {
+    try {
+      if (controlAction === 'OPEN') {
+        // 1. Simpan perubahan status ke Firestore (SRS-PRES-01)
+        await setSessionStatus(session.id, 'OPEN');
+        openSession(session.id); // Selaraskan store lokal
+
         setFeedbackType('success');
         setFeedbackTitle('Sesi Berhasil Dibuka!');
         setFeedbackMessage(
@@ -101,26 +123,22 @@ export default function AssistantSessionDetailRoute() {
         );
         setFeedbackVisible(true);
       } else {
-        setFeedbackType('error');
-        setFeedbackTitle('Gagal Membuka Sesi');
-        setFeedbackMessage('Sesi tidak dapat dibuka.');
-        setFeedbackVisible(true);
-      }
-    } else {
-      const ok = closeSession(session.id);
-      if (ok) {
+        // 2. Tutup status sesi di Firestore (SRS-PRES-01)
+        await setSessionStatus(session.id, 'CLOSED');
+        closeSession(session.id); // Selaraskan store lokal
+
         setFeedbackType('success');
         setFeedbackTitle('Sesi Berhasil Ditutup!');
         setFeedbackMessage(
           `Sesi ${session.courseName} (${session.classCode}) resmi ditutup. Presensi baru telah dikunci.`
         );
         setFeedbackVisible(true);
-      } else {
-        setFeedbackType('error');
-        setFeedbackTitle('Gagal Menutup Sesi');
-        setFeedbackMessage('Sesi tidak dapat ditutup.');
-        setFeedbackVisible(true);
       }
+    } catch (err: any) {
+      setFeedbackType('error');
+      setFeedbackTitle('Gagal Mengubah Status Sesi');
+      setFeedbackMessage(err?.message || 'Terjadi kesalahan saat menghubungi server.');
+      setFeedbackVisible(true);
     }
   };
 

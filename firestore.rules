@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // =========================================================================
+    // HELPER FUNCTIONS (SRS-SEC-01)
+    // =========================================================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAssistant() {
+      return isSignedIn() && (
+        request.auth.token.role == 'ASSISTANT' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ASSISTANT'
+      );
+    }
+
+    function isStudent() {
+      return isSignedIn() && (
+        request.auth.token.role == 'STUDENT' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'STUDENT'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // =========================================================================
+    // USERS COLLECTION
+    // =========================================================================
+    match /users/{userId} {
+      // Pengguna yang login dapat membaca profil; pengguna dapat mengedit profilnya sendiri
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (isOwner(userId) || isAssistant());
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // CLASSES COLLECTION (SRS-CRUD-01)
+    // =========================================================================
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAssistant();
+    }
+
+    // =========================================================================
+    // SESSIONS COLLECTION (SRS-PRES-01 & SRS-CRUD-01)
+    // =========================================================================
+    match /sessions/{sessionId} {
+      // Semua pengguna yang terautentikasi dapat melihat jadwal sesi
+      allow read: if isSignedIn();
+      // Hanya asisten yang dapat membuat, mengupdate status (OPEN/CLOSED), dan menghapus sesi
+      allow create, update, delete: if isAssistant();
+    }
+
+    // =========================================================================
+    // ATTENDANCE COLLECTION (SRS-PRES-02, SRS-SYNC-01, SRS-SEC-01)
+    // =========================================================================
+    match /attendance/{attendanceId} {
+      // Siapapun yang login dapat membaca rekap kehadiran untuk sesi praktikum
+      allow read: if isSignedIn();
+      
+      // Presensi Anti-Bocor & Anti-Duplikasi:
+      // Mahasiswa hanya dapat membuat dokumen kehadiran untuk dirinya sendiri.
+      // Sesi praktikum harus berstatus 'OPEN'.
+      // Dokumen presensi tidak boleh di-overwrite (tidak boleh ganda).
+      allow create: if isSignedIn() &&
+        request.resource.data.studentId == request.auth.uid &&
+        !exists(/databases/$(database)/documents/attendance/$(attendanceId)) &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'OPEN';
+
+      // Catatan presensi adalah rekaman resmi yang permanen dan tidak boleh diubah/dihapus
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // PERMITS COLLECTION (SRS-IZIN-01, SRS-IZIN-02)
+    // =========================================================================
+    match /permits/{permitId} {
+      // Praktikan dapat melihat izin miliknya; Asisten dapat melihat seluruh izin masuk
+      allow read: if isSignedIn() && (
+        isAssistant() ||
+        resource.data.studentId == request.auth.uid
+      );
+      
+      // Praktikan dapat mengajukan izin untuk dirinya sendiri
+      allow create: if isSignedIn() &&
+        request.resource.data.studentId == request.auth.uid;
+        
+      // Hanya asisten yang dapat mengubah status keputusan izin (APPROVED / REJECTED)
+      allow update: if isAssistant();
+      allow delete: if false;
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -9,23 +9,66 @@ import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { HistoryItemCard } from '@/features/attendance/components/HistoryItemCard';
-import { useAttendance, useCurrentUser } from '@/store/hooks';
+import { getStudentAttendanceHistory } from '@/services/attendance';
+import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 
 export default function StudentHistoryRoute() {
   const { currentUser } = useCurrentUser();
   const { getAttendanceByStudent } = useAttendance();
+  const { getSessionById } = useSessions();
   const [refreshing, setRefreshing] = useState(false);
+  const [firestoreRecords, setFirestoreRecords] = useState<AttendanceRecord[]>([]);
 
-  // Ambil riwayat presensi khusus untuk praktikan yang sedang login
-  const historyRecords = getAttendanceByStudent(currentUser.id);
+  // Ambil riwayat presensi khusus untuk praktikan yang sedang login dari store lokal
+  const localHistory = getAttendanceByStudent(currentUser.id);
 
-  const handleRefresh = () => {
+  useEffect(() => {
+    let isMounted = true;
+    getStudentAttendanceHistory(currentUser.id)
+      .then((records) => {
+        if (isMounted) {
+          setFirestoreRecords(records);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser.id]);
+
+  const handleRefresh = async () => {
     setRefreshing(true);
-    // State lokal akan otomatis sync karena context-based
-    setTimeout(() => {
+    try {
+      const records = await getStudentAttendanceHistory(currentUser.id);
+      setFirestoreRecords(records);
+    } catch {
+      // Fallback ke store lokal
+    } finally {
       setRefreshing(false);
-    }, 400);
+    }
   };
+
+  // Gabungkan record firestore dan lokal, hilangkan duplikasi berdasarkan id/sessionId
+  const combinedMap = new Map<string, AttendanceRecord & { session?: PracticalSession }>();
+
+  localHistory.forEach((item) => {
+    combinedMap.set(`${item.sessionId}_${item.studentId}`, item);
+  });
+
+  firestoreRecords.forEach((item) => {
+    const key = `${item.sessionId}_${item.studentId}`;
+    const existing = combinedMap.get(key);
+    combinedMap.set(key, {
+      ...item,
+      session: existing?.session || getSessionById(item.sessionId),
+    });
+  });
+
+  const historyRecords = Array.from(combinedMap.values()).sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   const handleOpenDetail = (sessionId: string) => {
     router.push(`/student/attendance/${sessionId}` as Href);
