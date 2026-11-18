@@ -350,9 +350,17 @@ export async function signUpUser(
       createdAt: new Date().toISOString(),
     });
 
-    currentAuthUser = newAuthUser;
-    signedOutExplicitly = false;
-    notifyAuthListeners();
+    if (approvalStatus !== 'APPROVED') {
+      // Akun membutuhkan persetujuan, jangan biarkan otomatis login
+      await signOut(auth);
+      currentAuthUser = null;
+      signedOutExplicitly = true;
+      notifyAuthListeners();
+    } else {
+      currentAuthUser = newAuthUser;
+      signedOutExplicitly = false;
+      notifyAuthListeners();
+    }
     return newAuthUser;
   }
 
@@ -379,10 +387,16 @@ export async function signUpUser(
   };
 
   localAccountsStore.push(newLocalRecord);
-  currentAuthUser = toAuthUser(newLocalRecord);
-  signedOutExplicitly = false;
-  notifyAuthListeners();
-  return currentAuthUser;
+  if (approvalStatus !== 'APPROVED') {
+    currentAuthUser = null;
+    signedOutExplicitly = true;
+    notifyAuthListeners();
+  } else {
+    currentAuthUser = toAuthUser(newLocalRecord);
+    signedOutExplicitly = false;
+    notifyAuthListeners();
+  }
+  return toAuthUser(newLocalRecord);
 }
 
 /**

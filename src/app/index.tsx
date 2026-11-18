@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -11,11 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import {
-  AuthUser,
-  getCurrentUser as getAuthUser,
-  onAuthChange,
   signInUser,
-  signOutUser,
   signUpUser,
 } from '@/services/auth';
 import { isFirebaseConfigured } from '@/services/firebase';
@@ -25,10 +21,7 @@ import { UserRole } from '@/types/attendance';
 type AuthMode = 'LOGIN' | 'REGISTER';
 
 export default function AuthAndRoleRoute() {
-  const { currentUser, setCurrentUser } = useCurrentUser();
-  const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
-    getAuthUser()
-  );
+  const { setCurrentUser } = useCurrentUser();
 
   const [mode, setMode] = useState<AuthMode>('LOGIN');
   const [email, setEmail] = useState('');
@@ -53,13 +46,6 @@ export default function AuthAndRoleRoute() {
     title: '',
     message: '',
   });
-
-  useEffect(() => {
-    const unsubscribe = onAuthChange((user) => {
-      setAuthUser(user);
-    });
-    return unsubscribe;
-  }, []);
 
   /**
    * Auto-routing RBAC berdasarkan peran pengguna (SRS-AUTH-02 & SRS-AUTH-ADMIN).
@@ -156,20 +142,6 @@ export default function AuthAndRoleRoute() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOutUser();
-    setFeedback({
-      visible: true,
-      type: 'info',
-      title: 'Berhasil Keluar',
-      message: 'Sesi Anda telah diakhiri. Silakan masuk kembali untuk melanjutkan.',
-    });
-  };
-
-  const activeRole = authUser?.role ?? currentUser.role;
-  const isAssistant = activeRole === 'ASSISTANT';
-  const isAdmin = activeRole === 'ADMIN';
-
   return (
     <Screen style={styles.container}>
       {/* Brand Header */}
@@ -196,71 +168,6 @@ export default function AuthAndRoleRoute() {
           />
         </View>
       </View>
-
-      {/* Sesi Aktif (Jika pengguna sudah login dan kembali ke layar awal) */}
-      {authUser ? (
-        <Card variant="accent" padding="md" style={styles.activeSessionCard}>
-          <View style={styles.userCardHeader}>
-            <AppText
-              variant="caption"
-              color={Colors.primaryDark}
-              weight="semibold"
-            >
-              SESI LOGIN AKTIF
-            </AppText>
-            <Badge
-              label={isAdmin ? 'Admin Lab' : isAssistant ? 'Asisten' : 'Praktikan'}
-              variant={isAdmin ? 'closed' : isAssistant ? 'primary' : 'attended'}
-              size="sm"
-              showDot
-            />
-          </View>
-
-          <View style={styles.userInfoRow}>
-            <View style={styles.avatar}>
-              <Icon
-                name={isAdmin ? 'shield-checkmark' : isAssistant ? 'school' : 'person'}
-                size={20}
-                color={Colors.primary}
-              />
-            </View>
-            <View style={styles.userTextContainer}>
-              <AppText variant="body" weight="semibold">
-                {authUser.name}
-              </AppText>
-              <AppText variant="caption" color={Colors.textMuted}>
-                {authUser.email} • {isAdmin ? 'Role: ' : isAssistant ? 'Kode: ' : 'NIM: '}
-                {authUser.identifier}
-              </AppText>
-            </View>
-          </View>
-
-          <View style={styles.sessionActionsRow}>
-            <View style={styles.sessionActionCol}>
-              <CustomButton
-                title={
-                  isAdmin
-                    ? 'Dashboard Admin'
-                    : isAssistant
-                    ? 'Dashboard Asisten'
-                    : 'Dashboard Praktikan'
-                }
-                size="sm"
-                variant="primary"
-                onPress={() => routeByUserRole(authUser)}
-              />
-            </View>
-            <View style={styles.sessionActionCol}>
-              <CustomButton
-                title="Keluar (Logout)"
-                size="sm"
-                variant="danger"
-                onPress={handleSignOut}
-              />
-            </View>
-          </View>
-        </Card>
-      ) : null}
 
       {/* Kartu Utama: Form Login & Registrasi Firebase (SRS-AUTH-01 & SRS-AUTH-02) */}
       <Card variant="default" padding="lg" style={styles.authCard}>
@@ -579,40 +486,6 @@ const styles = StyleSheet.create({
   },
   connectionBadgeWrap: {
     marginTop: Spacing.xs,
-  },
-  activeSessionCard: {
-    marginBottom: Spacing.md,
-  },
-  userCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  userInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userTextContainer: {
-    flex: 1,
-  },
-  sessionActionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
-  sessionActionCol: {
-    flex: 1,
   },
   authCard: {
     marginBottom: Spacing.md,
