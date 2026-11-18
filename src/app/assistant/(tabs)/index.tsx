@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -12,8 +12,13 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { signOutUser } from '@/services/auth';
+import { createSession, subscribeAssistantSessions } from '@/services/sessions';
 import { useCurrentUser, useSessions } from '@/store/hooks';
-import { CreateSessionInput, SessionStatus } from '@/types/attendance';
+import {
+  CreateSessionInput,
+  PracticalSession,
+  SessionStatus,
+} from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
 
@@ -21,6 +26,7 @@ export default function AssistantScheduleRoute() {
   const { currentUser } = useCurrentUser();
   const { sessions, addSession } = useSessions();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
+  const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -36,23 +42,63 @@ export default function AssistantScheduleRoute() {
     message: '',
   });
 
+  // Berlangganan data jadwal sesi asisten secara real-time dari Firestore
+  useEffect(() => {
+    if (!currentUser.id) return;
+    const unsubscribe = subscribeAssistantSessions(
+      currentUser.id,
+      (records) => {
+        setFirestoreSessions(records);
+      },
+      currentUser.name
+    );
+    return () => unsubscribe();
+  }, [currentUser.id, currentUser.name]);
+
   const handleConfirmLogout = async () => {
     setLogoutModalVisible(false);
     await signOutUser();
     router.replace('/' as Href);
   };
 
-  const handleCreateSession = (input: CreateSessionInput) => {
-    const res = addSession(input);
-    if (res.success) {
+  const handleCreateSession = async (input: CreateSessionInput) => {
+    try {
+      const newSessionData: Omit<PracticalSession, 'id'> = {
+        courseName: input.courseName.trim(),
+        classCode: (input.classCode || 'A1').trim(),
+        room: input.room.trim(),
+        timeSlot: `${input.startTime.trim()} - ${input.endTime.trim()} WIB`,
+        date: new Date().toISOString(),
+        status: 'NOT_STARTED',
+        assistantId: currentUser.id,
+        assistantName: currentUser.name,
+        totalStudents: input.totalStudents ?? 30,
+        description: input.description?.trim() || undefined,
+      };
+
+      // 1. Tulis langsung ke Cloud Firestore
+      await createSession(newSessionData);
+
+      // 2. Selaraskan juga dengan in-memory store
+      addSession(input);
+
       setFeedbackState({
         visible: true,
         type: 'success',
         title: 'Praktikum Ditambahkan!',
-        message: `Sesi ${input.courseName} (${input.classCode || 'A1'}) berhasil dijadwalkan di ${input.room}.`,
+        message: `Sesi ${input.courseName} (${input.classCode || 'A1'}) berhasil dijadwalkan di ${input.room} dan tersimpan di Cloud Firestore.`,
       });
+      return { success: true, message: 'Berhasil' };
+    } catch (err: any) {
+      const msg = err?.message || 'Gagal menyimpan sesi ke Cloud Firestore.';
+      setFeedbackState({
+        visible: true,
+        type: 'error',
+        title: 'Gagal Menambah Sesi',
+        message: msg,
+      });
+      return { success: false, message: msg };
     }
-    return res;
   };
 
   // Batasan peran: Praktikan tidak boleh mengakses jadwal asisten
@@ -70,12 +116,18 @@ export default function AssistantScheduleRoute() {
     );
   }
 
-  // Filter sesi yang diampu oleh asisten yang sedang aktif
-  const mySessions = sessions.filter(
-    (s) => s.assistantId === currentUser.id
-  );
+  // Gunakan data real-time Firestore jika tersedia, atau fallback lokal
+  const sourceSessions =
+    firestoreSessions.length > 0
+      ? firestoreSessions
+      : sessions.filter(
+          (s) =>
+            s.assistantId === currentUser.id ||
+            s.assistantId === 'ast-1' ||
+            s.assistantName === currentUser.name
+        );
 
-  const displayedSessions = mySessions.filter((s) => {
+  const displayedSessions = sourceSessions.filter((s) => {
     if (activeFilter === 'ALL') return true;
     return s.status === activeFilter;
   });

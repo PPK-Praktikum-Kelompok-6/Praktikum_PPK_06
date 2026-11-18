@@ -16,9 +16,10 @@ import {
   submitAttendanceToFirestore,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
+import { subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canAttend } from '@/store/rules';
-import { AttendanceRecord } from '@/types/attendance';
+import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
 
 export default function StudentAttendanceDetailRoute() {
@@ -31,6 +32,7 @@ export default function StudentAttendanceDetailRoute() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
+  const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
   const [feedbackState, setFeedbackState] = useState<{
     visible: boolean;
     type: 'success' | 'error';
@@ -43,7 +45,14 @@ export default function StudentAttendanceDetailRoute() {
     message: '',
   });
 
-  const session = sessionId ? getSessionById(sessionId) : undefined;
+  // Real-time listener dokumen sesi (SRS-SYNC-01)
+  useEffect(() => {
+    if (!sessionId) return;
+    const unsubSession = subscribeSessionDoc(sessionId, (sess) => {
+      setRealtimeSession(sess);
+    });
+    return () => unsubSession();
+  }, [sessionId]);
 
   // Real-time listener attendance record untuk sesi ini (SRS-SYNC-01)
   useEffect(() => {
@@ -53,6 +62,8 @@ export default function StudentAttendanceDetailRoute() {
     });
     return () => unsubscribe();
   }, [sessionId]);
+
+  const session = realtimeSession || (sessionId ? getSessionById(sessionId) : undefined);
 
   // Cek apakah praktikan aktif sudah tercatat hadir (dari real-time atau store lokal)
   const realtimeAttendedRecord = realtimeRecords.find(

@@ -21,8 +21,9 @@ import {
   setSessionStatus,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
+import { subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { AttendanceRecord } from '@/types/attendance';
+import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
 export default function AssistantSessionDetailRoute() {
@@ -34,11 +35,21 @@ export default function AssistantSessionDetailRoute() {
   const [controlModalVisible, setControlModalVisible] = useState(false);
   const [controlAction, setControlAction] = useState<SessionControlAction>('OPEN');
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
+  const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
 
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('success');
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  // Real-time listener dokumen sesi praktikum dari Firestore
+  useEffect(() => {
+    if (!id) return;
+    const unsubSession = subscribeSessionDoc(id, (sess) => {
+      setRealtimeSession(sess);
+    });
+    return () => unsubSession();
+  }, [id]);
 
   // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01)
   useEffect(() => {
@@ -74,7 +85,7 @@ export default function AssistantSessionDetailRoute() {
     );
   }
 
-  const session = id ? getSessionById(id) : undefined;
+  const session = realtimeSession || (id ? getSessionById(id) : undefined);
   // Gunakan record real-time jika ada, fallback ke store lokal
   const attendanceRecords =
     realtimeRecords.length > 0

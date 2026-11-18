@@ -1,5 +1,5 @@
 import { Href, router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -16,8 +16,9 @@ import {
 } from '@/constants/theme';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { signOutUser } from '@/services/auth';
+import { subscribeStudentSessions } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { SessionStatus } from '@/types/attendance';
+import { PracticalSession, SessionStatus } from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
 
@@ -35,8 +36,25 @@ export default function StudentScheduleRoute() {
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
   const [refreshing, setRefreshing] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
 
-  const filteredSessions = sessions.filter((s) => {
+  // Berlangganan sesi praktikum secara real-time dari Firestore
+  useEffect(() => {
+    if (!currentUser.id) return;
+    const unsub = subscribeStudentSessions(
+      currentUser.id,
+      currentUser.enrolledClasses || [],
+      (loaded) => {
+        setFirestoreSessions(loaded);
+      }
+    );
+    return () => unsub();
+  }, [currentUser.id, currentUser.enrolledClasses]);
+
+  const sourceSessions =
+    firestoreSessions.length > 0 ? firestoreSessions : sessions;
+
+  const filteredSessions = sourceSessions.filter((s) => {
     if (activeFilter === 'ALL') return true;
     return s.status === activeFilter;
   });

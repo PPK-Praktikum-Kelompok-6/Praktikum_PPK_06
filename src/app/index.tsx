@@ -68,12 +68,14 @@ export default function AuthAndRoleRoute() {
     name: string;
     role: UserRole;
     identifier: string;
+    enrolledClasses?: string[];
   }) => {
     setCurrentUser({
       id: user.uid,
       name: user.name,
       role: user.role,
       identifier: user.identifier,
+      enrolledClasses: user.enrolledClasses,
     });
 
     if (user.role === 'ASSISTANT') {

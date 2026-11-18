@@ -19,7 +19,11 @@ import { CreateSessionInput } from '@/types/attendance';
 export interface CreateSessionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (input: CreateSessionInput) => { success: boolean; message: string };
+  onSubmit: (
+    input: CreateSessionInput
+  ) =>
+    | { success: boolean; message: string }
+    | Promise<{ success: boolean; message: string }>;
 }
 
 const PRESET_COURSES = [
@@ -56,6 +60,7 @@ export function CreateSessionModal({
   const [endTime, setEndTime] = useState('10.00');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setCourseName('');
@@ -72,7 +77,7 @@ export function CreateSessionModal({
     onClose();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!courseName.trim()) {
       setError('Nama mata kuliah wajib diisi atau dipilih.');
       return;
@@ -87,20 +92,29 @@ export function CreateSessionModal({
     }
 
     setError(null);
-    const result = onSubmit({
-      courseName: courseName.trim(),
-      classCode: classCode.trim() || 'A1',
-      room: room.trim(),
-      startTime: startTime.trim(),
-      endTime: endTime.trim(),
-      description: description.trim() || undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      const result = await Promise.resolve(
+        onSubmit({
+          courseName: courseName.trim(),
+          classCode: classCode.trim() || 'A1',
+          room: room.trim(),
+          startTime: startTime.trim(),
+          endTime: endTime.trim(),
+          description: description.trim() || undefined,
+        })
+      );
 
-    if (result.success) {
-      resetForm();
-      onClose();
-    } else {
-      setError(result.message);
+      if (result.success) {
+        resetForm();
+        onClose();
+      } else {
+        setError(result.message);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Gagal menyimpan sesi praktikum.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -350,6 +364,7 @@ export function CreateSessionModal({
               title="Simpan Sesi"
               variant="primary"
               size="md"
+              loading={isSubmitting}
               onPress={handleSave}
               style={styles.footerButton}
               icon={<Icon name="checkmark" size={18} color={Colors.textWhite} />}

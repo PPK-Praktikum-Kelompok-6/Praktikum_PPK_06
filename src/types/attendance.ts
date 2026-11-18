@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   identifier: string; // NIM atau Kode Asisten (misal: "AST-01", "24060124130102")
+  enrolledClasses?: string[];
 }
 
 export interface AttendanceRecord {

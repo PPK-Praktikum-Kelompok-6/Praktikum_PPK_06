@@ -5,7 +5,9 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
+  onSnapshot,
   query,
   updateDoc,
   where,
@@ -72,6 +74,173 @@ export function subscribeSessions(listener: SessionListener): () => void {
   return () => {
     sessionListeners.delete(listener);
   };
+}
+
+/**
+ * Berlangganan (subscribe) real-time daftar sesi yang diampu asisten dari Firestore
+ */
+export function subscribeAssistantSessions(
+  assistantId: string,
+  onUpdate: (sessions: PracticalSession[]) => void,
+  assistantName?: string
+): () => void {
+  if (isFirebaseConfigured && assistantId) {
+    try {
+      const q = query(collection(db, 'sessions'));
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+          }));
+
+          const filtered = allSessions.filter(
+            (s) =>
+              s.assistantId === assistantId ||
+              s.assistantId === 'ast-1' ||
+              (assistantName && s.assistantName === assistantName)
+          );
+
+          onUpdate(filtered);
+        },
+        (error) => {
+          console.warn('Real-time assistant sessions listener error:', error);
+          onUpdate(
+            localSessionsStore.filter(
+              (s) =>
+                s.assistantId === assistantId ||
+                s.assistantId === 'ast-1' ||
+                (assistantName && s.assistantName === assistantName)
+            )
+          );
+        }
+      );
+
+      return unsubscribe;
+    } catch (err) {
+      console.warn('Could not setup Firestore onSnapshot for assistant sessions:', err);
+    }
+  }
+
+  // Fallback lokal
+  const sendLocal = () => {
+    onUpdate(
+      localSessionsStore.filter(
+        (s) =>
+          s.assistantId === assistantId ||
+          s.assistantId === 'ast-1' ||
+          (assistantName && s.assistantName === assistantName)
+      )
+    );
+  };
+  sendLocal();
+  return subscribeSessions(sendLocal);
+}
+
+/**
+ * Berlangganan (subscribe) real-time dokumen satu sesi praktikum berdasarkan ID.
+ */
+export function subscribeSessionDoc(
+  sessionId: string,
+  onUpdate: (session: PracticalSession | undefined) => void
+): () => void {
+  if (isFirebaseConfigured && sessionId) {
+    try {
+      const unsubscribe = onSnapshot(
+        doc(db, 'sessions', sessionId),
+        (docSnap) => {
+          if (docSnap.exists()) {
+            onUpdate({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+            });
+          } else {
+            onUpdate(localSessionsStore.find((s) => s.id === sessionId));
+          }
+        },
+        (error) => {
+          console.warn('Real-time session doc listener error:', error);
+          onUpdate(localSessionsStore.find((s) => s.id === sessionId));
+        }
+      );
+      return unsubscribe;
+    } catch (err) {
+      console.warn('Could not setup session doc onSnapshot:', err);
+    }
+  }
+
+  onUpdate(localSessionsStore.find((s) => s.id === sessionId));
+  return () => {};
+}
+
+/**
+ * Mengambil dokumen sesi praktikum dari Firestore atau fallback lokal secara async.
+ */
+export async function getSessionDoc(
+  sessionId: string
+): Promise<PracticalSession | undefined> {
+  if (!sessionId) return undefined;
+
+  if (isFirebaseConfigured) {
+    try {
+      const snap = await getDoc(doc(db, 'sessions', sessionId));
+      if (snap.exists()) {
+        return {
+          id: snap.id,
+          ...(snap.data() as Omit<PracticalSession, 'id'>),
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return localSessionsStore.find((s) => s.id === sessionId);
+}
+
+/**
+ * Berlangganan (subscribe) real-time daftar sesi untuk praktikan dari Firestore
+ */
+export function subscribeStudentSessions(
+  studentId: string,
+  enrolledClasses: string[],
+  onUpdate: (sessions: PracticalSession[]) => void
+): () => void {
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, 'sessions'));
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+          }));
+
+          const normalizedClasses = enrolledClasses.map((c) => c.toUpperCase());
+          const filtered = allSessions.filter(
+            (s) =>
+              normalizedClasses.length === 0 ||
+              normalizedClasses.includes((s.classCode || '').toUpperCase())
+          );
+          onUpdate(filtered.length > 0 ? filtered : allSessions);
+        },
+        (error) => {
+          console.warn('Real-time student sessions error:', error);
+          onUpdate(localSessionsStore);
+        }
+      );
+      return unsubscribe;
+    } catch (err) {
+      console.warn('Could not setup student sessions onSnapshot:', err);
+    }
+  }
+
+  const sendLocal = () => onUpdate(localSessionsStore);
+  sendLocal();
+  return subscribeSessions(sendLocal);
 }
 
 /**
