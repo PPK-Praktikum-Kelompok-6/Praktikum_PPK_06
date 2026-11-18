@@ -16,7 +16,7 @@ import {
 import { subscribeStudentSessions } from '@/services/sessions';
 import { useCurrentUser, useSessions } from '@/store/hooks';
 import { PracticalSession } from '@/types/attendance';
-import { PermitRequest } from '@/types/permit';
+import { PermitAttachment, PermitRequest } from '@/types/permit';
 
 export default function StudentPermitScreen() {
   const { currentUser } = useCurrentUser();
@@ -76,6 +76,7 @@ export default function StudentPermitScreen() {
     sessionId: string;
     courseName: string;
     reason: string;
+    attachment?: PermitAttachment;
   }) => {
     setLoading(true);
     try {
@@ -86,6 +87,7 @@ export default function StudentPermitScreen() {
         studentName: currentUser.name,
         studentNim: currentUser.identifier,
         reason: data.reason,
+        attachment: data.attachment,
       });
 
       if (result.success) {

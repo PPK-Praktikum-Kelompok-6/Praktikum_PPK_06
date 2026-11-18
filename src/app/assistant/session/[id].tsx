@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Card } from '@/components/ui/Card';
@@ -24,7 +24,7 @@ import {
 } from '@/services/attendance';
 import { subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { canOpen } from '@/store/rules';
+import { canOpen, isSessionExpired } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
@@ -70,6 +70,19 @@ export default function AssistantSessionDetailRoute() {
     return () => unsubscribe();
   }, [id]);
 
+  const session = realtimeSession || (id ? getSessionById(id) : undefined);
+
+  // Otomatis tutup sesi bila jam praktikum telah selesai
+  useEffect(() => {
+    if (session && session.status === 'OPEN') {
+      const { expired } = isSessionExpired(session);
+      if (expired) {
+        setSessionStatus(session.id, 'CLOSED');
+        closeSession(session.id);
+      }
+    }
+  }, [session, closeSession]);
+
   // Batasan peran: Praktikan tidak boleh mengakses detail dan kontrol sesi asisten
   if (currentUser.role !== 'ASSISTANT') {
     return (
@@ -95,7 +108,6 @@ export default function AssistantSessionDetailRoute() {
     );
   }
 
-  const session = realtimeSession || (id ? getSessionById(id) : undefined);
   // Gunakan record real-time jika ada, fallback ke store lokal
   const attendanceRecords =
     realtimeRecords.length > 0
@@ -260,9 +272,13 @@ export default function AssistantSessionDetailRoute() {
 
         <View style={styles.detailsGrid}>
           <View style={styles.detailRow}>
-            <Icon name="location-outline" size={16} color={Colors.textWhiteMuted} />
+            <Icon
+              name={session.deliveryMode === 'ONLINE' ? 'videocam-outline' : 'location-outline'}
+              size={16}
+              color={Colors.textWhiteMuted}
+            />
             <AppText variant="bodySm" color={Colors.textWhite}>
-              {session.room}
+              {session.deliveryMode === 'ONLINE' ? 'Daring (Online)' : session.room}
             </AppText>
           </View>
 
@@ -286,6 +302,24 @@ export default function AssistantSessionDetailRoute() {
               {session.assistantName}
             </AppText>
           </View>
+
+          {session.meetingLink ? (
+            <Pressable
+              style={styles.meetingLinkBox}
+              onPress={() => Linking.openURL(session.meetingLink!)}
+            >
+              <Icon name="link-outline" size={16} color={Colors.primaryLight} />
+              <AppText
+                variant="caption"
+                weight="bold"
+                color={Colors.textWhite}
+                numberOfLines={1}
+                style={styles.meetingLinkText}
+              >
+                Buka Link Praktikum: {session.meetingLink}
+              </AppText>
+            </Pressable>
+          ) : null}
 
           {session.description ? (
             <View style={styles.descriptionRow}>
@@ -550,6 +584,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  meetingLinkBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: 'rgba(37, 99, 235, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    marginTop: Spacing.xxs,
+  },
+  meetingLinkText: {
+    flex: 1,
   },
   descriptionRow: {
     flexDirection: 'row',

@@ -10,67 +10,200 @@ export interface RuleResult {
 }
 
 /**
+ * Parsing rentang waktu slot ("08.00 - 10.00 WIB" atau "08:00 - 10:00")
+ */
+export function parseSessionTimeSlot(timeSlot: string): {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+  startText: string;
+  endText: string;
+} | null {
+  if (!timeSlot) return null;
+  const matches = [...timeSlot.matchAll(/(\d{1,2})[.:](\d{2})/g)];
+  if (matches.length >= 2) {
+    return {
+      startHour: parseInt(matches[0][1], 10),
+      startMinute: parseInt(matches[0][2], 10),
+      endHour: parseInt(matches[1][1], 10),
+      endMinute: parseInt(matches[1][2], 10),
+      startText: `${matches[0][1]}.${matches[0][2]} WIB`,
+      endText: `${matches[1][1]}.${matches[1][2]} WIB`,
+    };
+  }
+  if (matches.length === 1) {
+    const sh = parseInt(matches[0][1], 10);
+    const sm = parseInt(matches[0][2], 10);
+    return {
+      startHour: sh,
+      startMinute: sm,
+      endHour: (sh + 2) % 24,
+      endMinute: sm,
+      startText: `${matches[0][1]}.${matches[0][2]} WIB`,
+      endText: `${(sh + 2) % 24}.${matches[0][2]} WIB`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Parsing tanggal sesi ke year, month (0-indexed), day
+ */
+export function getSessionDateParts(
+  dateStr?: string
+): { year: number; month: number; day: number } | null {
+  if (!dateStr) return null;
+  const ymdMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    return {
+      year: parseInt(ymdMatch[1], 10),
+      month: parseInt(ymdMatch[2], 10) - 1,
+      day: parseInt(ymdMatch[3], 10),
+    };
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      day: d.getDate(),
+    };
+  }
+  return null;
+}
+
+/**
+ * Mengonstruksi waktu mulai dan selesai sesi secara akurat dari tanggal dan slot waktu
+ */
+export function getSessionDateRange(
+  session: PracticalSession
+): {
+  start: Date;
+  end: Date;
+  startText: string;
+  endText: string;
+  dateText: string;
+} | null {
+  const times = parseSessionTimeSlot(session.timeSlot || '');
+  if (!times) return null;
+
+  const dateParts = getSessionDateParts(session.date);
+  const now = new Date();
+  const year = dateParts ? dateParts.year : now.getFullYear();
+  const month = dateParts ? dateParts.month : now.getMonth();
+  const day = dateParts ? dateParts.day : now.getDate();
+
+  const start = new Date(year, month, day, times.startHour, times.startMinute, 0, 0);
+  const end = new Date(year, month, day, times.endHour, times.endMinute, 0, 0);
+
+  if (end.getTime() < start.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  const dateText = `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`;
+
+  return { start, end, startText: times.startText, endText: times.endText, dateText };
+}
+
+/**
  * Memeriksa apakah waktu mulai sesi praktikum sudah tiba.
- * Format timeSlot yang didukung: "HH.MM - HH.MM WIB" atau "HH:MM - HH:MM".
- * Toleransi: Jika sesi baru saja dibuat (dalam 15 menit terakhir), sesi diizinkan dibuka langsung ("saat kelas dibuat").
+ * Mengharuskan tanggal yang tepat dan waktu mulai yang telah tercapai.
+ * Toleransi: Jika sesi baru saja dibuat (dalam 15 menit terakhir), asisten diizinkan membukanya langsung.
  */
 export function isSessionStartTimeReached(
   session: PracticalSession,
   now: Date = new Date()
-): { reached: boolean; scheduledTimeText: string } {
-  const slot = session.timeSlot || '';
-  const match = slot.match(/(\d{1,2})[.:](\d{2})/);
-  const scheduledTimeText = match ? `${match[1]}.${match[2]} WIB` : slot;
+): {
+  reached: boolean;
+  scheduledTimeText: string;
+  scheduledDateText: string;
+  reason?: string;
+} {
+  const range = getSessionDateRange(session);
+  if (!range) {
+    return {
+      reached: true,
+      scheduledTimeText: session.timeSlot || '',
+      scheduledDateText: '',
+    };
+  }
 
-  // Jika sesi baru saja dibuat dalam rentang 15 menit terakhir
+  // Toleransi 15 menit jika sesi baru dibuat
   if (session.createdAt) {
     const createdTime = new Date(session.createdAt).getTime();
     if (!isNaN(createdTime) && now.getTime() - createdTime < 15 * 60 * 1000) {
-      return { reached: true, scheduledTimeText };
+      return {
+        reached: true,
+        scheduledTimeText: range.startText,
+        scheduledDateText: range.dateText,
+      };
     }
   }
 
-  if (!match) {
-    return { reached: true, scheduledTimeText };
-  }
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const sessionDayStart = new Date(
+    range.start.getFullYear(),
+    range.start.getMonth(),
+    range.start.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
 
-  const startHour = parseInt(match[1], 10);
-  const startMinute = parseInt(match[2], 10);
-
-  let sessionDate = new Date();
-  if (session.date) {
-    const parsedDate = new Date(session.date);
-    if (!isNaN(parsedDate.getTime())) {
-      sessionDate = parsedDate;
-    }
-  }
-
-  const targetStart = new Date(sessionDate);
-  targetStart.setHours(startHour, startMinute, 0, 0);
-
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-
-  const sessionDayStart = new Date(sessionDate);
-  sessionDayStart.setHours(0, 0, 0, 0);
-
+  // Jika tanggal praktikum di masa depan
   if (sessionDayStart.getTime() > todayStart.getTime()) {
-    return { reached: false, scheduledTimeText };
+    return {
+      reached: false,
+      scheduledTimeText: range.startText,
+      scheduledDateText: range.dateText,
+      reason: `Sesi dijadwalkan pada ${range.dateText} pukul ${range.startText}. Praktikum belum dapat dibuka sebelum tanggal tersebut.`,
+    };
   }
 
-  if (sessionDayStart.getTime() === todayStart.getTime()) {
-    if (now.getTime() < targetStart.getTime()) {
-      return { reached: false, scheduledTimeText };
-    }
+  // Jika tanggal adalah hari ini, periksa jam mulai
+  if (sessionDayStart.getTime() === todayStart.getTime() && now.getTime() < range.start.getTime()) {
+    return {
+      reached: false,
+      scheduledTimeText: range.startText,
+      scheduledDateText: range.dateText,
+      reason: `Sesi dijadwalkan pukul ${range.startText}. Jam mulai praktikum belum tiba.`,
+    };
   }
 
-  return { reached: true, scheduledTimeText };
+  return {
+    reached: true,
+    scheduledTimeText: range.startText,
+    scheduledDateText: range.dateText,
+  };
+}
+
+/**
+ * Memeriksa apakah waktu praktikum telah berakhir (melewati jam selesai).
+ * Digunakan untuk menutup sesi secara otomatis.
+ */
+export function isSessionExpired(
+  session: PracticalSession,
+  now: Date = new Date()
+): { expired: boolean; endText: string; dateText: string } {
+  const range = getSessionDateRange(session);
+  if (!range) {
+    return { expired: false, endText: '', dateText: '' };
+  }
+
+  const isPast = now.getTime() >= range.end.getTime();
+  return {
+    expired: isPast,
+    endText: range.endText,
+    dateText: range.dateText,
+  };
 }
 
 /**
  * Pure business rule: Memeriksa apakah suatu sesi dapat dibuka oleh asisten.
  * Sesi hanya dapat dibuka jika statusnya saat ini 'NOT_STARTED', wewenang pengguna adalah 'ASSISTANT',
- * dan waktu mulai praktikum telah tiba (atau baru saja dibuat).
+ * belum kadaluarsa, dan waktu mulai praktikum telah tiba.
  */
 export function canOpen(
   session: PracticalSession | undefined,
@@ -95,12 +228,23 @@ export function canOpen(
     };
   }
 
+  // Constraint: Waktu selesai tidak boleh sudah terlewati
+  const expiredCheck = isSessionExpired(session);
+  if (expiredCheck.expired) {
+    return {
+      allowed: false,
+      reason: `Waktu praktikum telah selesai (${expiredCheck.dateText} ${expiredCheck.endText}). Sesi yang sudah melewati batas waktu tidak dapat dibuka.`,
+    };
+  }
+
   // Constraint: Waktu mulai sesi harus sudah tiba
   const timeCheck = isSessionStartTimeReached(session);
   if (!timeCheck.reached) {
     return {
       allowed: false,
-      reason: `Sesi praktikum belum masuk jam mulai (${timeCheck.scheduledTimeText}). Sesi hanya dapat dibuka saat jam mulai telah tiba atau saat kelas baru dibuat.`,
+      reason:
+        timeCheck.reason ||
+        `Sesi praktikum belum masuk jam mulai (${timeCheck.scheduledTimeText}). Sesi hanya dapat berjalan pada waktu dan tanggal yang tepat.`,
     };
   }
 
@@ -186,6 +330,14 @@ export function canAttend(
     return {
       allowed: false,
       reason: 'Sesi praktikum sudah ditutup. Presensi baru tidak dapat diterima.',
+    };
+  }
+  // Constraint: Waktu praktikum telah berakhir (otomatis tutup)
+  const expiredCheck = isSessionExpired(session);
+  if (expiredCheck.expired) {
+    return {
+      allowed: false,
+      reason: `Waktu praktikum telah berakhir (${expiredCheck.dateText} ${expiredCheck.endText}). Sesi praktikum ditutup secara otomatis.`,
     };
   }
   if (isAlreadyAttended(records, session.id, studentId)) {

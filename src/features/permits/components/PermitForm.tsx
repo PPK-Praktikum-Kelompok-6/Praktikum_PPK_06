@@ -1,5 +1,7 @@
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useState } from 'react';
 import {
+  Pressable,
   StyleSheet,
   TextInput,
   View,
@@ -11,16 +13,24 @@ import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { PracticalSession } from '@/types/attendance';
+import { PermitAttachment } from '@/types/permit';
 
 export interface PermitFormProps {
   sessions: PracticalSession[];
-  onSubmit: (data: { sessionId: string; courseName: string; reason: string }) => Promise<void>;
+  onSubmit: (data: {
+    sessionId: string;
+    courseName: string;
+    reason: string;
+    attachment?: PermitAttachment;
+  }) => Promise<void>;
   isLoading?: boolean;
 }
 
 export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitFormProps) {
   const [userSelectedSessionId, setUserSelectedSessionId] = useState<string>('');
   const [reason, setReason] = useState('');
+  const [attachment, setAttachment] = useState<PermitAttachment | null>(null);
+  const [pickingFile, setPickingFile] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedSessionId =
@@ -29,6 +39,48 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
       : sessions[0]?.id || '';
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
+
+  const handlePickDocument = async () => {
+    setErrorMessage(null);
+    setPickingFile(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const MAX_SIZE = 3 * 1024 * 1024; // Maksimal 3 MB (3,145,728 bytes)
+      const fileSize = asset.size ?? 0;
+
+      if (fileSize > MAX_SIZE) {
+        const sizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+        setErrorMessage(
+          `Ukuran file maksimal 3 MB. File "${asset.name}" yang Anda pilih berukuran ${sizeMB} MB.`
+        );
+        return;
+      }
+
+      setAttachment({
+        name: asset.name,
+        size: fileSize,
+        mimeType: asset.mimeType || 'application/octet-stream',
+        uri: asset.uri,
+      });
+    } catch (err: any) {
+      setErrorMessage('Gagal memilih file dokumen: ' + (err?.message || 'Error'));
+    } finally {
+      setPickingFile(false);
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachment(null);
+  };
 
   const handleSubmit = async () => {
     setErrorMessage(null);
@@ -49,8 +101,10 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
         sessionId: selectedSessionId,
         courseName: selectedSession?.courseName || 'Praktikum',
         reason: trimmed,
+        attachment: attachment ?? undefined,
       });
       setReason('');
+      setAttachment(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal mengirim permohonan izin.';
       setErrorMessage(msg);
@@ -68,7 +122,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
             Formulir Izin Praktikum
           </AppText>
           <AppText variant="caption" color={Colors.textSecondary}>
-            Sertakan alasan yang jelas untuk dianalisis oleh asisten & AI
+            Sertakan alasan yang jelas & bukti lampiran untuk ditinjau asisten
           </AppText>
         </View>
       </View>
@@ -109,7 +163,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
         <View style={styles.sessionInfoBox}>
           <Icon name="time-outline" size={14} color={Colors.primary} />
           <AppText variant="caption" color={Colors.primaryDark} style={styles.sessionInfoText}>
-            {selectedSession.date} • {selectedSession.timeSlot} • Ruang {selectedSession.room}
+            {selectedSession.date} • {selectedSession.timeSlot} • {selectedSession.deliveryMode === 'ONLINE' ? '🌐 Daring' : '🏢 ' + selectedSession.room}
           </AppText>
         </View>
       )}
@@ -118,7 +172,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
       <View style={styles.field}>
         <View style={styles.reasonHeader}>
           <AppText variant="label" weight="semibold" style={styles.label}>
-            Alasan Ketidakhadiran
+            Alasan Ketidakhadiran *
           </AppText>
           <AppText variant="caption" color={reason.trim().length >= 10 ? Colors.success : Colors.textMuted}>
             {reason.trim().length}/10 karakter
@@ -138,6 +192,66 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
           style={styles.textArea}
           textAlignVertical="top"
         />
+      </View>
+
+      {/* Kolom Lampiran Dokumen Bukti (Maks. 3 MB) */}
+      <View style={styles.field}>
+        <View style={styles.attachmentHeader}>
+          <AppText variant="label" weight="semibold" style={styles.label}>
+            LAMPIRAN BUKTI (OPSIONAL)
+          </AppText>
+          <AppText variant="caption" color={Colors.textMuted}>
+            PDF, JPG, PNG (Maks. 3 MB)
+          </AppText>
+        </View>
+
+        {attachment ? (
+          <View style={styles.attachedCard}>
+            <View style={styles.attachedLeft}>
+              <View style={styles.attachedIconWrap}>
+                <Icon
+                  name={attachment.mimeType.includes('pdf') ? 'document-text' : 'image'}
+                  size={20}
+                  color={Colors.primary}
+                />
+              </View>
+              <View style={styles.attachedTexts}>
+                <AppText variant="bodySm" weight="semibold" numberOfLines={1}>
+                  {attachment.name}
+                </AppText>
+                <AppText variant="caption" color={Colors.textMuted}>
+                  {(attachment.size / 1024).toFixed(1)} KB • Berkas Terlampir
+                </AppText>
+              </View>
+            </View>
+            <Pressable
+              onPress={handleRemoveAttachment}
+              style={styles.removeAttachButton}
+              accessibilityRole="button"
+              accessibilityLabel="Hapus lampiran"
+            >
+              <Icon name="trash-outline" size={18} color={Colors.danger} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={styles.pickFileBox}
+            onPress={handlePickDocument}
+            disabled={pickingFile}
+          >
+            <View style={styles.pickIconCircle}>
+              <Icon name="attach" size={18} color={Colors.primary} />
+            </View>
+            <View style={styles.pickFileTexts}>
+              <AppText variant="bodySm" weight="semibold" color={Colors.primaryDark}>
+                {pickingFile ? 'Membuka File Picker...' : 'Unggah Surat Dokter / Bukti Izin'}
+              </AppText>
+              <AppText variant="caption" color={Colors.textMuted}>
+                Format: PDF, JPG, JPEG, PNG (Maks. 3 MB)
+              </AppText>
+            </View>
+          </Pressable>
+        )}
       </View>
 
       {/* Error Message Feedback */}
@@ -232,6 +346,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     minHeight: 88,
+  },
+  attachmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  pickFileBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.primaryBorder,
+    backgroundColor: Colors.primaryBg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: Radius.md,
+  },
+  pickIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickFileTexts: {
+    flex: 1,
+  },
+  attachedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  attachedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+    marginRight: Spacing.xs,
+  },
+  attachedIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachedTexts: {
+    flex: 1,
+  },
+  removeAttachButton: {
+    padding: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.dangerBg,
   },
   errorBox: {
     flexDirection: 'row',

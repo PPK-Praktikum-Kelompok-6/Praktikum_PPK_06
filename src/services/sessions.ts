@@ -14,10 +14,24 @@ import {
 } from 'firebase/firestore';
 
 import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
+import { isSessionExpired } from '@/store/rules';
 import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
 import { db, isFirebaseConfigured } from './firebase';
 
 export { PracticalClass } from '@/types/attendance';
+
+/**
+ * Memastikan payload yang dikirim ke Cloud Firestore bebas dari nilai `undefined`.
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 export const DEFAULT_CLASSES: PracticalClass[] = [
   {
@@ -143,6 +157,9 @@ export function subscribeAssistantSessions(
             ...(docSnap.data() as Omit<PracticalSession, 'id'>),
           }));
 
+          // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
+          checkAndAutoCloseExpiredSessions(allSessions);
+
           const filtered = allSessions.filter(
             (s) =>
               s.assistantId === assistantId ||
@@ -266,6 +283,9 @@ export function subscribeStudentSessions(
             ...(docSnap.data() as Omit<PracticalSession, 'id'>),
           }));
 
+          // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
+          checkAndAutoCloseExpiredSessions(allSessions);
+
           const normalizedClasses = enrolledClasses.map((c) => c.toUpperCase());
           const filtered = allSessions.filter(
             (s) =>
@@ -298,6 +318,35 @@ export function getSessionById(sessionId: string): PracticalSession | undefined 
 }
 
 /**
+ * Memeriksa seluruh sesi yang berstatus 'OPEN'. Bila jam praktikum telah lewat,
+ * ubah status menjadi 'CLOSED' secara otomatis (baik di Firestore maupun lokal).
+ */
+let isAutoClosing = false;
+export async function checkAndAutoCloseExpiredSessions(
+  sessions?: PracticalSession[]
+): Promise<void> {
+  if (isAutoClosing) return;
+  isAutoClosing = true;
+  try {
+    const target = sessions || localSessionsStore;
+    const now = new Date();
+    for (const s of target) {
+      if (s.status === 'OPEN') {
+        const { expired } = isSessionExpired(s, now);
+        if (expired) {
+          // Tutup sesi otomatis
+          await updateSession(s.id, { status: 'CLOSED' });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Gagal memeriksa penutupan otomatis sesi:', err);
+  } finally {
+    isAutoClosing = false;
+  }
+}
+
+/**
  * 1. Membuat jadwal sesi praktikum baru di koleksi Firestore `sessions` (SRS-CRUD-01).
  */
 export async function createSession(
@@ -311,12 +360,15 @@ export async function createSession(
   }
 
   if (isFirebaseConfigured) {
-    const docRef = await addDoc(collection(db, 'sessions'), {
+    const rawData = {
       ...sessionData,
       courseName: sessionData.courseName.trim(),
       classCode: (sessionData.classCode || 'A1').trim(),
       room: sessionData.room.trim(),
-    });
+      deliveryMode: sessionData.deliveryMode || 'OFFLINE',
+    };
+    const cleanData = sanitizeForFirestore(rawData);
+    const docRef = await addDoc(collection(db, 'sessions'), cleanData);
     notifySessionListeners();
     return docRef.id;
   }
@@ -328,6 +380,7 @@ export async function createSession(
     courseName: sessionData.courseName.trim(),
     classCode: (sessionData.classCode || 'A1').trim(),
     room: sessionData.room.trim(),
+    deliveryMode: sessionData.deliveryMode || 'OFFLINE',
   };
   localSessionsStore = [created, ...localSessionsStore];
   notifySessionListeners();
@@ -440,7 +493,7 @@ export async function updateSession(
   }
 
   if (isFirebaseConfigured) {
-    const cleanUpdates = { ...updates };
+    const cleanUpdates = sanitizeForFirestore(updates);
     delete cleanUpdates.id;
     await updateDoc(doc(db, 'sessions', sessionId), cleanUpdates);
     notifySessionListeners();

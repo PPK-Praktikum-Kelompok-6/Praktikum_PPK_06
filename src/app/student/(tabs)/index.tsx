@@ -6,6 +6,7 @@ import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
+import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import {
   Colors,
@@ -145,6 +146,9 @@ export default function StudentScheduleRoute() {
           </Pressable>
         </View>
       </View>
+
+      {/* Live Real-time Clock */}
+      <LiveClock variant="light" />
 
       {/* Filter Chips */}
       <View style={styles.filterRow}>

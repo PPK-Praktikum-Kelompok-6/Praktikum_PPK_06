@@ -40,6 +40,8 @@ export interface PracticalSession {
   totalStudents: number;
   description?: string;
   createdAt?: string;
+  deliveryMode?: 'OFFLINE' | 'ONLINE';
+  meetingLink?: string;
   pendingChangeRequest?: 'DELETE' | 'RESCHEDULE';
 }
 
@@ -49,6 +51,9 @@ export interface CreateSessionInput {
   room: string;
   startTime: string;
   endTime: string;
+  date?: string;
+  deliveryMode?: 'OFFLINE' | 'ONLINE';
+  meetingLink?: string;
   description?: string;
   totalStudents?: number;
 }

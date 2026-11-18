@@ -18,6 +18,8 @@ export type SessionCardData = Pick<
   assistantName?: string;
   totalStudents?: number;
   description?: string;
+  deliveryMode?: 'OFFLINE' | 'ONLINE';
+  meetingLink?: string;
 };
 
 export interface SessionCardProps {
@@ -159,17 +161,21 @@ export function SessionCard({
 
           <View style={styles.heroStatCol}>
             <AppText variant="caption" weight="semibold" color={Colors.textWhite}>
-              Ruangan
+              {session.deliveryMode === 'ONLINE' ? 'Metode' : 'Ruangan'}
             </AppText>
             <View style={styles.statValueRow}>
-              <Icon name="location-outline" size={12} color={Colors.textWhiteMuted} />
+              <Icon
+                name={session.deliveryMode === 'ONLINE' ? 'videocam-outline' : 'location-outline'}
+                size={12}
+                color={Colors.textWhiteMuted}
+              />
               <AppText
                 variant="caption"
                 color={Colors.textWhiteMuted}
                 numberOfLines={1}
                 style={styles.statValueText}
               >
-                {session.room}
+                {session.deliveryMode === 'ONLINE' ? 'Daring (Online)' : session.room}
               </AppText>
             </View>
           </View>
@@ -235,7 +241,7 @@ export function SessionCard({
             {session.courseName}
           </AppText>
           <AppText variant="caption" color={Colors.textMuted}>
-            Kelas {session.classCode} · {session.room}
+            Kelas {session.classCode} · {session.deliveryMode === 'ONLINE' ? '🌐 Daring' : '🏢 ' + session.room}
           </AppText>
 
           {attended ? (

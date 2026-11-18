@@ -7,6 +7,7 @@ import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
+import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
@@ -103,30 +104,45 @@ export default function AssistantScheduleRoute() {
       )
         .trim()
         .toUpperCase();
+      const finalDate = input.date?.trim() || new Date().toISOString().split('T')[0];
+      const finalDeliveryMode = input.deliveryMode || 'OFFLINE';
+      const finalRoom =
+        finalDeliveryMode === 'ONLINE'
+          ? input.room?.trim() || 'Daring (Google Meet / Zoom)'
+          : input.room.trim();
+
       const newSessionData: Omit<PracticalSession, 'id'> = {
         courseName: input.courseName.trim(),
         classCode: finalClassCode,
-        room: input.room.trim(),
+        room: finalRoom,
         timeSlot: `${input.startTime.trim()} - ${input.endTime.trim()} WIB`,
-        date: new Date().toISOString(),
+        date: finalDate,
         status: 'NOT_STARTED',
         assistantId: currentUser.id,
         assistantName: currentUser.name,
         totalStudents: input.totalStudents ?? 30,
+        deliveryMode: finalDeliveryMode,
+        meetingLink: input.meetingLink?.trim() || undefined,
         description: input.description?.trim() || undefined,
+        createdAt: new Date().toISOString(),
       };
 
-      // 1. Tulis langsung ke Cloud Firestore
+      // 1. Tulis langsung ke Cloud Firestore (bebas undefined)
       await createSession(newSessionData);
 
       // 2. Selaraskan juga dengan in-memory store
-      addSession({ ...input, classCode: finalClassCode });
+      addSession({
+        ...input,
+        classCode: finalClassCode,
+        room: finalRoom,
+        date: finalDate,
+      });
 
       setFeedbackState({
         visible: true,
         type: 'success',
         title: 'Praktikum Ditambahkan!',
-        message: `Sesi ${input.courseName} (Kelas ${finalClassCode}) berhasil dijadwalkan di ${input.room} dan tersimpan di Cloud Firestore.`,
+        message: `Sesi ${input.courseName} (Kelas ${finalClassCode}) berhasil dijadwalkan untuk ${finalDate} di ${finalRoom}.`,
       });
       return { success: true, message: 'Berhasil' };
     } catch (err: any) {
@@ -254,6 +270,9 @@ export default function AssistantScheduleRoute() {
           <Icon name="log-out-outline" size={20} color={Colors.danger} />
         </Pressable>
       </View>
+
+      {/* Live Real-Time Clock */}
+      <LiveClock variant="light" />
 
       {/* Tanggung Jawab Kelas Praktikum (Ditetapkan Admin) */}
       <View style={styles.assignedClassesCard}>
