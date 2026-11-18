@@ -5,28 +5,31 @@ import { Firestore, getFirestore } from 'firebase/firestore';
 const firebaseConfig = {
   apiKey:
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY ||
-    'AIzaSyDemoKeyForLocalFallbackDevelopment00',
+    'AIzaSyBIEaal8mXM8fg1UQ8o6twVYGGhETufgKw',
   authDomain:
     process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-    'demo-ppk-praktikum.firebaseapp.com',
+    'ppk-praktikum-3ade8.firebaseapp.com',
   projectId:
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'demo-ppk-praktikum',
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'ppk-praktikum-3ade8',
   storageBucket:
     process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    'demo-ppk-praktikum.appspot.com',
+    'ppk-praktikum-3ade8.firebasestorage.app',
   messagingSenderId:
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '100000000000',
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '503940744413',
   appId:
     process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
-    '1:100000000000:web:abcdef1234567890',
+    '1:503940744413:web:f8d832b8d37d28eb608734',
+  measurementId:
+    process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || 'G-FCTWYJM98L',
 };
 
 /**
- * Bernilai true apabila kredensial Firebase nyata sudah dikonfigurasi di environment (.env).
+ * Bernilai true apabila kredensial Firebase nyata sudah dikonfigurasi.
  */
 export const isFirebaseConfigured: boolean = Boolean(
-  process.env.EXPO_PUBLIC_FIREBASE_API_KEY &&
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID
+  firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    !firebaseConfig.apiKey.includes('DemoKey')
 );
 
 export const app: FirebaseApp =
