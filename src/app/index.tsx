@@ -10,20 +10,17 @@ import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
 import {
   AuthUser,
   getCurrentUser as getAuthUser,
-  getDemoAccounts,
   onAuthChange,
   signInUser,
   signOutUser,
   signUpUser,
-  syncAuthUserFromProfile,
 } from '@/services/auth';
 import { isFirebaseConfigured } from '@/services/firebase';
 import { useCurrentUser } from '@/store/hooks';
-import { UserProfile, UserRole } from '@/types/attendance';
+import { UserRole } from '@/types/attendance';
 
 type AuthMode = 'LOGIN' | 'REGISTER';
 
@@ -34,8 +31,8 @@ export default function AuthAndRoleRoute() {
   );
 
   const [mode, setMode] = useState<AuthMode>('LOGIN');
-  const [email, setEmail] = useState('bahir@student.ac.id');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // State khusus Registrasi (SRS-AUTH-01)
@@ -44,7 +41,6 @@ export default function AuthAndRoleRoute() {
   const [identifier, setIdentifier] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [selectorVisible, setSelectorVisible] = useState(false);
   const [feedback, setFeedback] = useState<{
     visible: boolean;
     type: FeedbackType;
@@ -56,8 +52,6 @@ export default function AuthAndRoleRoute() {
     title: '',
     message: '',
   });
-
-  const demoAccounts = getDemoAccounts();
 
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
@@ -117,7 +111,7 @@ export default function AuthAndRoleRoute() {
         email: email.trim().toLowerCase(),
         name: fullName,
         role: registerRole,
-        identifier,
+        identifier: registerRole === 'ASSISTANT' ? '' : identifier,
       });
       routeByUserRole(createdUser);
     } catch (err) {
@@ -136,29 +130,6 @@ export default function AuthAndRoleRoute() {
     }
   };
 
-  const handleQuickDemoSelect = async (
-    demo: AuthUser & { demoPassword: string }
-  ) => {
-    setMode('LOGIN');
-    setEmail(demo.email);
-    setPassword(demo.demoPassword);
-    setSubmitting(true);
-    try {
-      const loggedInUser = await signInUser(demo.email, demo.demoPassword);
-      routeByUserRole(loggedInUser);
-    } catch {
-      const synced = syncAuthUserFromProfile({
-        id: demo.uid,
-        name: demo.name,
-        role: demo.role,
-        identifier: demo.identifier,
-      });
-      routeByUserRole(synced);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleSignOut = async () => {
     await signOutUser();
     setFeedback({
@@ -167,11 +138,6 @@ export default function AuthAndRoleRoute() {
       title: 'Berhasil Keluar',
       message: 'Sesi Anda telah diakhiri. Silakan masuk kembali untuk melanjutkan.',
     });
-  };
-
-  const handleProfileModalSelected = (selectedProfile: UserProfile) => {
-    const synced = syncAuthUserFromProfile(selectedProfile);
-    routeByUserRole(synced);
   };
 
   const activeRole = authUser?.role ?? currentUser.role;
@@ -394,33 +360,45 @@ export default function AuthAndRoleRoute() {
               </View>
             </View>
 
-            {/* Input NIM atau Kode Asisten */}
-            <View style={styles.fieldGroup}>
-              <AppText variant="label" style={styles.fieldLabel}>
-                {registerRole === 'ASSISTANT'
-                  ? 'KODE ASISTEN'
-                  : 'NIM PRAKTIKAN'}
-              </AppText>
-              <View style={styles.inputBox}>
-                <Icon
-                  name="card-outline"
-                  size={18}
-                  color={Colors.textMuted}
-                />
-                <TextInput
-                  value={identifier}
-                  onChangeText={setIdentifier}
-                  placeholder={
-                    registerRole === 'ASSISTANT'
-                      ? 'Contoh: AST-03'
-                      : 'Contoh: 24060124140130'
-                  }
-                  placeholderTextColor={Colors.textLight}
-                  style={styles.textInput}
-                  autoCapitalize="characters"
-                />
+            {/* Input NIM Praktikan atau Pemberitahuan Kode Asisten Otomatis */}
+            {registerRole === 'STUDENT' ? (
+              <View style={styles.fieldGroup}>
+                <AppText variant="label" style={styles.fieldLabel}>
+                  NIM PRAKTIKAN
+                </AppText>
+                <View style={styles.inputBox}>
+                  <Icon
+                    name="card-outline"
+                    size={18}
+                    color={Colors.textMuted}
+                  />
+                  <TextInput
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    placeholder="Contoh: 24060124140130"
+                    placeholderTextColor={Colors.textLight}
+                    style={styles.textInput}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={styles.autoAstCard}>
+                <Icon
+                  name="shield-checkmark"
+                  size={18}
+                  color={Colors.primary}
+                />
+                <View style={styles.autoAstTextCol}>
+                  <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
+                    Kode Asisten Otomatis
+                  </AppText>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Kode (misal AST-01, AST-02) akan diberikan otomatis oleh sistem saat Anda mendaftar.
+                  </AppText>
+                </View>
+              </View>
+            )}
           </>
         ) : null}
 
@@ -479,11 +457,7 @@ export default function AuthAndRoleRoute() {
 
         {/* Tombol Submit Utama */}
         <CustomButton
-          title={
-            mode === 'LOGIN'
-              ? 'Masuk & Arahkan Sesuai Peran'
-              : 'Daftar & Masuk ke Sistem'
-          }
+          title={mode === 'LOGIN' ? 'Masuk' : 'Daftar dan Masuk'}
           onPress={mode === 'LOGIN' ? handleLogin : handleRegister}
           loading={submitting}
           variant="primary"
@@ -497,60 +471,6 @@ export default function AuthAndRoleRoute() {
           }
         />
       </Card>
-
-      {/* Akun Demo Cepat & Pemilih Peran */}
-      <Card variant="flat" padding="md" style={styles.demoCard}>
-        <View style={styles.demoHeaderRow}>
-          <AppText variant="label">AKSES CEPAT AKUN DEMO (RBAC)</AppText>
-          <Pressable
-            onPress={() => setSelectorVisible(true)}
-            style={styles.modalTriggerLink}
-          >
-            <Icon name="swap-horizontal" size={14} color={Colors.primary} />
-            <AppText variant="caption" color={Colors.primary} weight="semibold">
-              Pilih Semua Profil
-            </AppText>
-          </Pressable>
-        </View>
-
-        <View style={styles.demoChipsWrap}>
-          {demoAccounts.slice(0, 4).map((acc) => {
-            const isAst = acc.role === 'ASSISTANT';
-            return (
-              <Pressable
-                key={acc.uid}
-                style={styles.demoChip}
-                onPress={() => handleQuickDemoSelect(acc)}
-              >
-                <Icon
-                  name={isAst ? 'school' : 'person'}
-                  size={14}
-                  color={isAst ? Colors.primary : Colors.info}
-                />
-                <View style={styles.demoChipTextCol}>
-                  <AppText
-                    variant="caption"
-                    weight="semibold"
-                    numberOfLines={1}
-                  >
-                    {acc.name.split(' ')[0]} ({isAst ? 'Asisten' : 'Praktikan'})
-                  </AppText>
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    {acc.email}
-                  </AppText>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
-
-      {/* Role Selector Modal */}
-      <RoleSelectorModal
-        visible={selectorVisible}
-        onClose={() => setSelectorVisible(false)}
-        onUserSelected={handleProfileModalSelected}
-      />
 
       {/* Feedback Modal (FR-07 / SRS-UI-01) */}
       <FeedbackModal
@@ -687,35 +607,19 @@ const styles = StyleSheet.create({
     color: Colors.text,
     paddingVertical: Spacing.xs,
   },
-  demoCard: {
-    marginBottom: Spacing.xl,
-  },
-  demoHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  modalTriggerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xxs + 2,
-  },
-  demoChipsWrap: {
-    gap: Spacing.xs,
-  },
-  demoChip: {
+  autoAstCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    paddingVertical: Spacing.xs + 2,
-    paddingHorizontal: Spacing.sm + 2,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    backgroundColor: Colors.primaryBg,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: Colors.border,
+    marginBottom: Spacing.md,
   },
-  demoChipTextCol: {
+  autoAstTextCol: {
     flex: 1,
+    gap: 2,
   },
 });

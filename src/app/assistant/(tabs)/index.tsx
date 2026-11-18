@@ -11,6 +11,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
+import { signOutUser } from '@/services/auth';
 import { useCurrentUser, useSessions } from '@/store/hooks';
 import { CreateSessionInput, SessionStatus } from '@/types/attendance';
 
@@ -22,6 +23,7 @@ export default function AssistantScheduleRoute() {
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [feedbackState, setFeedbackState] = useState<{
     visible: boolean;
     type: FeedbackType;
@@ -33,6 +35,12 @@ export default function AssistantScheduleRoute() {
     title: '',
     message: '',
   });
+
+  const handleConfirmLogout = async () => {
+    setLogoutModalVisible(false);
+    await signOutUser();
+    router.replace('/' as Href);
+  };
 
   const handleCreateSession = (input: CreateSessionInput) => {
     const res = addSession(input);
@@ -93,12 +101,12 @@ export default function AssistantScheduleRoute() {
         </View>
 
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => setLogoutModalVisible(true)}
           accessibilityRole="button"
-          accessibilityLabel="Ganti peran"
-          style={styles.avatar}
+          accessibilityLabel="Keluar dari akun asisten"
+          style={styles.logoutButton}
         >
-          <Icon name="person" size={20} color={Colors.primary} />
+          <Icon name="log-out-outline" size={20} color={Colors.danger} />
         </Pressable>
       </View>
 
@@ -196,6 +204,19 @@ export default function AssistantScheduleRoute() {
         onPrimary={() => setFeedbackState((prev) => ({ ...prev, visible: false }))}
         onClose={() => setFeedbackState((prev) => ({ ...prev, visible: false }))}
       />
+
+      {/* Logout Confirmation Modal */}
+      <FeedbackModal
+        visible={logoutModalVisible}
+        type="warning"
+        title="Konfirmasi Keluar"
+        message={`Apakah Anda yakin ingin keluar dari akun Asisten (${currentUser.name})?`}
+        primaryLabel="Ya, Keluar"
+        secondaryLabel="Batal"
+        onPrimary={handleConfirmLogout}
+        onSecondary={() => setLogoutModalVisible(false)}
+        onClose={() => setLogoutModalVisible(false)}
+      />
     </Screen>
   );
 }
@@ -216,11 +237,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 2,
   },
-  avatar: {
+  logoutButton: {
     width: 44,
     height: 44,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryBg,
+    backgroundColor: Colors.dangerBg,
     alignItems: 'center',
     justifyContent: 'center',
   },

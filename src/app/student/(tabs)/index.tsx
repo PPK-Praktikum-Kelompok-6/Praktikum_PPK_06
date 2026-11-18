@@ -14,11 +14,10 @@ import {
   Shadows,
   Spacing,
 } from '@/constants/theme';
-import { RoleSelectorModal } from '@/features/role/components/RoleSelectorModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
-import { signOutUser, syncAuthUserFromProfile } from '@/services/auth';
+import { signOutUser } from '@/services/auth';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { SessionStatus, UserProfile } from '@/types/attendance';
+import { SessionStatus } from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
 
@@ -35,7 +34,6 @@ export default function StudentScheduleRoute() {
 
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
   const [refreshing, setRefreshing] = useState(false);
-  const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const filteredSessions = sessions.filter((s) => {
@@ -57,13 +55,6 @@ export default function StudentScheduleRoute() {
     setTimeout(() => {
       setRefreshing(false);
     }, 350);
-  };
-
-  const handleUserSelected = (user: UserProfile) => {
-    syncAuthUserFromProfile(user);
-    if (user.role === 'ASSISTANT') {
-      router.replace('/assistant' as Href);
-    }
   };
 
   const handleConfirmLogout = async () => {
@@ -92,14 +83,6 @@ export default function StudentScheduleRoute() {
           </AppText>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => setRoleModalVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Ganti profil atau peran"
-            style={styles.avatar}
-          >
-            <Icon name="person" size={20} color={Colors.primary} />
-          </Pressable>
           <Pressable
             onPress={() => setLogoutModalVisible(true)}
             accessibilityRole="button"
@@ -191,12 +174,6 @@ export default function StudentScheduleRoute() {
         </>
       )}
 
-      <RoleSelectorModal
-        visible={roleModalVisible}
-        onClose={() => setRoleModalVisible(false)}
-        onUserSelected={handleUserSelected}
-      />
-
       <FeedbackModal
         visible={logoutModalVisible}
         type="warning"
@@ -232,17 +209,6 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 2,
     marginBottom: 2,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.glassSurface,
-    borderWidth: 1.2,
-    borderColor: Colors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.sm,
   },
   logoutButton: {
     width: 44,

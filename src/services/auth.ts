@@ -4,7 +4,15 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 
 import { MOCK_USERS } from '@/data/mockData';
 import { UserRole } from '@/types/attendance';
@@ -204,6 +212,45 @@ export async function getUserProfile(uid: string): Promise<AuthUser | null> {
 }
 
 /**
+ * Menghasilkan kode asisten berikutnya secara otomatis (AST-01, AST-02, ..., AST-10).
+ */
+export async function getNextAvailableAssistantCode(): Promise<string> {
+  const takenCodes = new Set<string>();
+
+  localAccountsStore
+    .filter((acc) => acc.role === 'ASSISTANT')
+    .forEach((acc) => takenCodes.add(acc.identifier.trim().toUpperCase()));
+
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('role', '==', 'ASSISTANT')
+      );
+      const snap = await getDocs(q);
+      snap.docs.forEach((d) => {
+        const idf = d.data().identifier;
+        if (idf) {
+          takenCodes.add(String(idf).trim().toUpperCase());
+        }
+      });
+    } catch {
+      // Fallback
+    }
+  }
+
+  for (let i = 1; i <= 99; i++) {
+    const code = i < 10 ? `AST-0${i}` : `AST-${i}`;
+    const altCode = `AST-${i}`;
+    if (!takenCodes.has(code) && !takenCodes.has(altCode)) {
+      return code;
+    }
+  }
+
+  return `AST-${Date.now().toString().slice(-2)}`;
+}
+
+/**
  * Mendaftarkan pengguna baru ke Firebase Authentication & menyimpan profil ke Firestore `users/{uid}` (SRS-AUTH-01).
  */
 export async function signUpUser(
@@ -213,7 +260,6 @@ export async function signUpUser(
 ): Promise<AuthUser> {
   const normalizedEmail = email.trim().toLowerCase();
   const trimmedName = profile.name.trim();
-  const trimmedIdentifier = profile.identifier.trim();
 
   if (!normalizedEmail || !normalizedEmail.includes('@')) {
     throw new Error('Format alamat email tidak valid.');
@@ -224,12 +270,18 @@ export async function signUpUser(
   if (!trimmedName) {
     throw new Error('Nama lengkap wajib diisi.');
   }
-  if (!trimmedIdentifier) {
-    throw new Error(
-      profile.role === 'ASSISTANT'
-        ? 'Kode Asisten wajib diisi.'
-        : 'NIM Praktikan wajib diisi.'
-    );
+
+  let trimmedIdentifier = profile.identifier ? profile.identifier.trim() : '';
+
+  if (profile.role === 'ASSISTANT') {
+    // Alokasi kode asisten secara otomatis (misal AST-01, AST-02) jika belum ada
+    if (!trimmedIdentifier) {
+      trimmedIdentifier = await getNextAvailableAssistantCode();
+    }
+  } else {
+    if (!trimmedIdentifier) {
+      throw new Error('NIM Praktikan wajib diisi.');
+    }
   }
 
   if (isFirebaseConfigured) {
