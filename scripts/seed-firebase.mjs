@@ -186,6 +186,39 @@ async function seed() {
     console.log(`✅ Sesi ${s.classCode} (${s.courseName}) tersimpan.`);
   }
 
+  console.log('\n📋 Mengisi data Presensi & Izin ke Firestore...');
+  let bahirUid = 'mDZOvU3OiKUl037f9C1DuX5O6IH3';
+  try {
+    const bahirLogin = await signInWithEmailAndPassword(auth, 'bahir@student.ac.id', 'password123');
+    bahirUid = bahirLogin.user.uid;
+  } catch {}
+
+  await setDoc(doc(db, 'attendance', `attendance_session-3_${bahirUid}`), {
+    id: `attendance_session-3_${bahirUid}`,
+    sessionId: 'session-3',
+    studentId: bahirUid,
+    studentName: 'Bahir Ananda Wibowo',
+    studentNim: '24060124140184',
+    timestamp: new Date().toISOString(),
+    notes: 'Hadir praktikum Basis Data',
+  });
+  console.log('✅ Rekaman Presensi awal tersimpan di attendance.');
+
+  await setDoc(doc(db, 'permits', 'permit-demo-1'), {
+    id: 'permit-demo-1',
+    sessionId: 'session-2',
+    courseName: 'Struktur Data & Algoritma',
+    studentId: bahirUid,
+    studentName: 'Bahir Ananda Wibowo',
+    studentNim: '24060124140184',
+    reason: 'Mohon izin tidak dapat hadir karena demam tinggi dan disarankan dokter istirahat.',
+    category: 'SAKIT',
+    urgencyLevel: 'TINGGI',
+    status: 'PENDING',
+    createdAt: new Date().toISOString(),
+  });
+  console.log('✅ Rekaman Pengajuan Izin awal tersimpan di permits.');
+
   console.log('\n🎉 SEMUA DATA & AKUN BERHASIL DI-SEED KE FIREBASE CLOUD!');
   process.exit(0);
 }
