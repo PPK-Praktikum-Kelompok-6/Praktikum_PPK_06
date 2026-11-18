@@ -48,9 +48,9 @@ function resolveBadge(
 ): { label: string; variant: BadgeVariant; dotColor: string; showDot: boolean } {
   if (attended) {
     return {
-      label: StatusLabel.attended,
+      label: 'Status Absen Berhasil',
       variant: 'attended',
-      dotColor: Colors.info,
+      dotColor: Colors.success,
       showDot: true,
     };
   }
@@ -132,6 +132,14 @@ export function SessionCard({
               <AppText variant="caption" color={Colors.textWhiteMuted}>
                 Asisten: {session.assistantName}
               </AppText>
+            ) : null}
+            {attended ? (
+              <View style={styles.heroAttendedBadge}>
+                <Icon name="checkmark-circle" size={13} color={Colors.success} />
+                <AppText variant="caption" weight="bold" color={Colors.textWhite}>
+                  Kelas {session.classCode} • Status Absen Berhasil
+                </AppText>
+              </View>
             ) : null}
           </View>
         </View>
@@ -229,16 +237,26 @@ export function SessionCard({
           <AppText variant="caption" color={Colors.textMuted}>
             Kelas {session.classCode} · {session.room}
           </AppText>
-          <View style={styles.metaRow}>
-            <Icon name="time-outline" size={14} color={Colors.textMuted} />
-            <AppText
-              variant="caption"
-              color={Colors.textMuted}
-              style={styles.metaText}
-            >
-              {session.timeSlot}
-            </AppText>
-          </View>
+
+          {attended ? (
+            <View style={styles.attendedSuccessBadge}>
+              <Icon name="checkmark-circle" size={13} color={Colors.success} />
+              <AppText variant="caption" weight="bold" color={Colors.success}>
+                Kelas {session.classCode} • Status Absen Berhasil
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.metaRow}>
+              <Icon name="time-outline" size={14} color={Colors.textMuted} />
+              <AppText
+                variant="caption"
+                color={Colors.textMuted}
+                style={styles.metaText}
+              >
+                {session.timeSlot}
+              </AppText>
+            </View>
+          )}
         </View>
 
         <Badge
@@ -364,6 +382,28 @@ const styles = StyleSheet.create({
   details: {
     flex: 1,
     marginRight: Spacing.sm,
+  },
+  attendedSuccessBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: 4,
+    backgroundColor: Colors.successBg,
+    paddingHorizontal: Spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+    alignSelf: 'flex-start',
+  },
+  heroAttendedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: 'rgba(34, 197, 94, 0.25)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    marginTop: Spacing.xs,
+    alignSelf: 'flex-start',
   },
   metaRow: {
     flexDirection: 'row',

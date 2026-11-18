@@ -1,11 +1,22 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
+
 import { PermitRequest } from '@/types/permit';
 import { classifyPermitReason } from './ai';
+import { db, isFirebaseConfigured } from './firebase';
 
 /**
  * Service pengolahan data izin (SRS-IZIN-01, SRS-IZIN-02, SRS-AI-01).
  *
- * Menggunakan in-memory store dengan simulasi asynchronous delay
- * sehingga berfungsi mandiri maupun saat dihubungkan ke Cloud Firestore.
+ * Menggunakan integrasi Cloud Firestore real-time dengan in-memory fallback.
  */
 
 export type PermitListener = () => void;
@@ -28,6 +39,88 @@ export function getStudentPermitsSync(studentId: string): PermitRequest[] {
 
 export function getIncomingPermitsSync(): PermitRequest[] {
   return [...permitStore];
+}
+
+/**
+ * Berlangganan real-time daftar izin untuk satu mahasiswa dari Cloud Firestore
+ */
+export function subscribeStudentPermits(
+  studentId: string,
+  onUpdate: (permits: PermitRequest[]) => void
+): () => void {
+  if (isFirebaseConfigured && studentId) {
+    try {
+      const q = query(collection(db, 'permits'));
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const list: PermitRequest[] = snap.docs
+            .map((d) => ({
+              id: d.id,
+              ...(d.data() as Omit<PermitRequest, 'id'>),
+            }))
+            .filter((p) => p.studentId === studentId);
+          list.sort(
+            (a, b) =>
+              new Date(b.submittedAt).getTime() -
+              new Date(a.submittedAt).getTime()
+          );
+          onUpdate(list);
+        },
+        (err) => {
+          console.warn('Real-time student permits listener error:', err);
+          onUpdate(permitStore.filter((p) => p.studentId === studentId));
+        }
+      );
+      return unsub;
+    } catch (e) {
+      console.warn('Could not setup student permits listener:', e);
+    }
+  }
+
+  const send = () =>
+    onUpdate(permitStore.filter((p) => p.studentId === studentId));
+  send();
+  return subscribePermits(send);
+}
+
+/**
+ * Berlangganan real-time seluruh daftar permohonan izin untuk asisten dari Cloud Firestore
+ */
+export function subscribeIncomingPermits(
+  onUpdate: (permits: PermitRequest[]) => void
+): () => void {
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, 'permits'));
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const list: PermitRequest[] = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<PermitRequest, 'id'>),
+          }));
+          list.sort(
+            (a, b) =>
+              new Date(b.submittedAt).getTime() -
+              new Date(a.submittedAt).getTime()
+          );
+          onUpdate(list);
+        },
+        (err) => {
+          console.warn('Real-time incoming permits listener error:', err);
+          onUpdate([...permitStore]);
+        }
+      );
+      return unsub;
+    } catch (e) {
+      console.warn('Could not setup incoming permits listener:', e);
+    }
+  }
+
+  const send = () => onUpdate([...permitStore]);
+  send();
+  return subscribePermits(send);
 }
 
 let permitStore: PermitRequest[] = [
@@ -123,6 +216,31 @@ export async function submitPermit(
     aiClassification: aiResult,
   };
 
+  // Simpan ke Cloud Firestore jika terhubung
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(
+        collection(db, 'permits'),
+        where('sessionId', '==', permitData.sessionId),
+        where('studentId', '==', permitData.studentId)
+      );
+      const snap = await getDocs(q);
+      const hasActive = snap.docs.some(
+        (d) => (d.data() as PermitRequest).status !== 'REJECTED'
+      );
+      if (hasActive) {
+        return {
+          success: false,
+          message: 'Anda sudah pernah mengajukan izin untuk sesi praktikum ini.',
+        };
+      }
+
+      await setDoc(doc(db, 'permits', newPermit.id), newPermit);
+    } catch (err) {
+      console.warn('Gagal menyimpan izin ke Firestore:', err);
+    }
+  }
+
   permitStore.unshift(newPermit);
   notifyListeners();
 
@@ -176,6 +294,19 @@ export async function reviewPermit(
     reviewedBy: assistantName,
     reviewedAt: new Date().toISOString(),
   };
+
+  if (isFirebaseConfigured) {
+    try {
+      await updateDoc(doc(db, 'permits', permitId), {
+        status: decision,
+        decisionNote: decisionNote?.trim() || null,
+        reviewedBy: assistantName,
+        reviewedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Gagal memperbarui status izin di Firestore:', err);
+    }
+  }
 
   notifyListeners();
 

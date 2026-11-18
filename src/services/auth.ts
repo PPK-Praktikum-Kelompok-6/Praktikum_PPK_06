@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 
 import { MOCK_USERS } from '@/data/mockData';
-import { UserRole } from '@/types/attendance';
+import { ApprovalStatus, UserRole } from '@/types/attendance';
 import { auth, db, isFirebaseConfigured } from './firebase';
 
 export interface AuthUser {
@@ -23,8 +23,10 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
-  identifier: string; // NIM atau Kode Asisten
+  identifier: string; // NIM, Kode Asisten, atau Kode Admin
   enrolledClasses?: string[];
+  approvalStatus?: ApprovalStatus;
+  requestedClass?: string;
 }
 
 export type AuthChangeListener = (user: AuthUser | null) => void;
@@ -35,12 +37,22 @@ interface LocalAccountRecord extends AuthUser {
 
 const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
   {
+    uid: 'adm-01',
+    email: 'admin@praktikum.ac.id',
+    name: 'Administrator Lab',
+    role: 'ADMIN',
+    identifier: 'ADM-01',
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
     uid: MOCK_USERS[0].id,
     email: 'zaidan@praktikum.ac.id',
     name: MOCK_USERS[0].name,
     role: MOCK_USERS[0].role,
     identifier: MOCK_USERS[0].identifier,
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[1].id,
@@ -49,6 +61,7 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     role: MOCK_USERS[1].role,
     identifier: MOCK_USERS[1].identifier,
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[2].id,
@@ -58,6 +71,7 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     identifier: MOCK_USERS[2].identifier,
     enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[3].id,
@@ -67,6 +81,7 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     identifier: MOCK_USERS[3].identifier,
     enrolledClasses: ['A1', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[4].id,
@@ -76,13 +91,19 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     identifier: MOCK_USERS[4].identifier,
     enrolledClasses: ['B2', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
 ];
 
 const localAccountsStore: LocalAccountRecord[] = [...DEFAULT_DEMO_ACCOUNTS];
 let currentAuthUser: AuthUser | null = null;
 let signedOutExplicitly = false;
+let authInitialized = false;
 const authListeners = new Set<AuthChangeListener>();
+
+export function isAuthInitialized(): boolean {
+  return authInitialized;
+}
 
 function notifyAuthListeners() {
   authListeners.forEach((listener) => listener(currentAuthUser));
@@ -96,6 +117,8 @@ function toAuthUser(record: LocalAccountRecord): AuthUser {
     role: record.role,
     identifier: record.identifier,
     enrolledClasses: record.enrolledClasses,
+    approvalStatus: record.approvalStatus,
+    requestedClass: record.requestedClass,
   };
 }
 
@@ -142,6 +165,7 @@ export function syncAuthUserFromProfile(profile: {
       name: profile.name,
       role: profile.role,
       identifier: profile.identifier,
+      approvalStatus: 'APPROVED',
       enrolledClasses:
         profile.role === 'STUDENT' ? ['A1', 'B2', 'C1'] : undefined,
     };
@@ -160,6 +184,7 @@ export function onAuthChange(listener: AuthChangeListener): () => void {
   let firebaseUnsubscribe: (() => void) | null = null;
   if (isFirebaseConfigured) {
     firebaseUnsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      authInitialized = true;
       if (!fbUser) {
         currentAuthUser = null;
         notifyAuthListeners();
@@ -172,6 +197,8 @@ export function onAuthChange(listener: AuthChangeListener): () => void {
         notifyAuthListeners();
       }
     });
+  } else {
+    authInitialized = true;
   }
 
   return () => {
@@ -197,9 +224,11 @@ export async function getUserProfile(uid: string): Promise<AuthUser | null> {
           uid,
           email: data.email || '',
           name: data.name || 'Pengguna Praktikum',
-          role: data.role === 'ASSISTANT' ? 'ASSISTANT' : 'STUDENT',
+          role: (data.role as UserRole) || 'STUDENT',
           identifier: data.identifier || '-',
           enrolledClasses: data.enrolledClasses,
+          approvalStatus: data.approvalStatus || 'APPROVED',
+          requestedClass: data.requestedClass,
         };
       }
     } catch {
@@ -272,16 +301,24 @@ export async function signUpUser(
   }
 
   let trimmedIdentifier = profile.identifier ? profile.identifier.trim() : '';
+  let approvalStatus: ApprovalStatus = 'APPROVED';
+  let requestedClass: string | undefined = undefined;
 
   if (profile.role === 'ASSISTANT') {
     // Alokasi kode asisten secara otomatis (misal AST-01, AST-02) jika belum ada
     if (!trimmedIdentifier) {
       trimmedIdentifier = await getNextAvailableAssistantCode();
     }
-  } else {
+    approvalStatus = 'PENDING_ADMIN';
+  } else if (profile.role === 'STUDENT') {
     if (!trimmedIdentifier) {
       throw new Error('NIM Praktikan wajib diisi.');
     }
+    approvalStatus = 'PENDING_ASSISTANT';
+    requestedClass = profile.requestedClass || profile.enrolledClasses?.[0] || 'C1';
+  } else if (profile.role === 'ADMIN') {
+    trimmedIdentifier = 'ADM-01';
+    approvalStatus = 'APPROVED';
   }
 
   if (isFirebaseConfigured) {
@@ -296,9 +333,10 @@ export async function signUpUser(
       name: trimmedName,
       role: profile.role,
       identifier: trimmedIdentifier,
+      approvalStatus,
+      requestedClass,
       enrolledClasses:
-        profile.enrolledClasses ??
-        (profile.role === 'STUDENT' ? ['A1', 'B2', 'C1'] : undefined),
+        approvalStatus === 'APPROVED' ? (profile.enrolledClasses ?? ['C1']) : [],
     };
 
     await setDoc(doc(db, 'users', credential.user.uid), {
@@ -306,6 +344,8 @@ export async function signUpUser(
       name: newAuthUser.name,
       role: newAuthUser.role,
       identifier: newAuthUser.identifier,
+      approvalStatus: newAuthUser.approvalStatus,
+      requestedClass: newAuthUser.requestedClass || null,
       enrolledClasses: newAuthUser.enrolledClasses ?? [],
       createdAt: new Date().toISOString(),
     });
@@ -331,9 +371,10 @@ export async function signUpUser(
     name: trimmedName,
     role: profile.role,
     identifier: trimmedIdentifier,
+    approvalStatus,
+    requestedClass,
     enrolledClasses:
-      profile.enrolledClasses ??
-      (profile.role === 'STUDENT' ? ['A1', 'B2', 'C1'] : undefined),
+      approvalStatus === 'APPROVED' ? (profile.enrolledClasses ?? ['C1']) : [],
     password,
   };
 
@@ -373,8 +414,27 @@ export async function signInUser(
       name: credential.user.displayName || normalizedEmail.split('@')[0],
       role: 'STUDENT',
       identifier: '-',
+      approvalStatus: 'APPROVED',
       enrolledClasses: ['A1', 'B2', 'C1'],
     };
+
+    // Validasi Perizinan Akun (SRS-AUTH-APPROVAL)
+    if (resolvedUser.approvalStatus === 'PENDING_ADMIN') {
+      await signOutUser();
+      throw new Error(
+        'Akun Asisten Anda sedang menunggu persetujuan dari Admin Lab.'
+      );
+    }
+    if (resolvedUser.approvalStatus === 'PENDING_ASSISTANT') {
+      await signOutUser();
+      throw new Error(
+        `Akun Praktikan Anda sedang menunggu persetujuan dari Asisten Kelas ${resolvedUser.requestedClass || ''}.`
+      );
+    }
+    if (resolvedUser.approvalStatus === 'REJECTED') {
+      await signOutUser();
+      throw new Error('Pendaftaran akun Anda ditolak oleh pengelola lab.');
+    }
 
     currentAuthUser = resolvedUser;
     signedOutExplicitly = false;
@@ -393,6 +453,20 @@ export async function signInUser(
   }
   if (matched.password !== password && password.length < 6) {
     throw new Error('Kata sandi yang Anda masukkan salah.');
+  }
+
+  if (matched.approvalStatus === 'PENDING_ADMIN') {
+    throw new Error(
+      'Akun Asisten Anda sedang menunggu persetujuan dari Admin Lab.'
+    );
+  }
+  if (matched.approvalStatus === 'PENDING_ASSISTANT') {
+    throw new Error(
+      `Akun Praktikan Anda sedang menunggu persetujuan dari Asisten Kelas ${matched.requestedClass || ''}.`
+    );
+  }
+  if (matched.approvalStatus === 'REJECTED') {
+    throw new Error('Pendaftaran akun Anda ditolak oleh pengelola lab.');
   }
 
   currentAuthUser = toAuthUser(matched);

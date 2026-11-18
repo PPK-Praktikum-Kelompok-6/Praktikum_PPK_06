@@ -11,9 +11,11 @@ import { PermitStatusCard } from '@/features/permits/components/PermitStatusCard
 import {
   getStudentPermitsSync,
   submitPermit,
-  subscribePermits,
+  subscribeStudentPermits,
 } from '@/services/permits';
+import { subscribeStudentSessions } from '@/services/sessions';
 import { useCurrentUser, useSessions } from '@/store/hooks';
+import { PracticalSession } from '@/types/attendance';
 import { PermitRequest } from '@/types/permit';
 
 export default function StudentPermitScreen() {
@@ -23,6 +25,7 @@ export default function StudentPermitScreen() {
   const [permits, setPermits] = useState<PermitRequest[]>(() =>
     getStudentPermitsSync(currentUser.id)
   );
+  const [liveSessions, setLiveSessions] = useState<PracticalSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -40,12 +43,26 @@ export default function StudentPermitScreen() {
   });
 
   useEffect(() => {
-    // Sinkronisasi otomatis data permohonan izin
-    const unsubscribe = subscribePermits(() => {
-      setPermits(getStudentPermitsSync(currentUser.id));
+    if (!currentUser.id) return;
+    // Sinkronisasi otomatis data permohonan izin dari Firestore
+    const unsubPermits = subscribeStudentPermits(currentUser.id, (loaded) => {
+      setPermits(loaded);
     });
-    return unsubscribe;
-  }, [currentUser.id]);
+
+    // Sinkronisasi daftar sesi yang diikuti mahasiswa secara real-time
+    const unsubSessions = subscribeStudentSessions(
+      currentUser.id,
+      currentUser.enrolledClasses || [],
+      (sessList) => {
+        setLiveSessions(sessList);
+      }
+    );
+
+    return () => {
+      unsubPermits();
+      unsubSessions();
+    };
+  }, [currentUser.id, currentUser.enrolledClasses]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -121,7 +138,7 @@ export default function StudentPermitScreen() {
 
         {/* Form Pengajuan Izin */}
         <PermitForm
-          sessions={sessions}
+          sessions={liveSessions.length > 0 ? liveSessions : sessions}
           onSubmit={handleSubmitPermit}
           isLoading={loading}
         />

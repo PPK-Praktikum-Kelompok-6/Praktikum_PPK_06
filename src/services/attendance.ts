@@ -256,6 +256,60 @@ export function subscribeToSessionAttendance(
 }
 
 /**
+ * Berlangganan (subscribe) real-time seluruh rekaman presensi milik satu mahasiswa.
+ */
+export function subscribeStudentAttendance(
+  studentId: string,
+  onUpdate: (records: AttendanceRecord[]) => void
+): () => void {
+  if (!studentId) {
+    return () => {};
+  }
+
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(
+        collection(db, 'attendance'),
+        where('studentId', '==', studentId)
+      );
+
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot: QuerySnapshot<DocumentData>) => {
+          const records: AttendanceRecord[] = snapshot.docs.map(
+            (docSnap: QueryDocumentSnapshot<DocumentData>) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<AttendanceRecord, 'id'>),
+            })
+          );
+          onUpdate(records);
+        },
+        (error: Error) => {
+          console.warn('Real-time student attendance listener error:', error);
+          onUpdate(
+            localAttendanceStore.filter((r) => r.studentId === studentId)
+          );
+        }
+      );
+
+      return unsubscribe;
+    } catch (err) {
+      console.warn('Could not setup student attendance onSnapshot:', err);
+    }
+  }
+
+  const sendCurrent = () => {
+    onUpdate(localAttendanceStore.filter((r) => r.studentId === studentId));
+  };
+  sendCurrent();
+  const listener = () => sendCurrent();
+  attendanceListeners.add(listener);
+  return () => {
+    attendanceListeners.delete(listener);
+  };
+}
+
+/**
  * 4. Mengambil Riwayat Kehadiran Praktikan Tertentu (SRS-PRES-02)
  */
 export async function getStudentAttendanceHistory(

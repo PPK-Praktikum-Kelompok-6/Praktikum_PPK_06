@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Card } from '@/components/ui/Card';
@@ -17,12 +17,14 @@ import {
   SessionControlModal,
 } from '@/features/sessions/components/SessionControlModal';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import { requestSessionChange } from '@/services/admin';
 import {
   setSessionStatus,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
 import { subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
+import { canOpen } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
@@ -36,6 +38,14 @@ export default function AssistantSessionDetailRoute() {
   const [controlAction, setControlAction] = useState<SessionControlAction>('OPEN');
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
   const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
+
+  // State Permintaan Reschedule / Hapus Sesi (Izin Admin)
+  const [changeModalVisible, setChangeModalVisible] = useState(false);
+  const [changeType, setChangeType] = useState<'DELETE' | 'RESCHEDULE'>('RESCHEDULE');
+  const [changeReason, setChangeReason] = useState('');
+  const [newTimeSlot, setNewTimeSlot] = useState('13.00 - 15.00 WIB');
+  const [newRoom, setNewRoom] = useState('');
+  const [submittingChange, setSubmittingChange] = useState(false);
 
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('success');
@@ -115,8 +125,70 @@ export default function AssistantSessionDetailRoute() {
   }
 
   const handleOpenControl = (action: SessionControlAction) => {
+    if (action === 'OPEN') {
+      const rule = canOpen(session, currentUser.role);
+      if (!rule.allowed) {
+        setFeedbackType('warning');
+        setFeedbackTitle('Sesi Belum Dapat Dibuka');
+        setFeedbackMessage(
+          rule.reason ||
+            'Sesi praktikum belum masuk jam mulai. Sesi hanya dapat dibuka saat jam praktikum telah tiba.'
+        );
+        setFeedbackVisible(true);
+        return;
+      }
+    }
     setControlAction(action);
     setControlModalVisible(true);
+  };
+
+  const handleOpenChangeModal = (type: 'DELETE' | 'RESCHEDULE') => {
+    setChangeType(type);
+    setChangeReason('');
+    setNewTimeSlot(session?.timeSlot || '13.00 - 15.00 WIB');
+    setNewRoom(session?.room || '');
+    setChangeModalVisible(true);
+  };
+
+  const handleSubmitChangeRequest = async () => {
+    if (!session) return;
+    if (changeReason.trim().length < 5) {
+      setFeedbackType('warning');
+      setFeedbackTitle('Alasan Wajib Diisi');
+      setFeedbackMessage('Mohon sertakan alasan pengajuan perubahan sesi minimal 5 karakter untuk ditinjau admin.');
+      setFeedbackVisible(true);
+      return;
+    }
+
+    setSubmittingChange(true);
+    try {
+      await requestSessionChange({
+        sessionId: session.id,
+        courseName: session.courseName,
+        classCode: session.classCode,
+        type: changeType,
+        requestedBy: currentUser.id,
+        requestedByName: currentUser.name,
+        reason: changeReason.trim(),
+        newTimeSlot: changeType === 'RESCHEDULE' ? newTimeSlot.trim() : undefined,
+        newRoom: changeType === 'RESCHEDULE' ? newRoom.trim() : undefined,
+      });
+
+      setChangeModalVisible(false);
+      setFeedbackType('success');
+      setFeedbackTitle('Permohonan Terkirim ke Admin');
+      setFeedbackMessage(
+        `Permintaan ${changeType === 'DELETE' ? 'penghapusan' : 'penjadwalan ulang'} sesi praktikum telah dikirim ke Administrator dan menunggu otorisasi.`
+      );
+      setFeedbackVisible(true);
+    } catch (err: any) {
+      setFeedbackType('error');
+      setFeedbackTitle('Gagal Mengajukan Permintaan');
+      setFeedbackMessage(err?.message || 'Terjadi kesalahan sistem.');
+      setFeedbackVisible(true);
+    } finally {
+      setSubmittingChange(false);
+    }
   };
 
   const handleConfirmAction = async () => {
@@ -274,6 +346,46 @@ export default function AssistantSessionDetailRoute() {
         </View>
       </Card>
 
+      {/* Tata Kelola Sesi: Reschedule / Hapus dengan Izin Admin */}
+      <Card variant="default" padding="md" style={styles.governanceCard}>
+        <View style={styles.governanceHeader}>
+          <Icon name="shield-checkmark" size={18} color={Colors.primary} />
+          <AppText variant="title">Pengaturan Jadwal & Otorisasi</AppText>
+        </View>
+        <AppText variant="caption" color={Colors.textMuted} style={styles.governanceDesc}>
+          Setiap perubahan jadwal (reschedule) atau penghapusan sesi wajib mendapatkan persetujuan dari Administrator Lab.
+        </AppText>
+
+        {session.pendingChangeRequest ? (
+          <View style={styles.pendingNoticeBox}>
+            <Icon name="time-outline" size={16} color={Colors.warning} />
+            <AppText variant="caption" weight="semibold" color={Colors.warning}>
+              Sesi ini sedang menunggu persetujuan Admin untuk{' '}
+              {session.pendingChangeRequest === 'DELETE' ? 'penghapusan' : 'reschedule'}.
+            </AppText>
+          </View>
+        ) : (
+          <View style={styles.governanceBtnRow}>
+            <CustomButton
+              title="Minta Reschedule"
+              variant="outline"
+              size="sm"
+              icon={<Icon name="calendar-outline" size={16} color={Colors.primary} />}
+              style={styles.govBtn}
+              onPress={() => handleOpenChangeModal('RESCHEDULE')}
+            />
+            <CustomButton
+              title="Minta Hapus Sesi"
+              variant="outline"
+              size="sm"
+              icon={<Icon name="trash-outline" size={16} color={Colors.danger} />}
+              style={styles.govBtn}
+              onPress={() => handleOpenChangeModal('DELETE')}
+            />
+          </View>
+        )}
+      </Card>
+
       {/* Attendance Ratio Summary */}
       <StatSummaryCard
         attendedCount={attendanceRecords.length}
@@ -292,6 +404,88 @@ export default function AssistantSessionDetailRoute() {
         onConfirm={handleConfirmAction}
         onCancel={() => setControlModalVisible(false)}
       />
+
+      {/* Modal Pengajuan Reschedule / Hapus Sesi */}
+      <Modal
+        visible={changeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setChangeModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setChangeModalVisible(false)}
+        />
+        <View style={styles.changeModalSheet}>
+          <AppText variant="title" weight="bold">
+            {changeType === 'DELETE'
+              ? 'Ajukan Izin Hapus Sesi ke Admin'
+              : 'Ajukan Izin Reschedule Sesi ke Admin'}
+          </AppText>
+          <AppText variant="caption" color={Colors.textSecondary} style={styles.changeModalSub}>
+            Sesi praktikum {session.courseName} ({session.classCode})
+          </AppText>
+
+          {changeType === 'RESCHEDULE' ? (
+            <>
+              <View style={styles.fieldGroup}>
+                <AppText variant="label">Jadwal Jam Baru:</AppText>
+                <TextInput
+                  value={newTimeSlot}
+                  onChangeText={setNewTimeSlot}
+                  placeholder="Contoh: 13.00 - 15.00 WIB"
+                  placeholderTextColor={Colors.textLight}
+                  style={styles.modalInput}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <AppText variant="label">Ruangan Baru (Opsional):</AppText>
+                <TextInput
+                  value={newRoom}
+                  onChangeText={setNewRoom}
+                  placeholder={session.room}
+                  placeholderTextColor={Colors.textLight}
+                  style={styles.modalInput}
+                />
+              </View>
+            </>
+          ) : null}
+
+          <View style={styles.fieldGroup}>
+            <AppText variant="label">
+              Alasan Pengajuan {changeType === 'DELETE' ? 'Penghapusan' : 'Reschedule'} *
+            </AppText>
+            <TextInput
+              value={changeReason}
+              onChangeText={setChangeReason}
+              placeholder="Jelaskan alasan pengajuan kepada admin lab..."
+              placeholderTextColor={Colors.textLight}
+              multiline
+              numberOfLines={3}
+              style={[styles.modalInput, styles.modalTextArea]}
+            />
+          </View>
+
+          <View style={styles.changeActionRow}>
+            <CustomButton
+              title="Batal"
+              variant="outline"
+              size="md"
+              style={styles.govBtn}
+              onPress={() => setChangeModalVisible(false)}
+            />
+            <CustomButton
+              title="Kirim ke Admin"
+              variant={changeType === 'DELETE' ? 'danger' : 'primary'}
+              size="md"
+              loading={submittingChange}
+              style={styles.govBtn}
+              onPress={handleSubmitChangeRequest}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* Feedback Modal */}
       <FeedbackModal
@@ -381,5 +575,72 @@ const styles = StyleSheet.create({
   },
   actionButtonContainer: {
     width: '100%',
+  },
+  governanceCard: {
+    marginBottom: Spacing.lg,
+  },
+  governanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 4,
+  },
+  governanceDesc: {
+    marginBottom: Spacing.md,
+  },
+  pendingNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.warningBg,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+  },
+  governanceBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  govBtn: {
+    flex: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  changeModalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
+    maxHeight: '85%',
+  },
+  changeModalSub: {
+    marginTop: 2,
+    marginBottom: Spacing.md,
+  },
+  fieldGroup: {
+    marginBottom: Spacing.sm,
+  },
+  modalInput: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 14,
+    color: Colors.text,
+    marginTop: 4,
+  },
+  modalTextArea: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  changeActionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
   },
 });

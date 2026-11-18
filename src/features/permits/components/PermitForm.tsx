@@ -19,11 +19,14 @@ export interface PermitFormProps {
 }
 
 export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitFormProps) {
-  const [selectedSessionId, setSelectedSessionId] = useState<string>(
-    sessions[0]?.id || ''
-  );
+  const [userSelectedSessionId, setUserSelectedSessionId] = useState<string>('');
   const [reason, setReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const selectedSessionId =
+    userSelectedSessionId && sessions.some((s) => s.id === userSelectedSessionId)
+      ? userSelectedSessionId
+      : sessions[0]?.id || '';
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
 
@@ -92,7 +95,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
                   variant={isSelected ? 'primary' : 'outline'}
                   size="sm"
                   fullWidth={false}
-                  onPress={() => setSelectedSessionId(session.id)}
+                  onPress={() => setUserSelectedSessionId(session.id)}
                   style={styles.sessionChip}
                 />
               );

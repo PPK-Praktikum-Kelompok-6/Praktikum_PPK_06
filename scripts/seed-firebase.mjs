@@ -21,11 +21,20 @@ const db = getFirestore(app);
 
 const ACCOUNTS = [
   {
+    email: 'admin@praktikum.ac.id',
+    name: 'Administrator Lab',
+    role: 'ADMIN',
+    identifier: 'ADM-01',
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
     email: 'zaidan@praktikum.ac.id',
     name: 'Muhammad Zaidan Alfarizi',
     role: 'ASSISTANT',
     identifier: 'AST-01',
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     email: 'bayu@praktikum.ac.id',
@@ -33,6 +42,7 @@ const ACCOUNTS = [
     role: 'ASSISTANT',
     identifier: 'AST-02',
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     email: 'bahir@student.ac.id',
@@ -41,6 +51,7 @@ const ACCOUNTS = [
     identifier: '24060124140184',
     enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     email: 'ahmad@student.ac.id',
@@ -49,6 +60,7 @@ const ACCOUNTS = [
     identifier: '24060124140101',
     enrolledClasses: ['A1', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
   {
     email: 'siti@student.ac.id',
@@ -57,6 +69,7 @@ const ACCOUNTS = [
     identifier: '24060124140102',
     enrolledClasses: ['B2', 'C1'],
     password: 'password123',
+    approvalStatus: 'APPROVED',
   },
 ];
 
@@ -156,6 +169,7 @@ async function seed() {
         role: acc.role,
         identifier: acc.identifier,
         enrolledClasses: acc.enrolledClasses || [],
+        approvalStatus: acc.approvalStatus || 'APPROVED',
         createdAt: new Date().toISOString(),
       });
       console.log(`   📝 Dokumen profil Firestore users/${uid} tersimpan.`);

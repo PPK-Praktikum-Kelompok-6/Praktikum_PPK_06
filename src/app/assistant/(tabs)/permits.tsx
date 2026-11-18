@@ -10,7 +10,7 @@ import { PermitReviewCard } from '@/features/permits/components/PermitReviewCard
 import {
   getIncomingPermitsSync,
   reviewPermit,
-  subscribePermits,
+  subscribeIncomingPermits,
 } from '@/services/permits';
 import { useCurrentUser } from '@/store/hooks';
 import { PermitRequest } from '@/types/permit';
@@ -37,9 +37,9 @@ export default function AssistantPermitsScreen() {
   });
 
   useEffect(() => {
-    // Sinkronisasi otomatis saat ada izin baru atau perubahan status
-    const unsubscribe = subscribePermits(() => {
-      setPermits(getIncomingPermitsSync());
+    // Sinkronisasi otomatis data permohonan izin masuk dari Firestore
+    const unsubscribe = subscribeIncomingPermits((loaded) => {
+      setPermits(loaded);
     });
     return unsubscribe;
   }, []);

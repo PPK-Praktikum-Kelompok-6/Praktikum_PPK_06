@@ -10,6 +10,7 @@ import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 import {
   AuthUser,
   getCurrentUser as getAuthUser,
+  isAuthInitialized,
   isExplicitlySignedOut,
   onAuthChange,
   signOutUser,
@@ -22,25 +23,38 @@ export default function StudentTabsLayout() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
     getAuthUser()
   );
+  const [initialized, setInitialized] = useState(() => isAuthInitialized());
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
       setAuthUser(user);
+      setInitialized(true);
     });
     return unsubscribe;
   }, []);
 
+  // Tunggu inisialisasi sesi Firebase Auth pada saat reload halaman
+  if (!initialized) {
+    return <View style={styles.root} />;
+  }
+
+  const activeUser = authUser || (currentUser?.id ? currentUser : null);
+  const activeId = (activeUser as any)?.uid || (activeUser as any)?.id;
+
   // Proteksi Sesi Login (SRS-AUTH-01 & SRS-AUTH-02): Jika pengguna sudah logout, arahkan ke halaman login
-  if (isExplicitlySignedOut() || (!authUser && !currentUser?.id)) {
+  if (isExplicitlySignedOut() || !activeUser || !activeId) {
     return <Redirect href="/" />;
   }
 
-  const activeRole = authUser?.role ?? currentUser.role;
-
   // Guard RBAC Praktikan (SRS-AUTH-02): Arahkan asisten ke dashboard asisten
-  if (activeRole !== 'STUDENT') {
+  if (activeUser.role === 'ASSISTANT') {
     return <Redirect href="/assistant" />;
+  }
+
+  // Guard RBAC Admin
+  if (activeUser.role === 'ADMIN') {
+    return <Redirect href={'/admin' as any} />;
   }
 
   const bottomOffset = Math.max(insets.bottom, Spacing.md) + 6;

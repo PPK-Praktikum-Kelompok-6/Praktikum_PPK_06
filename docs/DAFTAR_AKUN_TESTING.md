@@ -9,8 +9,9 @@
 
 ## 1. Daftar Akun Pengujian Utama
 
-| Peran | Nama Pengguna | Alamat Email | Kata Sandi | Identitas (NIM / Kode) | Kelas Terdaftar |
+| Peran | Nama Pengguna | Alamat Email | Kata Sandi | Identitas (NIM / Kode) | Kelas Terdaftar / Wewenang |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| 👑 **Administrator** | Administrator Lab PPK | `admin@praktikum.ac.id` | `password123` | `ADM-01` | Pengelola Hak Akses, Persetujuan Sesi, Plotting Asisten |
 | 🛡️ **Asisten 1** | Muhammad Zaidan Alfarizi | `zaidan@praktikum.ac.id` | `password123` | `AST-01` | Pengampu Kelas C1, B2 |
 | 🛡️ **Asisten 2** | Crystiano Bayu Satya Alves | `bayu@praktikum.ac.id` | `password123` | `AST-02` | Pengampu Kelas A1 |
 | 🎓 **Praktikan 1** | Bahir Ananda Wibowo | `bahir@student.ac.id` | `password123` | `24060124140184` | Kelas A1, B2, C1 |
@@ -21,23 +22,36 @@
 
 ## 2. Skenario Pengujian Alur Peran (RBAC Testing)
 
-### Skenario A: Login sebagai Asisten Praktikum
+### Skenario A: Login sebagai Administrator (Role Baru)
+1. Buka aplikasi di halaman awal (`/`).
+2. Masukkan email: `admin@praktikum.ac.id` dan kata sandi: `password123`.
+3. Tekan tombol **"Masuk"**.
+4. **Hasil yang Diharapkan:**
+   - Sistem secara otomatis mengarahkan ke Dashboard Admin (`/admin`).
+   - Admin dapat meninjau & menyetujui pengajuan Reschedule / Hapus Sesi dari Asisten.
+   - Admin dapat mengatur & mengubah penugasan asisten ke kelas praktikum (Tab Kelas).
+   - Admin dapat menyetujui/menolak pendaftaran akun Asisten baru (Tab Persetujuan Akun).
+
+### Skenario B: Login sebagai Asisten Praktikum
 1. Buka aplikasi di halaman awal (`/`).
 2. Masukkan email: `zaidan@praktikum.ac.id` dan kata sandi: `password123`.
 3. Tekan tombol **"Masuk"**.
 4. **Hasil yang Diharapkan:**
-   - Sistem secara otomatis mengarahkan rute ke Dashboard Asisten (`/assistant`).
-   - Tampil jadwal praktikum yang diampu oleh Zaidan (Kelas C1 & B2).
-   - Asisten memiliki akses untuk membuka/menutup sesi praktikum dan melihat rekap presensi serta review perizinan AI.
+   - Sistem mengarahkan ke Dashboard Asisten (`/assistant`).
+   - Tampil kartu **"Tanggung Jawab Kelas (Ditetapkan Admin)"** sesuai plotting admin.
+   - Tampil kartu **"Persetujuan Praktikan Baru"** untuk menyetujui mahasiswa yang mendaftar ke kelasnya.
+   - Sesi praktikum hanya bisa dibuka bila jam mulai telah tercapai.
+   - Asisten dapat mengajukan perubahan jadwal (reschedule) atau penghapusan sesi yang akan diteruskan ke Admin untuk persetujuan.
 
-### Skenario B: Login sebagai Praktikan
+### Skenario C: Login sebagai Praktikan
 1. Buka aplikasi di halaman awal (`/`).
 2. Masukkan email: `bahir@student.ac.id` dan kata sandi: `password123`.
 3. Tekan tombol **"Masuk"**.
 4. **Hasil yang Diharapkan:**
-   - Sistem secara otomatis mengarahkan rute ke Dashboard Praktikan (`/student`).
-   - Tampil daftar praktikum kelas yang diikuti oleh Bahir.
-   - Praktikan memiliki akses untuk melakukan presensi (anti-bocor) dan mengajukan izin ketidakhadiran dengan analisis AI.
+   - Sistem mengarahkan ke Dashboard Praktikan (`/student`).
+   - Praktikan **hanya melihat dan hanya bisa mengakses kelas yang terdaftar** (enrolled classes).
+   - Saat praktikan sudah berhasil presensi, kartu sesi menampilkan label **"Kelas [Kode] • Status Absen Berhasil"**.
+   - Saat mengajukan izin (Permit), form permit terhubung langsung ke Firestore dan menampilkan sesi kelas yang valid.
 
 ---
 

@@ -1,10 +1,11 @@
-import React, { createContext, useReducer } from 'react';
+import React, { createContext, useEffect, useReducer } from 'react';
 
 import {
   MOCK_ATTENDANCE_RECORDS,
   MOCK_SESSIONS,
   MOCK_USERS,
 } from '@/data/mockData';
+import { onAuthChange } from '@/services/auth';
 import {
   AttendanceRecord,
   CreateSessionInput,
@@ -42,8 +43,15 @@ export interface AppStoreContextType {
 
 export const AppStoreContext = createContext<AppStoreContextType | null>(null);
 
+const GUEST_USER: UserProfile = {
+  id: '',
+  name: 'Tamu',
+  role: 'STUDENT',
+  identifier: '-',
+};
+
 const initialState: AppState = {
-  currentUser: MOCK_USERS[0], // Default: Muhammad Zaidan Alfarizi (ASSISTANT)
+  currentUser: GUEST_USER,
   sessions: MOCK_SESSIONS,
   attendanceRecords: MOCK_ATTENDANCE_RECORDS,
 };
@@ -54,6 +62,28 @@ export interface AppProviderProps {
 
 export function AppProvider({ children }: AppProviderProps) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Sinkronisasi otomatis pengguna yang aktif dari Firebase Auth
+  useEffect(() => {
+    const unsub = onAuthChange((user) => {
+      if (user) {
+        dispatch({
+          type: 'SET_CURRENT_USER',
+          payload: {
+            id: user.uid,
+            name: user.name,
+            role: user.role,
+            identifier: user.identifier,
+            enrolledClasses: user.enrolledClasses,
+            approvalStatus: user.approvalStatus,
+          },
+        });
+      } else {
+        dispatch({ type: 'SET_CURRENT_USER', payload: GUEST_USER });
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const setCurrentUser = (user: UserProfile) => {
     dispatch({ type: 'SET_CURRENT_USER', payload: user });

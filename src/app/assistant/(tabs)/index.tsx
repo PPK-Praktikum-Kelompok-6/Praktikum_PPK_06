@@ -11,8 +11,18 @@ import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
-import { signOutUser } from '@/services/auth';
-import { createSession, subscribeAssistantSessions } from '@/services/sessions';
+import {
+  approveStudentAccount,
+  rejectStudentAccount,
+  subscribeAllClasses,
+  subscribePendingStudents,
+} from '@/services/admin';
+import { AuthUser, signOutUser } from '@/services/auth';
+import {
+  createSession,
+  PracticalClass,
+  subscribeAssistantSessions,
+} from '@/services/sessions';
 import { useCurrentUser, useSessions } from '@/store/hooks';
 import {
   CreateSessionInput,
@@ -27,6 +37,8 @@ export default function AssistantScheduleRoute() {
   const { sessions, addSession } = useSessions();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
+  const [assignedClasses, setAssignedClasses] = useState<PracticalClass[]>([]);
+  const [pendingStudents, setPendingStudents] = useState<AuthUser[]>([]);
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -42,17 +54,39 @@ export default function AssistantScheduleRoute() {
     message: '',
   });
 
-  // Berlangganan data jadwal sesi asisten secara real-time dari Firestore
+  // Berlangganan data jadwal sesi asisten, kelas penugasan, dan persetujuan mahasiswa dari Firestore
   useEffect(() => {
     if (!currentUser.id) return;
-    const unsubscribe = subscribeAssistantSessions(
+    const unsubSessions = subscribeAssistantSessions(
       currentUser.id,
       (records) => {
         setFirestoreSessions(records);
       },
       currentUser.name
     );
-    return () => unsubscribe();
+
+    const unsubClasses = subscribeAllClasses((classList) => {
+      const myCls = classList.filter(
+        (c) =>
+          c.assistantId === currentUser.id ||
+          c.assistantId === 'ast-1' ||
+          (currentUser.name &&
+            c.assistantName
+              .toLowerCase()
+              .includes(currentUser.name.toLowerCase().split(' ')[0]))
+      );
+      setAssignedClasses(myCls);
+    });
+
+    const unsubStudents = subscribePendingStudents((students) => {
+      setPendingStudents(students);
+    });
+
+    return () => {
+      unsubSessions();
+      unsubClasses();
+      unsubStudents();
+    };
   }, [currentUser.id, currentUser.name]);
 
   const handleConfirmLogout = async () => {
@@ -136,6 +170,45 @@ export default function AssistantScheduleRoute() {
     router.push(`/assistant/session/${sessionId}` as Href);
   };
 
+  const handleApproveStudent = async (student: AuthUser) => {
+    try {
+      const cls = student.requestedClass || 'C1';
+      await approveStudentAccount(student.uid, cls, currentUser.name);
+      setFeedbackState({
+        visible: true,
+        type: 'success',
+        title: 'Praktikan Disetujui',
+        message: `Mahasiswa ${student.name} (${student.identifier}) berhasil disetujui untuk mengikuti Kelas ${cls}.`,
+      });
+    } catch (err: any) {
+      setFeedbackState({
+        visible: true,
+        type: 'error',
+        title: 'Gagal Menyetujui',
+        message: err?.message || 'Terjadi kesalahan.',
+      });
+    }
+  };
+
+  const handleRejectStudent = async (student: AuthUser) => {
+    try {
+      await rejectStudentAccount(student.uid);
+      setFeedbackState({
+        visible: true,
+        type: 'info',
+        title: 'Pendaftaran Ditolak',
+        message: `Pendaftaran mahasiswa ${student.name} telah ditolak.`,
+      });
+    } catch (err: any) {
+      setFeedbackState({
+        visible: true,
+        type: 'error',
+        title: 'Gagal Menolak',
+        message: err?.message || 'Terjadi kesalahan.',
+      });
+    }
+  };
+
   return (
     <Screen withBottomNavPadding>
       {/* Header */}
@@ -161,6 +234,76 @@ export default function AssistantScheduleRoute() {
           <Icon name="log-out-outline" size={20} color={Colors.danger} />
         </Pressable>
       </View>
+
+      {/* Tanggung Jawab Kelas Praktikum (Ditetapkan Admin) */}
+      <View style={styles.assignedClassesCard}>
+        <View style={styles.assignedHeader}>
+          <Icon name="school" size={18} color={Colors.primary} />
+          <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+            TANGGUNG JAWAB KELAS (DITETAPKAN ADMIN)
+          </AppText>
+        </View>
+        {assignedClasses.length === 0 ? (
+          <AppText variant="caption" color={Colors.textMuted}>
+            Belum ada kelas laboratorium yang ditugaskan oleh Admin untuk akun Anda.
+          </AppText>
+        ) : (
+          <View style={styles.classBadgeList}>
+            {assignedClasses.map((cls) => (
+              <View key={cls.id} style={styles.assignedClassChip}>
+                <AppText variant="caption" weight="bold" color={Colors.primary}>
+                  Kelas {cls.classCode}
+                </AppText>
+                <AppText variant="caption" color={Colors.textSecondary}>
+                  {cls.courseName} ({cls.room})
+                </AppText>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Persetujuan Pendaftaran Praktikan Baru (SRS-AUTH-APPROVAL) */}
+      {pendingStudents.length > 0 ? (
+        <View style={styles.pendingStudentsCard}>
+          <View style={styles.pendingStudentsHeader}>
+            <Icon name="person-add" size={18} color={Colors.warning} />
+            <AppText variant="caption" weight="bold" color={Colors.warning}>
+              PERSETUJUAN PRAKTIKAN BARU ({pendingStudents.length})
+            </AppText>
+          </View>
+          <AppText variant="caption" color={Colors.textMuted} style={styles.pendingSub}>
+            Mahasiswa berikut mendaftar dan menunggu persetujuan bergabung ke kelas praktikum:
+          </AppText>
+
+          {pendingStudents.map((std) => (
+            <View key={std.uid} style={styles.pendingStudentItem}>
+              <View style={styles.pendingStudentInfo}>
+                <AppText variant="bodySm" weight="bold">
+                  {std.name}
+                </AppText>
+                <AppText variant="caption" color={Colors.textMuted}>
+                  NIM: {std.identifier} • Kelas Pilihan: {std.requestedClass || 'C1'}
+                </AppText>
+              </View>
+              <View style={styles.pendingStudentActions}>
+                <CustomButton
+                  title="Tolak"
+                  variant="outline"
+                  size="sm"
+                  onPress={() => handleRejectStudent(std)}
+                />
+                <CustomButton
+                  title="Setujui"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => handleApproveStudent(std)}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {/* Filter Chips */}
       <View style={styles.filterRow}>
@@ -326,5 +469,65 @@ const styles = StyleSheet.create({
   },
   sessionList: {
     paddingBottom: Spacing.xl,
+  },
+  assignedClassesCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  assignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  classBadgeList: {
+    gap: Spacing.xs,
+    marginTop: 4,
+  },
+  assignedClassChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.primaryBg,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+  },
+  pendingStudentsCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  pendingStudentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 2,
+  },
+  pendingSub: {
+    marginBottom: Spacing.sm,
+  },
+  pendingStudentItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  pendingStudentInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  pendingStudentActions: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
   },
 });

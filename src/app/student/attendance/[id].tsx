@@ -84,7 +84,12 @@ export default function StudentAttendanceDetailRoute() {
       : undefined);
 
   // Evaluasi aturan bisnis murni dari store/rules.ts
-  const rule = canAttend(session, attendanceRecords, currentUser.id);
+  const rule = canAttend(
+    session,
+    attendanceRecords,
+    currentUser.id,
+    currentUser.enrolledClasses
+  );
 
   const handleAttendanceSubmit = async (notes: string) => {
     if (!session) return;
@@ -159,6 +164,42 @@ export default function StudentAttendanceDetailRoute() {
           iconName="alert-circle-outline"
           actionLabel="Kembali ke Jadwal"
           onAction={() => router.back()}
+          style={styles.emptyContainer}
+        />
+      </Screen>
+    );
+  }
+
+  // Batasan kelas: Praktikan hanya berhak mengakses kelas yang diikutinya (SRS-RBAC-01)
+  const isEnrolled =
+    !currentUser.enrolledClasses ||
+    currentUser.enrolledClasses.length === 0 ||
+    currentUser.enrolledClasses.some(
+      (c) => c.toUpperCase() === session.classCode.toUpperCase()
+    );
+
+  if (!isEnrolled) {
+    return (
+      <Screen>
+        <View style={styles.navHeader}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <Icon name="arrow-back" size={22} color={Colors.text} />
+          </Pressable>
+          <AppText variant="title">Detail Sesi</AppText>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <EmptyState
+          title="Akses Ditolak: Bukan Kelas Anda"
+          message={`Anda tidak terdaftar di kelas praktikum ${session.classCode} (${session.courseName}). Anda hanya berhak mengakses kelas yang Anda ikuti.`}
+          iconName="lock-closed-outline"
+          actionLabel="Kembali ke Jadwal Saya"
+          onAction={() => router.replace('/student')}
           style={styles.emptyContainer}
         />
       </Screen>

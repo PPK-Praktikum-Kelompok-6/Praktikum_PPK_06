@@ -39,6 +39,7 @@ export default function AuthAndRoleRoute() {
   const [fullName, setFullName] = useState('');
   const [registerRole, setRegisterRole] = useState<UserRole>('STUDENT');
   const [identifier, setIdentifier] = useState('');
+  const [selectedClass, setSelectedClass] = useState('C1');
 
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -61,7 +62,7 @@ export default function AuthAndRoleRoute() {
   }, []);
 
   /**
-   * Auto-routing RBAC berdasarkan peran pengguna (SRS-AUTH-02).
+   * Auto-routing RBAC berdasarkan peran pengguna (SRS-AUTH-02 & SRS-AUTH-ADMIN).
    */
   const routeByUserRole = (user: {
     uid: string;
@@ -78,7 +79,9 @@ export default function AuthAndRoleRoute() {
       enrolledClasses: user.enrolledClasses,
     });
 
-    if (user.role === 'ASSISTANT') {
+    if (user.role === 'ADMIN') {
+      router.replace('/admin' as any);
+    } else if (user.role === 'ASSISTANT') {
       router.replace('/assistant' as Href);
     } else {
       router.replace('/student' as Href);
@@ -114,8 +117,29 @@ export default function AuthAndRoleRoute() {
         name: fullName,
         role: registerRole,
         identifier: registerRole === 'ASSISTANT' ? '' : identifier,
+        requestedClass: registerRole === 'STUDENT' ? selectedClass : undefined,
       });
-      routeByUserRole(createdUser);
+
+      if (createdUser.approvalStatus === 'PENDING_ADMIN') {
+        setFeedback({
+          visible: true,
+          type: 'success',
+          title: 'Pendaftaran Berhasil!',
+          message:
+            'Akun Asisten Anda berhasil diajukan dan sedang menunggu persetujuan dari Admin Lab.',
+        });
+        setMode('LOGIN');
+      } else if (createdUser.approvalStatus === 'PENDING_ASSISTANT') {
+        setFeedback({
+          visible: true,
+          type: 'success',
+          title: 'Pendaftaran Berhasil!',
+          message: `Akun Praktikan Anda berhasil diajukan dan sedang menunggu persetujuan dari Asisten Pengampu Kelas ${selectedClass}.`,
+        });
+        setMode('LOGIN');
+      } else {
+        routeByUserRole(createdUser);
+      }
     } catch (err) {
       const msg =
         err instanceof Error
@@ -144,6 +168,7 @@ export default function AuthAndRoleRoute() {
 
   const activeRole = authUser?.role ?? currentUser.role;
   const isAssistant = activeRole === 'ASSISTANT';
+  const isAdmin = activeRole === 'ADMIN';
 
   return (
     <Screen style={styles.container}>
@@ -184,8 +209,8 @@ export default function AuthAndRoleRoute() {
               SESI LOGIN AKTIF
             </AppText>
             <Badge
-              label={isAssistant ? 'Asisten' : 'Praktikan'}
-              variant={isAssistant ? 'primary' : 'attended'}
+              label={isAdmin ? 'Admin Lab' : isAssistant ? 'Asisten' : 'Praktikan'}
+              variant={isAdmin ? 'closed' : isAssistant ? 'primary' : 'attended'}
               size="sm"
               showDot
             />
@@ -194,7 +219,7 @@ export default function AuthAndRoleRoute() {
           <View style={styles.userInfoRow}>
             <View style={styles.avatar}>
               <Icon
-                name={isAssistant ? 'school' : 'person'}
+                name={isAdmin ? 'shield-checkmark' : isAssistant ? 'school' : 'person'}
                 size={20}
                 color={Colors.primary}
               />
@@ -204,7 +229,7 @@ export default function AuthAndRoleRoute() {
                 {authUser.name}
               </AppText>
               <AppText variant="caption" color={Colors.textMuted}>
-                {authUser.email} • {isAssistant ? 'Kode: ' : 'NIM: '}
+                {authUser.email} • {isAdmin ? 'Role: ' : isAssistant ? 'Kode: ' : 'NIM: '}
                 {authUser.identifier}
               </AppText>
             </View>
@@ -214,7 +239,11 @@ export default function AuthAndRoleRoute() {
             <View style={styles.sessionActionCol}>
               <CustomButton
                 title={
-                  isAssistant ? 'Dashboard Asisten' : 'Dashboard Praktikan'
+                  isAdmin
+                    ? 'Dashboard Admin'
+                    : isAssistant
+                    ? 'Dashboard Asisten'
+                    : 'Dashboard Praktikan'
                 }
                 size="sm"
                 variant="primary"
@@ -364,26 +393,65 @@ export default function AuthAndRoleRoute() {
 
             {/* Input NIM Praktikan atau Pemberitahuan Kode Asisten Otomatis */}
             {registerRole === 'STUDENT' ? (
-              <View style={styles.fieldGroup}>
-                <AppText variant="label" style={styles.fieldLabel}>
-                  NIM PRAKTIKAN
-                </AppText>
-                <View style={styles.inputBox}>
-                  <Icon
-                    name="card-outline"
-                    size={18}
-                    color={Colors.textMuted}
-                  />
-                  <TextInput
-                    value={identifier}
-                    onChangeText={setIdentifier}
-                    placeholder="Contoh: 24060124140130"
-                    placeholderTextColor={Colors.textLight}
-                    style={styles.textInput}
-                    keyboardType="numeric"
-                  />
+              <>
+                <View style={styles.fieldGroup}>
+                  <AppText variant="label" style={styles.fieldLabel}>
+                    NIM PRAKTIKAN
+                  </AppText>
+                  <View style={styles.inputBox}>
+                    <Icon
+                      name="card-outline"
+                      size={18}
+                      color={Colors.textMuted}
+                    />
+                    <TextInput
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                      placeholder="Contoh: 24060124140130"
+                      placeholderTextColor={Colors.textLight}
+                      style={styles.textInput}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
-              </View>
+
+                {/* Pemilihan Kelas yang ingin diikuti praktikan */}
+                <View style={styles.fieldGroup}>
+                  <AppText variant="label" style={styles.fieldLabel}>
+                    PILIH KELAS PRAKTIKUM
+                  </AppText>
+                  <View style={styles.classChipsRow}>
+                    {[
+                      { code: 'C1', label: 'C1 - Web & Mobile' },
+                      { code: 'B2', label: 'B2 - Struktur Data' },
+                      { code: 'A1', label: 'A1 - Basis Data' },
+                    ].map((cls) => {
+                      const isSel = selectedClass === cls.code;
+                      return (
+                        <Pressable
+                          key={cls.code}
+                          style={[
+                            styles.classChip,
+                            isSel && styles.classChipActive,
+                          ]}
+                          onPress={() => setSelectedClass(cls.code)}
+                        >
+                          <AppText
+                            variant="caption"
+                            weight={isSel ? 'semibold' : 'regular'}
+                            color={isSel ? Colors.textWhite : Colors.textSecondary}
+                          >
+                            {cls.label}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <AppText variant="caption" color={Colors.textMuted} style={styles.classHint}>
+                    ⚠️ Pendaftaran praktikan memerlukan persetujuan asisten kelas terkait.
+                  </AppText>
+                </View>
+              </>
             ) : (
               <View style={styles.autoAstCard}>
                 <Icon
@@ -393,10 +461,10 @@ export default function AuthAndRoleRoute() {
                 />
                 <View style={styles.autoAstTextCol}>
                   <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
-                    Kode Asisten Otomatis
+                    Pendaftaran Asisten Lab
                   </AppText>
                   <AppText variant="caption" color={Colors.textMuted}>
-                    Kode (misal AST-01, AST-02) akan diberikan otomatis oleh sistem saat Anda mendaftar.
+                    Kode asisten akan diberikan otomatis dan memerlukan persetujuan Administrator Lab.
                   </AppText>
                 </View>
               </View>
@@ -623,5 +691,26 @@ const styles = StyleSheet.create({
   autoAstTextCol: {
     flex: 1,
     gap: 2,
+  },
+  classChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: 2,
+  },
+  classChip: {
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  classChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  classHint: {
+    marginTop: Spacing.xs,
   },
 });

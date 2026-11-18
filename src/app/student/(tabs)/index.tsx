@@ -15,10 +15,15 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
+import { subscribeStudentAttendance } from '@/services/attendance';
 import { signOutUser } from '@/services/auth';
 import { subscribeStudentSessions } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { PracticalSession, SessionStatus } from '@/types/attendance';
+import {
+  AttendanceRecord,
+  PracticalSession,
+  SessionStatus,
+} from '@/types/attendance';
 
 type FilterOption = 'ALL' | SessionStatus;
 
@@ -37,22 +42,51 @@ export default function StudentScheduleRoute() {
   const [refreshing, setRefreshing] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
+  const [studentAttendance, setStudentAttendance] = useState<AttendanceRecord[]>([]);
 
-  // Berlangganan sesi praktikum secara real-time dari Firestore
+  // Berlangganan sesi praktikum & kehadiran secara real-time dari Firestore
   useEffect(() => {
     if (!currentUser.id) return;
-    const unsub = subscribeStudentSessions(
+    const unsubSessions = subscribeStudentSessions(
       currentUser.id,
       currentUser.enrolledClasses || [],
       (loaded) => {
         setFirestoreSessions(loaded);
       }
     );
-    return () => unsub();
+
+    const unsubAttendance = subscribeStudentAttendance(
+      currentUser.id,
+      (records) => {
+        setStudentAttendance(records);
+      }
+    );
+
+    return () => {
+      unsubSessions();
+      unsubAttendance();
+    };
   }, [currentUser.id, currentUser.enrolledClasses]);
 
-  const sourceSessions =
+  const hasAttended = (sessionId: string) => {
+    return (
+      studentAttendance.some((r) => r.sessionId === sessionId) ||
+      isAlreadyAttended(sessionId, currentUser.id)
+    );
+  };
+
+  const rawSessions =
     firestoreSessions.length > 0 ? firestoreSessions : sessions;
+
+  // Filter ketat: Praktikan hanya boleh melihat sesi untuk kelas yang diikutinya (SRS-RBAC-01)
+  const enrolledClassesNormalized = (currentUser.enrolledClasses || []).map((c) =>
+    c.toUpperCase()
+  );
+
+  const sourceSessions = rawSessions.filter((s) => {
+    if (enrolledClassesNormalized.length === 0) return true;
+    return enrolledClassesNormalized.includes((s.classCode || '').toUpperCase());
+  });
 
   const filteredSessions = sourceSessions.filter((s) => {
     if (activeFilter === 'ALL') return true;
@@ -160,7 +194,7 @@ export default function StudentScheduleRoute() {
           {activeSession ? (
             <SessionCard
               session={activeSession}
-              attended={isAlreadyAttended(activeSession.id, currentUser.id)}
+              attended={hasAttended(activeSession.id)}
               variant="hero"
               onPress={() => handleOpenSession(activeSession.id)}
             />
@@ -183,7 +217,7 @@ export default function StudentScheduleRoute() {
                 <SessionCard
                   key={session.id}
                   session={session}
-                  attended={isAlreadyAttended(session.id, currentUser.id)}
+                  attended={hasAttended(session.id)}
                   onPress={() => handleOpenSession(session.id)}
                 />
               ))}

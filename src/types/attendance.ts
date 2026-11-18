@@ -1,12 +1,20 @@
 export type SessionStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
-export type UserRole = 'ASSISTANT' | 'STUDENT';
+export type UserRole = 'ADMIN' | 'ASSISTANT' | 'STUDENT';
+export type ApprovalStatus =
+  | 'PENDING_ADMIN'
+  | 'PENDING_ASSISTANT'
+  | 'APPROVED'
+  | 'REJECTED';
 
 export interface UserProfile {
   id: string;
   name: string;
   role: UserRole;
-  identifier: string; // NIM atau Kode Asisten (misal: "AST-01", "24060124130102")
+  identifier: string; // NIM, Kode Asisten, atau Kode Admin ("AST-01", "24060124130102", "ADM-01")
   enrolledClasses?: string[];
+  approvalStatus?: ApprovalStatus;
+  requestedClass?: string;
+  email?: string;
 }
 
 export interface AttendanceRecord {
@@ -31,6 +39,8 @@ export interface PracticalSession {
   assistantName: string;
   totalStudents: number;
   description?: string;
+  createdAt?: string;
+  pendingChangeRequest?: 'DELETE' | 'RESCHEDULE';
 }
 
 export interface CreateSessionInput {
@@ -41,4 +51,23 @@ export interface CreateSessionInput {
   endTime: string;
   description?: string;
   totalStudents?: number;
+}
+
+export interface SessionChangeRequest {
+  id: string;
+  sessionId: string;
+  courseName: string;
+  classCode: string;
+  type: 'DELETE' | 'RESCHEDULE';
+  requestedBy: string;
+  requestedByName: string;
+  reason: string;
+  newTimeSlot?: string;
+  newDate?: string;
+  newRoom?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  adminNote?: string;
 }
