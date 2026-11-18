@@ -94,6 +94,25 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     password: 'password123',
     approvalStatus: 'APPROVED',
   },
+  {
+    uid: 'iUuzqYziLZhWndnZdh9bx4NRsSe2',
+    email: 'herman@praktikum.ac.id',
+    name: 'Herman',
+    role: 'ASSISTANT',
+    identifier: 'AST-03',
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
+    uid: 'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    email: 'jeedan@praktikan.ac.id',
+    name: 'Jeedan',
+    role: 'STUDENT',
+    identifier: '24060124130102',
+    enrolledClasses: ['A1', 'B2', 'C1'],
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
 ];
 
 const localAccountsStore: LocalAccountRecord[] = [...DEFAULT_DEMO_ACCOUNTS];
@@ -350,6 +369,16 @@ export async function signUpUser(
       enrolledClasses: newAuthUser.enrolledClasses ?? [],
       createdAt: new Date().toISOString(),
     });
+
+    // Simpan juga ke cache lokal agar langsung terlihat di Database Akun
+    const existingIndex = localAccountsStore.findIndex(
+      (acc) => acc.email.toLowerCase() === normalizedEmail
+    );
+    if (existingIndex >= 0) {
+      localAccountsStore[existingIndex] = { ...newAuthUser, password };
+    } else {
+      localAccountsStore.push({ ...newAuthUser, password });
+    }
 
     if (approvalStatus !== 'APPROVED') {
       // Akun membutuhkan persetujuan, jangan biarkan otomatis login

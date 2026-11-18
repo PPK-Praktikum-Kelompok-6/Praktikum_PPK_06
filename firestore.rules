@@ -32,9 +32,9 @@ service cloud.firestore {
     // USERS COLLECTION
     // =========================================================================
     match /users/{userId} {
-      // Pengguna yang login dapat membaca profil; pengguna dapat mengedit profilnya sendiri
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(userId);
+      // Direktori akun publik dapat dibaca di halaman login & sistem
+      allow read: if true;
+      allow create: if true;
       allow update: if isSignedIn() && (isOwner(userId) || isAssistant());
       allow delete: if false;
     }
@@ -43,7 +43,8 @@ service cloud.firestore {
     // CLASSES COLLECTION (SRS-CRUD-01)
     // =========================================================================
     match /classes/{classId} {
-      allow read: if isSignedIn();
+      // Daftar kelas praktikum dapat dibaca publik untuk pemilihan saat registrasi
+      allow read: if true;
       allow create, update, delete: if isAssistant();
     }
 

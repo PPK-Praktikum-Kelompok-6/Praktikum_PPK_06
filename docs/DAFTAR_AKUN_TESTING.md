@@ -14,9 +14,11 @@
 | 👑 **Administrator** | Administrator Lab PPK | `admin@praktikum.ac.id` | `password123` | `ADM-01` | Pengelola Hak Akses, Persetujuan Sesi, Plotting Asisten |
 | 🛡️ **Asisten 1** | Muhammad Zaidan Alfarizi | `zaidan@praktikum.ac.id` | `password123` | `AST-01` | Pengampu Kelas C1, B2 |
 | 🛡️ **Asisten 2** | Crystiano Bayu Satya Alves | `bayu@praktikum.ac.id` | `password123` | `AST-02` | Pengampu Kelas A1 |
+| 🛡️ **Asisten 3** | Herman | `herman@praktikum.ac.id` | `password123` | `AST-03` | Asisten Lab (Siap Ditugaskan) |
 | 🎓 **Praktikan 1** | Bahir Ananda Wibowo | `bahir@student.ac.id` | `password123` | `24060124140184` | Kelas A1, B2, C1 |
 | 🎓 **Praktikan 2** | Ahmad Dahlan | `ahmad@student.ac.id` | `password123` | `24060124140101` | Kelas A1, C1 |
 | 🎓 **Praktikan 3** | Siti Nurhaliza | `siti@student.ac.id` | `password123` | `24060124140102` | Kelas B2, C1 |
+| 🎓 **Praktikan 4** | Jeedan | `jeedan@praktikan.ac.id` | `password123` | `24060124130102` | Kelas A1, B2, C1 |
 
 ---
 
