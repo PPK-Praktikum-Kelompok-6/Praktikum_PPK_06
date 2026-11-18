@@ -44,13 +44,13 @@ Sebagai PM dalam tim proyek praktikum ini, Zaidan memegang kendali atas 5 pilar 
 
 - [x] **Inisiasi Sprint 2**: Menyusun dokumen pembagian tugas dan penyesuaian SRS berdasarkan konsultasi kebutuhan praktikum.
 - [x] **Arsitektur & Kontrak Data**: Menetapkan struktur folder baru (`src/services/` dan `src/features/permits/`) serta kontrak tipe data TypeScript.
-- [ ] **Sprint Kick-Off**: Membagikan panduan tugas mandiri kepada Bayu, Bahir, dan Ferdy.
-- [ ] **Code Review & QA**:
-  - [ ] Review PR Bayu (`feat/bayu/auth-firestore-crud`).
-  - [ ] Review PR Bahir (`feat/bahir/attendance-realtime-rules`).
-  - [ ] Review PR Ferdy (`feat/ferdy/permit-ai-handling`).
-- [ ] **Uji Integrasi End-to-End**: Verifikasi seluruh alur (Registrasi/Login $\rightarrow$ Buka Sesi $\rightarrow$ Presensi Real-time $\rightarrow$ Pengajuan Izin AI $\rightarrow$ Review Asisten).
-- [ ] **Final Merge**: Penggabungan cabang `dev` ke `main` untuk rilis akhir praktikum.
+- [x] **Sprint Kick-Off**: Membagikan panduan tugas mandiri kepada Bayu, Bahir, dan Ferdy.
+- [x] **Code Review & QA**:
+  - [x] Review PR Bayu (`feat/bayu/auth-firestore-crud`) — Lolos & Ter-merge.
+  - [x] Review PR Bahir (`feat/bahir/attendance-realtime-rules`) — Lolos & Ter-merge.
+  - [x] Review PR Ferdy (`feat/ferdy/permit-ai-handling`) — Lolos & Ter-merge.
+- [x] **Uji Integrasi End-to-End**: Verifikasi seluruh alur (Registrasi/Login $\rightarrow$ Buka Sesi $\rightarrow$ Presensi Real-time $\rightarrow$ Pengajuan Izin AI $\rightarrow$ Review Asisten) lulus lint & typecheck.
+- [x] **Final Merge**: Penggabungan cabang fitur ke `dev` dan sinkronisasi ke `main` untuk rilis akhir praktikum.
 
 ---
 
