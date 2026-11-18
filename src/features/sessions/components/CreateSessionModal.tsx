@@ -24,6 +24,8 @@ export interface CreateSessionModalProps {
   ) =>
     | { success: boolean; message: string }
     | Promise<{ success: boolean; message: string }>;
+  defaultClassCode?: string;
+  availableClasses?: string[];
 }
 
 const PRESET_COURSES = [
@@ -52,9 +54,12 @@ export function CreateSessionModal({
   visible,
   onClose,
   onSubmit,
+  defaultClassCode,
+  availableClasses,
 }: CreateSessionModalProps) {
   const [courseName, setCourseName] = useState('');
-  const [classCode, setClassCode] = useState('A1');
+  const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
+  const classCode = selectedClassCode ?? defaultClassCode ?? 'A1';
   const [room, setRoom] = useState('');
   const [startTime, setStartTime] = useState('08.00');
   const [endTime, setEndTime] = useState('10.00');
@@ -64,7 +69,7 @@ export function CreateSessionModal({
 
   const resetForm = () => {
     setCourseName('');
-    setClassCode('A1');
+    setSelectedClassCode(null);
     setRoom('');
     setStartTime('08.00');
     setEndTime('10.00');
@@ -249,18 +254,34 @@ export function CreateSessionModal({
               </View>
             </View>
 
-            {/* Row: Kelas & Preset Waktu */}
+            {/* Row: Kelas Praktikum */}
             <View style={styles.fieldGroup}>
               <AppText variant="label" style={styles.fieldLabel}>
-                KELAS PRAKTIKUM
+                PILIH KELAS PRAKTIKUM *
               </AppText>
-              <TextInput
-                style={styles.input}
-                placeholder="Contoh: A1, B2, atau C1"
-                placeholderTextColor={Colors.textLight}
-                value={classCode}
-                onChangeText={setClassCode}
-              />
+              <View style={styles.chipsWrap}>
+                {(availableClasses && availableClasses.length > 0
+                  ? availableClasses
+                  : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']
+                ).map((code) => {
+                  const isSelected = classCode.toUpperCase() === code.toUpperCase();
+                  return (
+                    <Pressable
+                      key={code}
+                      style={[styles.chip, isSelected && styles.chipActive]}
+                      onPress={() => setSelectedClassCode(code)}
+                    >
+                      <AppText
+                        variant="caption"
+                        color={isSelected ? Colors.textWhite : Colors.textSecondary}
+                        weight={isSelected ? 'semibold' : 'regular'}
+                      >
+                        Kelas {code}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             {/* Waktu Mulai & Waktu Selesai */}

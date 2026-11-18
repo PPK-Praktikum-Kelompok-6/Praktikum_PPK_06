@@ -71,3 +71,14 @@ export interface SessionChangeRequest {
   reviewedBy?: string;
   adminNote?: string;
 }
+
+export interface PracticalClass {
+  id: string;
+  classCode: string; // 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2'
+  courseName?: string;
+  room?: string;
+  assistantId: string;
+  assistantName: string;
+  studentIds: string[];
+  isOpen?: boolean; // Dikendalikan oleh admin untuk membuka/menutup ketersediaan kelas
+}

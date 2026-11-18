@@ -13,7 +13,7 @@ import {
 import { SessionChangeRequest } from '@/types/attendance';
 import { AuthUser } from './auth';
 import { db, isFirebaseConfigured } from './firebase';
-import { deleteSession, PracticalClass, updateSession } from './sessions';
+import { DEFAULT_CLASSES, deleteSession, PracticalClass, updateSession } from './sessions';
 
 /**
  * Service Administrasi & Tata Kelola Lab (Admin & Perizinan Berjenjang).
@@ -176,11 +176,34 @@ export function subscribeAllClasses(
             id: d.id,
             ...(d.data() as Omit<PracticalClass, 'id'>),
           }));
-          list.sort((a, b) => a.classCode.localeCompare(b.classCode));
-          onUpdate(list);
+
+          // Pastikan semua 8 kelas standar (A1 s/d D2) selalu ada
+          const merged: PracticalClass[] = DEFAULT_CLASSES.map((def) => {
+            const found = list.find(
+              (c) => c.classCode.toUpperCase() === def.classCode.toUpperCase()
+            );
+            if (found) {
+              return {
+                ...def,
+                ...found,
+                isOpen: found.isOpen !== false,
+              };
+            }
+            return def;
+          });
+
+          list.forEach((c) => {
+            if (!merged.some((m) => m.classCode.toUpperCase() === c.classCode.toUpperCase())) {
+              merged.push(c);
+            }
+          });
+
+          merged.sort((a, b) => a.classCode.localeCompare(b.classCode));
+          onUpdate(merged);
         },
         (err) => {
           console.warn('Real-time classes error:', err);
+          onUpdate(DEFAULT_CLASSES);
         }
       );
       return unsub;
@@ -188,19 +211,44 @@ export function subscribeAllClasses(
       console.warn('Could not setup classes listener:', e);
     }
   }
+
+  onUpdate(DEFAULT_CLASSES);
   return () => {};
 }
 
 export async function assignAssistantToClass(
   classId: string,
+  classCode: string,
   assistantId: string,
   assistantName: string
 ): Promise<void> {
   if (isFirebaseConfigured) {
-    await updateDoc(doc(db, 'classes', classId), {
-      assistantId,
-      assistantName,
-    });
+    await setDoc(
+      doc(db, 'classes', classId),
+      {
+        classCode: classCode.toUpperCase(),
+        assistantId,
+        assistantName,
+      },
+      { merge: true }
+    );
+  }
+}
+
+export async function toggleActiveClass(
+  classId: string,
+  classCode: string,
+  isOpen: boolean
+): Promise<void> {
+  if (isFirebaseConfigured) {
+    await setDoc(
+      doc(db, 'classes', classId),
+      {
+        classCode: classCode.toUpperCase(),
+        isOpen,
+      },
+      { merge: true }
+    );
   }
 }
 

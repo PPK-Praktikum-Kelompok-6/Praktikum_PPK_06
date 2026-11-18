@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   setDoc,
   where,
@@ -503,4 +504,48 @@ export async function signOutUser(): Promise<void> {
   currentAuthUser = null;
   signedOutExplicitly = true;
   notifyAuthListeners();
+}
+
+/**
+ * Berlangganan secara realtime ke daftar seluruh akun pengguna di sistem (SRS-AUTH-LIVE-SYNC).
+ * Jika ada akun yang bertambah/berubah/dihapus di database Firestore, callback akan langsung dipanggil.
+ */
+export function subscribeAllUsers(
+  onUpdate: (users: AuthUser[]) => void
+): () => void {
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, 'users'));
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const list: AuthUser[] = snap.docs.map((d) => ({
+            uid: d.id,
+            ...(d.data() as Omit<AuthUser, 'uid'>),
+          }));
+          list.sort((a, b) => {
+            const roleOrder: Record<UserRole, number> = {
+              ADMIN: 0,
+              ASSISTANT: 1,
+              STUDENT: 2,
+            };
+            const diff = (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
+            if (diff !== 0) return diff;
+            return a.name.localeCompare(b.name);
+          });
+          onUpdate(list);
+        },
+        (err) => {
+          console.warn('Realtime users error:', err);
+          onUpdate(getDemoAccounts());
+        }
+      );
+      return unsub;
+    } catch (e) {
+      console.warn('Could not setup users realtime listener:', e);
+    }
+  }
+
+  onUpdate(getDemoAccounts());
+  return () => {};
 }

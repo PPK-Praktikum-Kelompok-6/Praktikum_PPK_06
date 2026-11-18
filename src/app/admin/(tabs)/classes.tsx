@@ -13,6 +13,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   assignAssistantToClass,
   subscribeAllClasses,
+  toggleActiveClass,
 } from '@/services/admin';
 import { getDemoAccounts } from '@/services/auth';
 import { PracticalClass } from '@/services/sessions';
@@ -57,12 +58,17 @@ export default function AdminClassesScreen() {
 
     setSubmitting(true);
     try {
-      await assignAssistantToClass(selectedClass.id, ast.uid, ast.name);
+      await assignAssistantToClass(
+        selectedClass.id,
+        selectedClass.classCode,
+        ast.uid,
+        ast.name
+      );
       setFeedback({
         visible: true,
         type: 'success',
         title: 'Penugasan Berhasil',
-        message: `Asisten ${ast.name} (${ast.identifier}) berhasil ditetapkan sebagai penanggung jawab Kelas ${selectedClass.classCode} (${selectedClass.courseName}).`,
+        message: `Asisten ${ast.name} (${ast.identifier}) berhasil ditetapkan sebagai penanggung jawab Kelas ${selectedClass.classCode}.`,
       });
       setAssignModalVisible(false);
       setSelectedClass(null);
@@ -75,6 +81,28 @@ export default function AdminClassesScreen() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (cls: PracticalClass) => {
+    const nextState = cls.isOpen === false;
+    try {
+      await toggleActiveClass(cls.id, cls.classCode, nextState);
+      setFeedback({
+        visible: true,
+        type: 'info',
+        title: nextState ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
+        message: `Status ketersediaan pendaftaran untuk Kelas ${cls.classCode} sekarang ${
+          nextState ? 'DIBUKA' : 'DITUTUP'
+        }.`,
+      });
+    } catch (err: any) {
+      setFeedback({
+        visible: true,
+        type: 'error',
+        title: 'Gagal Mengubah Status',
+        message: err?.message || 'Terjadi kesalahan sistem.',
+      });
     }
   };
 
@@ -105,7 +133,9 @@ export default function AdminClassesScreen() {
             const assignedClasses = classes.filter(
               (c) =>
                 c.assistantId === ast.uid ||
-                c.assistantName.toLowerCase().includes(ast.name.toLowerCase().split(' ')[0])
+                (c.assistantName || '')
+                  .toLowerCase()
+                  .includes(ast.name.toLowerCase().split(' ')[0])
             );
             return (
               <View key={ast.uid} style={styles.assistantSummaryRow}>
@@ -156,11 +186,19 @@ export default function AdminClassesScreen() {
                 </View>
 
                 <View style={styles.classDetails}>
-                  <AppText variant="title" weight="bold">
-                    {cls.courseName}
-                  </AppText>
+                  <View style={styles.classTitleRow}>
+                    <AppText variant="title" weight="bold">
+                      Kelas {cls.classCode}
+                    </AppText>
+                    <Badge
+                      label={cls.isOpen !== false ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup'}
+                      variant={cls.isOpen !== false ? 'open' : 'closed'}
+                      size="sm"
+                      showDot
+                    />
+                  </View>
                   <AppText variant="caption" color={Colors.textMuted}>
-                    Ruangan: {cls.room} • {cls.studentIds?.length || 0} Praktikan
+                    Ruangan: {cls.room || 'Lab Komputer'} • {cls.studentIds?.length || 0} Praktikan Terdaftar
                   </AppText>
                   <View style={styles.assistantBadgeRow}>
                     <Icon name="person" size={13} color={Colors.primary} />
@@ -172,13 +210,23 @@ export default function AdminClassesScreen() {
               </View>
 
               <View style={styles.classActionRow}>
-                <CustomButton
-                  title="Ganti / Tugaskan Asisten"
-                  variant="outline"
-                  size="sm"
-                  icon={<Icon name="swap-horizontal" size={16} color={Colors.primary} />}
-                  onPress={() => handleOpenAssign(cls)}
-                />
+                <View style={styles.actionBtnCol}>
+                  <CustomButton
+                    title={cls.isOpen !== false ? 'Tutup Pendaftaran' : 'Buka Pendaftaran'}
+                    variant={cls.isOpen !== false ? 'outline' : 'primary'}
+                    size="sm"
+                    onPress={() => handleToggleActive(cls)}
+                  />
+                </View>
+                <View style={styles.actionBtnCol}>
+                  <CustomButton
+                    title="Tugaskan Asisten"
+                    variant="outline"
+                    size="sm"
+                    icon={<Icon name="swap-horizontal" size={16} color={Colors.primary} />}
+                    onPress={() => handleOpenAssign(cls)}
+                  />
+                </View>
               </View>
             </Card>
           );
@@ -324,6 +372,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  classTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
+  },
   assistantBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -331,9 +385,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   classActionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
     paddingTop: Spacing.sm,
+  },
+  actionBtnCol: {
+    flex: 1,
   },
   modalBackdrop: {
     flex: 1,

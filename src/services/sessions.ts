@@ -14,53 +14,100 @@ import {
 } from 'firebase/firestore';
 
 import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
-import { PracticalSession, UserProfile } from '@/types/attendance';
+import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
 import { db, isFirebaseConfigured } from './firebase';
 
-export interface PracticalClass {
-  id: string;
-  classCode: string;
-  courseName: string;
-  room: string;
-  assistantId: string;
-  assistantName: string;
-  studentIds: string[];
-}
+export { PracticalClass } from '@/types/attendance';
+
+export const DEFAULT_CLASSES: PracticalClass[] = [
+  {
+    id: 'class-a1',
+    classCode: 'A1',
+    courseName: 'Praktikum A1',
+    room: 'Lab Basis Data',
+    assistantId: 'ast-2',
+    assistantName: 'Crystiano Bayu Satya Alves',
+    studentIds: ['std-1', 'std-2', 'std-5'],
+    isOpen: true,
+  },
+  {
+    id: 'class-a2',
+    classCode: 'A2',
+    courseName: 'Praktikum A2',
+    room: 'Lab Basis Data',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-b1',
+    classCode: 'B1',
+    courseName: 'Praktikum B1',
+    room: 'Lab Komputer 1',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-b2',
+    classCode: 'B2',
+    courseName: 'Praktikum B2',
+    room: 'Lab Komputer 1',
+    assistantId: 'ast-1',
+    assistantName: 'Muhammad Zaidan Alfarizi',
+    studentIds: ['std-1', 'std-3', 'std-4'],
+    isOpen: true,
+  },
+  {
+    id: 'class-c1',
+    classCode: 'C1',
+    courseName: 'Praktikum C1',
+    room: 'Lab Komputer 2',
+    assistantId: 'ast-1',
+    assistantName: 'Muhammad Zaidan Alfarizi',
+    studentIds: ['std-1', 'std-2', 'std-3', 'std-4', 'std-5'],
+    isOpen: true,
+  },
+  {
+    id: 'class-c2',
+    classCode: 'C2',
+    courseName: 'Praktikum C2',
+    room: 'Lab Komputer 2',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-d1',
+    classCode: 'D1',
+    courseName: 'Praktikum D1',
+    room: 'Lab Jaringan',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-d2',
+    classCode: 'D2',
+    courseName: 'Praktikum D2',
+    room: 'Lab Jaringan',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+];
 
 export type SessionListener = () => void;
 
 const sessionListeners = new Set<SessionListener>();
 let localSessionsStore: PracticalSession[] = [...MOCK_SESSIONS];
 
-let localClassesStore: PracticalClass[] = [
-  {
-    id: 'class-c1',
-    classCode: 'C1',
-    courseName: 'Pemrograman Web & Mobile',
-    room: 'Lab Komputer 2',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-2', 'std-3', 'std-4', 'std-5'],
-  },
-  {
-    id: 'class-b2',
-    classCode: 'B2',
-    courseName: 'Struktur Data & Algoritma',
-    room: 'Lab Komputer 1',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-3', 'std-4'],
-  },
-  {
-    id: 'class-a1',
-    classCode: 'A1',
-    courseName: 'Basis Data Lanjut',
-    room: 'Lab Basis Data',
-    assistantId: 'ast-2',
-    assistantName: 'Crystiano Bayu Satya Alves',
-    studentIds: ['std-1', 'std-2', 'std-5'],
-  },
-];
+let localClassesStore: PracticalClass[] = [...DEFAULT_CLASSES];
 
 function notifySessionListeners() {
   sessionListeners.forEach((listener) => listener());
