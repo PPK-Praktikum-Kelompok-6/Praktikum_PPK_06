@@ -83,7 +83,10 @@ export function subscribeStudentPermits(
 ): () => void {
   if (isFirebaseConfigured && studentId) {
     try {
-      const q = query(collection(db, 'permits'));
+      const q = query(
+        collection(db, 'permits'),
+        where('studentId', '==', studentId)
+      );
       const unsubFirestore = onSnapshot(
         q,
         (snap) => {
@@ -227,13 +230,13 @@ export async function submitPermit(
     try {
       const q = query(
         collection(db, 'permits'),
-        where('sessionId', '==', permitData.sessionId)
+        where('studentId', '==', permitData.studentId)
       );
       const snap = await getDocs(q);
       const hasActive = snap.docs.some((d) => {
         const data = d.data() as PermitRequest;
         return (
-          data.studentId === permitData.studentId && data.status !== 'REJECTED'
+          data.sessionId === permitData.sessionId && data.status !== 'REJECTED'
         );
       });
       if (hasActive) {

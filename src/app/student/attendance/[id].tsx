@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
@@ -12,11 +13,13 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { AttendanceForm } from '@/features/attendance/components/AttendanceForm';
 import { AttendanceSuccessCard } from '@/features/attendance/components/AttendanceSuccessCard';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import { subscribeAllClasses } from '@/services/admin';
 import {
   submitAttendanceToFirestore,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
-import { subscribeSessionDoc } from '@/services/sessions';
+import { PermitRequest, subscribeStudentPermits } from '@/services/permits';
+import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canAttend } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
@@ -33,6 +36,8 @@ export default function StudentAttendanceDetailRoute() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
   const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
+  const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
+  const [myPermits, setMyPermits] = useState<PermitRequest[]>([]);
   const [feedbackState, setFeedbackState] = useState<{
     visible: boolean;
     type: 'success' | 'error';
@@ -54,14 +59,24 @@ export default function StudentAttendanceDetailRoute() {
     return () => unsubSession();
   }, [sessionId]);
 
-  // Real-time listener attendance record untuk sesi ini (SRS-SYNC-01)
+  // Real-time listener attendance record untuk sesi ini + daftar kelas & izin (SRS-SYNC-01)
   useEffect(() => {
     if (!sessionId) return;
     const unsubscribe = subscribeToSessionAttendance(sessionId, (records) => {
       setRealtimeRecords(records);
     });
-    return () => unsubscribe();
-  }, [sessionId]);
+    const unsubClasses = subscribeAllClasses((cls) => {
+      setAllClasses(cls);
+    });
+    const unsubPermits = subscribeStudentPermits(currentUser.id, (permits) => {
+      setMyPermits(permits);
+    });
+    return () => {
+      unsubscribe();
+      unsubClasses();
+      unsubPermits();
+    };
+  }, [sessionId, currentUser.id]);
 
   const session = realtimeSession || (sessionId ? getSessionById(sessionId) : undefined);
 
@@ -83,13 +98,27 @@ export default function StudentAttendanceDetailRoute() {
         )
       : undefined);
 
+  // Evaluasi kelas yang diikuti praktikan (dari enrolledClasses maupun studentIds kelas)
+  const effectiveEnrolledCodes = Array.from(
+    new Set([
+      ...(currentUser.enrolledClasses || []).map((c) => c.toUpperCase()),
+      ...allClasses
+        .filter((cls) => (cls.studentIds || []).includes(currentUser.id))
+        .map((cls) => cls.classCode.toUpperCase()),
+    ])
+  );
+
   // Evaluasi aturan bisnis murni dari store/rules.ts
   const rule = canAttend(
     session,
     attendanceRecords,
     currentUser.id,
-    currentUser.enrolledClasses
+    effectiveEnrolledCodes.length > 0 ? effectiveEnrolledCodes : undefined
   );
+
+  const sessionPermit = session
+    ? myPermits.find((p) => p.sessionId === session.id && p.status !== 'REJECTED')
+    : undefined;
 
   const handleAttendanceSubmit = async (notes: string) => {
     if (!session) return;
@@ -171,12 +200,15 @@ export default function StudentAttendanceDetailRoute() {
   }
 
   // Batasan kelas: Praktikan hanya berhak mengakses kelas yang diikutinya (SRS-RBAC-01)
-  const isEnrolled =
-    !currentUser.enrolledClasses ||
-    currentUser.enrolledClasses.length === 0 ||
-    currentUser.enrolledClasses.some(
-      (c) => c.toUpperCase() === session.classCode.toUpperCase()
+  const isJoinedByClassId =
+    Boolean(session.classId) &&
+    allClasses.some(
+      (c) => c.id === session.classId && (c.studentIds || []).includes(currentUser.id)
     );
+  const isEnrolled =
+    isJoinedByClassId ||
+    effectiveEnrolledCodes.length === 0 ||
+    effectiveEnrolledCodes.includes(session.classCode.toUpperCase());
 
   if (!isEnrolled) {
     return (
@@ -331,7 +363,7 @@ export default function StudentAttendanceDetailRoute() {
         </View>
       </Card>
 
-      {/* Bagian Bukti Kehadiran atau Form Presensi */}
+      {/* Bagian Bukti Kehadiran, Bukti Izin Disetujui, atau Form Presensi */}
       <View style={styles.contentSection}>
         {attended && attendedRecord ? (
           <AttendanceSuccessCard
@@ -339,6 +371,33 @@ export default function StudentAttendanceDetailRoute() {
             session={session}
             style={styles.successCard}
           />
+        ) : sessionPermit?.status === 'APPROVED' ? (
+          <Card variant="default" padding="lg" style={styles.permitApprovedCard}>
+            <View style={styles.permitApprovedHeader}>
+              <View style={styles.permitIconWrap}>
+                <Icon name="checkmark-done-circle" size={26} color={Colors.primary} />
+              </View>
+              <View style={styles.permitHeaderTitleCol}>
+                <Badge label="Izin Praktikum Disetujui" variant="open" size="sm" showDot />
+                <AppText variant="title" weight="bold" style={styles.permitApprovedTitle}>
+                  Ketidakhadiran Anda Tercatat Resmi
+                </AppText>
+              </View>
+            </View>
+            <AppText variant="bodySm" color={Colors.textSecondary}>
+              Alasan: &ldquo;{sessionPermit.reason}&rdquo;
+            </AppText>
+            {sessionPermit.decisionNote ? (
+              <View style={styles.permitDecisionNote}>
+                <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+                  Catatan Asisten ({sessionPermit.reviewedBy || 'Asisten'}):
+                </AppText>
+                <AppText variant="caption" color={Colors.textSecondary}>
+                  {sessionPermit.decisionNote}
+                </AppText>
+              </View>
+            ) : null}
+          </Card>
         ) : (
           <AttendanceForm
             session={session}
@@ -462,6 +521,41 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     marginTop: Spacing.xxl,
+  },
+  permitApprovedCard: {
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    backgroundColor: Colors.primaryBg,
+    gap: Spacing.sm,
+  },
+  permitApprovedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  permitIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permitHeaderTitleCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  permitApprovedTitle: {
+    marginTop: 2,
+  },
+  permitDecisionNote: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.sm,
+    borderRadius: Radius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+    gap: 2,
   },
 });
 

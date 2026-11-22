@@ -10,20 +10,69 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import { subscribeAllClasses } from '@/services/admin';
 import { subscribeToSessionAttendance } from '@/services/attendance';
+import { PracticalClass, subscribeAssistantSessions } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { AttendanceRecord } from '@/types/attendance';
+import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 
 export default function AssistantRecapRoute() {
   const { currentUser } = useCurrentUser();
   const { sessions } = useSessions();
   const { attendanceRecords } = useAttendance();
-  const [realtimeMap, setRealtimeMap] = useState<Record<string, AttendanceRecord[]>>({});
 
-  const mySessions = useMemo(
-    () => sessions.filter((s) => s.assistantId === currentUser.id),
-    [sessions, currentUser.id]
-  );
+  const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
+  const [assignedClasses, setAssignedClasses] = useState<PracticalClass[]>([]);
+  const [realtimeMap, setRealtimeMap] = useState<Record<string, AttendanceRecord[]>>({});
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Subscribe ke jadwal sesi asisten & kelas yang diampu (termasuk Co-Assistant) dari Firestore
+  useEffect(() => {
+    if (!currentUser.id || currentUser.role !== 'ASSISTANT') return;
+
+    const unsubSessions = subscribeAssistantSessions(
+      currentUser.id,
+      (loaded) => {
+        setFirestoreSessions(loaded);
+      },
+      currentUser.name
+    );
+
+    const unsubClasses = subscribeAllClasses((classList) => {
+      const firstName = (currentUser.name || '').toLowerCase().split(' ')[0];
+      const myCls = classList.filter((c) => {
+        const ids = c.assistantIds || (c.assistantId ? [c.assistantId] : []);
+        const names = c.assistantNames || (c.assistantName ? [c.assistantName] : []);
+        return (
+          ids.includes(currentUser.id) ||
+          (Boolean(firstName) && names.some((n) => n.toLowerCase().includes(firstName)))
+        );
+      });
+      setAssignedClasses(myCls);
+    });
+
+    return () => {
+      unsubSessions();
+      unsubClasses();
+    };
+  }, [currentUser.id, currentUser.name, currentUser.role]);
+
+  const mySessions = useMemo(() => {
+    const myClassCodes = assignedClasses.map((c) => c.classCode.toUpperCase());
+    const myClassIds = assignedClasses.map((c) => c.id);
+    const firstName = (currentUser.name || '').toLowerCase().split(' ')[0];
+    const source = firestoreSessions.length > 0 ? firestoreSessions : sessions;
+
+    return source.filter((s) => {
+      const isDirectOwner =
+        s.assistantId === currentUser.id ||
+        (Boolean(firstName) && (s.assistantName || '').toLowerCase().includes(firstName));
+      const isCoAssistantClass =
+        (s.classId && myClassIds.includes(s.classId)) ||
+        myClassCodes.includes((s.classCode || '').toUpperCase());
+      return isDirectOwner || isCoAssistantClass;
+    });
+  }, [assignedClasses, currentUser.id, currentUser.name, firestoreSessions, sessions]);
 
   // Subscribe real-time attendance untuk setiap sesi yang diampu
   useEffect(() => {
@@ -40,6 +89,13 @@ export default function AssistantRecapRoute() {
       unsubscribes.forEach((unsub) => unsub());
     };
   }, [currentUser.role, mySessions]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 300);
+  };
 
   // Batasan peran: Praktikan tidak boleh mengakses rekapitulasi asisten
   if (currentUser.role !== 'ASSISTANT') {
@@ -59,16 +115,25 @@ export default function AssistantRecapRoute() {
   const totalSessions = mySessions.length;
   const totalAttended = mySessions.reduce((acc, session) => {
     const rt = realtimeMap[session.id];
-    const count = rt ? rt.length : attendanceRecords.filter((r) => r.sessionId === session.id).length;
+    const count = rt
+      ? rt.length
+      : attendanceRecords.filter((r) => r.sessionId === session.id).length;
     return acc + count;
   }, 0);
 
-  const totalCapacity = mySessions.reduce((acc, session) => acc + session.totalStudents, 0);
+  const totalCapacity = mySessions.reduce(
+    (acc, session) => acc + session.totalStudents,
+    0
+  );
   const overallPercentage =
     totalCapacity > 0 ? Math.round((totalAttended / totalCapacity) * 100) : 0;
 
   return (
-    <Screen withBottomNavPadding>
+    <Screen
+      withBottomNavPadding
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -92,7 +157,7 @@ export default function AssistantRecapRoute() {
       {/* High-level Summary Card */}
       <Card variant="default" padding="md" style={styles.summaryCard}>
         <AppText variant="caption" color={Colors.textMuted} weight="semibold">
-          RINGKASAN TOTAL
+          RINGKASAN TOTAL ({assignedClasses.length} KELAS DIAMPU)
         </AppText>
         <View style={styles.metricRow}>
           <View style={styles.metricItem}>
@@ -132,7 +197,7 @@ export default function AssistantRecapRoute() {
       {mySessions.length === 0 ? (
         <EmptyState
           title="Belum Ada Rekap"
-          message="Belum ada sesi praktikum yang terdaftar untuk ditampilkan rekapnya."
+          message="Belum ada sesi praktikum yang terdaftar pada kelas yang Anda ampu untuk ditampilkan rekapnya."
           iconName="stats-chart-outline"
         />
       ) : (
@@ -151,9 +216,15 @@ export default function AssistantRecapRoute() {
             return (
               <Pressable
                 key={session.id}
-                onPress={() => router.push(`/assistant/session/${session.id}` as Href)}
+                onPress={() =>
+                  router.push(`/assistant/session/${session.id}` as Href)
+                }
               >
-                <Card variant="default" padding="md" style={styles.sessionRecapCard}>
+                <Card
+                  variant="default"
+                  padding="md"
+                  style={styles.sessionRecapCard}
+                >
                   <View style={styles.cardHeader}>
                     <View style={styles.courseInfo}>
                       <AppText variant="body" weight="bold">
@@ -161,6 +232,9 @@ export default function AssistantRecapRoute() {
                       </AppText>
                       <AppText variant="caption" color={Colors.textMuted}>
                         Kelas {session.classCode} • {session.room}
+                      </AppText>
+                      <AppText variant="caption" color={Colors.primaryDark}>
+                        Asprak: {session.assistantName}
                       </AppText>
                     </View>
                     <StatusBadge status={session.status} size="sm" />
@@ -171,7 +245,11 @@ export default function AssistantRecapRoute() {
                       <AppText variant="caption" color={Colors.textSecondary}>
                         Kehadiran: {attendedCount} dari {session.totalStudents} Mahasiswa
                       </AppText>
-                      <AppText variant="caption" color={Colors.primary} weight="semibold">
+                      <AppText
+                        variant="caption"
+                        color={Colors.primary}
+                        weight="semibold"
+                      >
                         {pct}%
                       </AppText>
                     </View>
@@ -179,7 +257,11 @@ export default function AssistantRecapRoute() {
                   </View>
 
                   <View style={styles.cardFooter}>
-                    <AppText variant="caption" color={Colors.primary} weight="semibold">
+                    <AppText
+                      variant="caption"
+                      color={Colors.primary}
+                      weight="semibold"
+                    >
                       Lihat Detail & Presensi →
                     </AppText>
                   </View>
@@ -250,6 +332,7 @@ const styles = StyleSheet.create({
   courseInfo: {
     flex: 1,
     marginRight: Spacing.sm,
+    gap: 2,
   },
   progressSection: {
     marginBottom: Spacing.sm,

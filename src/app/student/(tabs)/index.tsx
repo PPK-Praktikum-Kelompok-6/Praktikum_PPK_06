@@ -28,6 +28,7 @@ import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { subscribeAllClasses } from '@/services/admin';
 import { subscribeStudentAttendance } from '@/services/attendance';
 import { signOutUser } from '@/services/auth';
+import { PermitRequest, subscribeStudentPermits } from '@/services/permits';
 import {
   confirmJoinClassAsStudent,
   leaveClassAsStudent,
@@ -60,6 +61,7 @@ export default function StudentScheduleRoute() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
   const [studentAttendance, setStudentAttendance] = useState<AttendanceRecord[]>([]);
+  const [studentPermits, setStudentPermits] = useState<PermitRequest[]>([]);
   const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
 
   // State Gabung Kelas via Kode Kelas Praktikan (dengan Konfirmasi Nama Kelas & Nama Asprak)
@@ -107,10 +109,18 @@ export default function StudentScheduleRoute() {
       }
     );
 
+    const unsubPermits = subscribeStudentPermits(
+      currentUser.id,
+      (permits) => {
+        setStudentPermits(permits);
+      }
+    );
+
     return () => {
       unsubClasses();
       unsubSessions();
       unsubAttendance();
+      unsubPermits();
     };
   }, [currentUser.id, currentUser.enrolledClasses]);
 
@@ -242,6 +252,15 @@ export default function StudentScheduleRoute() {
       studentAttendance.some((r) => r.sessionId === sessionId) ||
       isAlreadyAttended(sessionId, currentUser.id)
     );
+  };
+
+  const getPermitStatus = (
+    sessionId: string
+  ): 'PENDING' | 'APPROVED' | 'REJECTED' | undefined => {
+    const found = studentPermits.find(
+      (p) => p.sessionId === sessionId && p.status !== 'REJECTED'
+    );
+    return found?.status;
   };
 
   const rawSessions =
@@ -460,6 +479,7 @@ export default function StudentScheduleRoute() {
             <SessionCard
               session={activeSession}
               attended={hasAttended(activeSession.id)}
+              permitStatus={getPermitStatus(activeSession.id)}
               variant="hero"
               onPress={() => handleOpenSession(activeSession.id)}
             />
@@ -483,6 +503,7 @@ export default function StudentScheduleRoute() {
                   key={session.id}
                   session={session}
                   attended={hasAttended(session.id)}
+                  permitStatus={getPermitStatus(session.id)}
                   onPress={() => handleOpenSession(session.id)}
                 />
               ))}

@@ -25,6 +25,7 @@ export type SessionCardData = Pick<
 export interface SessionCardProps {
   session: SessionCardData;
   attended?: boolean;
+  permitStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   variant?: 'default' | 'hero';
   actionLabel?: string;
   actionIcon?: IconName;
@@ -46,13 +47,30 @@ function parseDayAndNumber(dateStr: string): { dayLabel: string; dateNum: string
 
 function resolveBadge(
   status: SessionCardStatus,
-  attended?: boolean
+  attended?: boolean,
+  permitStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
 ): { label: string; variant: BadgeVariant; dotColor: string; showDot: boolean } {
   if (attended) {
     return {
       label: 'Status Absen Berhasil',
       variant: 'attended',
       dotColor: Colors.success,
+      showDot: true,
+    };
+  }
+  if (permitStatus === 'APPROVED') {
+    return {
+      label: 'Izin Disetujui',
+      variant: 'open',
+      dotColor: Colors.primary,
+      showDot: true,
+    };
+  }
+  if (permitStatus === 'PENDING') {
+    return {
+      label: 'Izin Menunggu',
+      variant: 'waiting',
+      dotColor: Colors.warning,
       showDot: true,
     };
   }
@@ -84,14 +102,20 @@ function resolveBadge(
 export function SessionCard({
   session,
   attended = false,
+  permitStatus,
   variant = 'default',
   actionLabel,
   actionIcon = 'play',
   onPress,
 }: SessionCardProps) {
-  const badge = resolveBadge(session.status, attended);
+  const badge = resolveBadge(session.status, attended, permitStatus);
   const resolvedActionLabel =
-    actionLabel ?? (attended ? 'Lihat Bukti Presensi' : 'Presensi Sekarang');
+    actionLabel ??
+    (attended
+      ? 'Lihat Bukti Presensi'
+      : permitStatus === 'APPROVED'
+      ? 'Lihat Bukti Izin Disetujui'
+      : 'Presensi Sekarang');
 
   if (variant === 'hero') {
     return (
@@ -251,6 +275,13 @@ export function SessionCard({
                 Kelas {session.classCode} • Status Absen Berhasil
               </AppText>
             </View>
+          ) : permitStatus === 'APPROVED' ? (
+            <View style={styles.permitApprovedBadge}>
+              <Icon name="document-text" size={13} color={Colors.primary} />
+              <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+                Kelas {session.classCode} • Izin Praktikum Disetujui
+              </AppText>
+            </View>
           ) : (
             <View style={styles.metaRow}>
               <Icon name="time-outline" size={14} color={Colors.textMuted} />
@@ -395,6 +426,17 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: 4,
     backgroundColor: Colors.successBg,
+    paddingHorizontal: Spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+    alignSelf: 'flex-start',
+  },
+  permitApprovedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: 4,
+    backgroundColor: Colors.primaryBg,
     paddingHorizontal: Spacing.xs + 2,
     paddingVertical: 2,
     borderRadius: Radius.xs,

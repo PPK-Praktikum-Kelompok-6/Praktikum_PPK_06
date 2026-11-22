@@ -3,24 +3,36 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // =========================================================================
-    // HELPER FUNCTIONS (SRS-SEC-01)
+    // HELPER FUNCTIONS (SRS-SEC-01 & RBAC)
     // =========================================================================
     
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'ADMIN' ||
+        getUserRole() == 'ADMIN'
+      );
+    }
+
     function isAssistant() {
       return isSignedIn() && (
         request.auth.token.role == 'ASSISTANT' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ASSISTANT'
+        getUserRole() == 'ASSISTANT' ||
+        isAdmin()
       );
     }
 
     function isStudent() {
       return isSignedIn() && (
         request.auth.token.role == 'STUDENT' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'STUDENT'
+        getUserRole() == 'STUDENT'
       );
     }
 
@@ -32,20 +44,27 @@ service cloud.firestore {
     // USERS COLLECTION
     // =========================================================================
     match /users/{userId} {
-      // Direktori akun publik dapat dibaca di halaman login & sistem
+      // Direktori akun dapat dibaca untuk sinkronisasi profil & kehadiran kelas
       allow read: if true;
       allow create: if true;
-      allow update: if isSignedIn() && (isOwner(userId) || isAssistant());
-      allow delete: if false;
+      allow update: if isSignedIn() && (isOwner(userId) || isAssistant() || isAdmin());
+      allow delete: if isAdmin();
     }
 
     // =========================================================================
-    // CLASSES COLLECTION (SRS-CRUD-01)
+    // CLASSES COLLECTION (SRS-CRUD-01 & KODE KELAS ALA GOOGLE CLASSROOM)
     // =========================================================================
     match /classes/{classId} {
-      // Daftar kelas praktikum dapat dibaca publik untuk pemilihan saat registrasi
+      // Daftar kelas praktikum dapat dibaca untuk pengecekan kode undangan
       allow read: if true;
-      allow create, update, delete: if isAssistant();
+      // Pembuatan & penghapusan kelas hanya oleh Asisten atau Admin
+      allow create, delete: if isAssistant() || isAdmin();
+      // Update kelas diizinkan bagi Asisten/Admin, serta Praktikan yang join/keluar kelas via Kode Kelas
+      allow update: if isSignedIn() && (
+        isAssistant() ||
+        isAdmin() ||
+        (isStudent() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentIds']))
+      );
     }
 
     // =========================================================================
@@ -54,8 +73,17 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       // Semua pengguna yang terautentikasi dapat melihat jadwal sesi
       allow read: if isSignedIn();
-      // Hanya asisten yang dapat membuat, mengupdate status (OPEN/CLOSED), dan menghapus sesi
-      allow create, update, delete: if isAssistant();
+      // Hanya asisten atau admin yang dapat membuat, mengupdate status (OPEN/CLOSED), dan menghapus sesi
+      allow create, update, delete: if isAssistant() || isAdmin();
+    }
+
+    // =========================================================================
+    // SESSION REQUESTS COLLECTION (TATA KELOLA RESCHEDULE / HAPUS SESI)
+    // =========================================================================
+    match /session_requests/{requestId} {
+      allow read: if isSignedIn() && (isAssistant() || isAdmin());
+      allow create: if isAssistant();
+      allow update, delete: if isAdmin() || isAssistant();
     }
 
     // =========================================================================
@@ -66,35 +94,42 @@ service cloud.firestore {
       allow read: if isSignedIn();
       
       // Presensi Anti-Bocor & Anti-Duplikasi:
-      // Mahasiswa hanya dapat membuat dokumen kehadiran untuk dirinya sendiri.
-      // Sesi praktikum harus berstatus 'OPEN'.
-      // Dokumen presensi tidak boleh di-overwrite (tidak boleh ganda).
-      allow create: if isSignedIn() &&
-        request.resource.data.studentId == request.auth.uid &&
-        !exists(/databases/$(database)/documents/attendance/$(attendanceId)) &&
-        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'OPEN';
+      // 1. Mahasiswa hanya dapat membuat dokumen kehadiran untuk dirinya sendiri saat sesi 'OPEN' dan belum ada record.
+      // 2. Asisten atau Admin berwenang melakukan input/override kehadiran manual (misal mahasiswa lupa presensi).
+      allow create: if isSignedIn() && (
+        isAssistant() ||
+        (
+          request.resource.data.studentId == request.auth.uid &&
+          !exists(/databases/$(database)/documents/attendance/$(attendanceId)) &&
+          get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'OPEN'
+        )
+      );
 
-      // Catatan presensi adalah rekaman resmi yang permanen dan tidak boleh diubah/dihapus
-      allow update, delete: if false;
+      // Asisten/Admin dapat memperbarui catatan presensi manual; mahasiswa tidak boleh mengubah/menghapus
+      allow update: if isAssistant() || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // =========================================================================
     // PERMITS COLLECTION (SRS-IZIN-01, SRS-IZIN-02)
     // =========================================================================
     match /permits/{permitId} {
-      // Praktikan dapat melihat izin miliknya; Asisten dapat melihat seluruh izin masuk
+      // Praktikan dapat melihat izin miliknya; Asisten/Admin dapat melihat seluruh izin masuk
       allow read: if isSignedIn() && (
         isAssistant() ||
+        isAdmin() ||
         resource.data.studentId == request.auth.uid
       );
       
-      // Praktikan dapat mengajukan izin untuk dirinya sendiri
-      allow create: if isSignedIn() &&
-        request.resource.data.studentId == request.auth.uid;
+      // Praktikan dapat mengajukan izin untuk dirinya sendiri; Asisten dapat mencatat izin/sakit fisik manual
+      allow create: if isSignedIn() && (
+        request.resource.data.studentId == request.auth.uid ||
+        isAssistant()
+      );
         
-      // Hanya asisten yang dapat mengubah status keputusan izin (APPROVED / REJECTED)
-      allow update: if isAssistant();
-      allow delete: if false;
+      // Hanya asisten atau admin yang dapat mengubah status keputusan izin (APPROVED / REJECTED)
+      allow update: if isAssistant() || isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

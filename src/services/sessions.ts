@@ -203,6 +203,36 @@ export function subscribeAssistantSessions(
   onUpdate: (sessions: PracticalSession[]) => void,
   assistantName?: string
 ): () => void {
+  const firstName = (assistantName || '').toLowerCase().split(' ')[0];
+
+  const filterForAssistant = (allSessions: PracticalSession[]) => {
+    const myClassIds = new Set<string>();
+    const myClassCodes = new Set<string>();
+
+    localClassesStore.forEach((cls) => {
+      const ids = cls.assistantIds || (cls.assistantId ? [cls.assistantId] : []);
+      const names = cls.assistantNames || (cls.assistantName ? [cls.assistantName] : []);
+      const isMine =
+        ids.includes(assistantId) ||
+        (Boolean(firstName) && names.some((n) => n.toLowerCase().includes(firstName)));
+      if (isMine) {
+        myClassIds.add(cls.id);
+        myClassCodes.add(cls.classCode.toUpperCase());
+      }
+    });
+
+    return allSessions.filter((s) => {
+      const directOwner =
+        s.assistantId === assistantId ||
+        (Boolean(firstName) &&
+          (s.assistantName || '').toLowerCase().includes(firstName));
+      const coAssistantClass =
+        (s.classId && myClassIds.has(s.classId)) ||
+        myClassCodes.has((s.classCode || '').toUpperCase());
+      return directOwner || coAssistantClass;
+    });
+  };
+
   if (isFirebaseConfigured && assistantId) {
     try {
       const q = query(collection(db, 'sessions'));
@@ -218,25 +248,11 @@ export function subscribeAssistantSessions(
           // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
           checkAndAutoCloseExpiredSessions(allSessions);
 
-          const filtered = allSessions.filter(
-            (s) =>
-              s.assistantId === assistantId ||
-              s.assistantId === 'ast-1' ||
-              (assistantName && s.assistantName === assistantName)
-          );
-
-          onUpdate(filtered);
+          onUpdate(filterForAssistant(allSessions));
         },
         (error) => {
           console.warn('Real-time assistant sessions listener error:', error);
-          onUpdate(
-            localSessionsStore.filter(
-              (s) =>
-                s.assistantId === assistantId ||
-                s.assistantId === 'ast-1' ||
-                (assistantName && s.assistantName === assistantName)
-            )
-          );
+          onUpdate(filterForAssistant(localSessionsStore));
         }
       );
 
@@ -248,14 +264,7 @@ export function subscribeAssistantSessions(
 
   // Fallback lokal
   const sendLocal = () => {
-    onUpdate(
-      localSessionsStore.filter(
-        (s) =>
-          s.assistantId === assistantId ||
-          s.assistantId === 'ast-1' ||
-          (assistantName && s.assistantName === assistantName)
-      )
-    );
+    onUpdate(filterForAssistant(localSessionsStore));
   };
   sendLocal();
   return subscribeSessions(sendLocal);

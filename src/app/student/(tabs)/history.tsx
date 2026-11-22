@@ -9,7 +9,12 @@ import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { HistoryItemCard } from '@/features/attendance/components/HistoryItemCard';
-import { getStudentAttendanceHistory } from '@/services/attendance';
+import { subscribeAllClasses } from '@/services/admin';
+import {
+  getStudentAttendanceHistory,
+  subscribeStudentAttendance,
+} from '@/services/attendance';
+import { subscribeStudentSessions } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 
@@ -19,24 +24,35 @@ export default function StudentHistoryRoute() {
   const { getSessionById } = useSessions();
   const [refreshing, setRefreshing] = useState(false);
   const [firestoreRecords, setFirestoreRecords] = useState<AttendanceRecord[]>([]);
+  const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
 
   // Ambil riwayat presensi khusus untuk praktikan yang sedang login dari store lokal
   const localHistory = getAttendanceByStudent(currentUser.id);
 
   useEffect(() => {
-    let isMounted = true;
-    getStudentAttendanceHistory(currentUser.id)
-      .then((records) => {
-        if (isMounted) {
-          setFirestoreRecords(records);
-        }
-      })
-      .catch(() => {});
+    if (!currentUser.id) return;
+
+    const unsubAtt = subscribeStudentAttendance(currentUser.id, (records) => {
+      setFirestoreRecords(records);
+    });
+
+    const unsubClasses = subscribeAllClasses((clsList) => {
+      const joinedCodes = clsList
+        .filter((c) => (c.studentIds || []).includes(currentUser.id))
+        .map((c) => c.classCode);
+      const allCodes = Array.from(
+        new Set([...(currentUser.enrolledClasses || []), ...joinedCodes])
+      );
+      subscribeStudentSessions(currentUser.id, allCodes, (sessList) => {
+        setFirestoreSessions(sessList);
+      });
+    });
 
     return () => {
-      isMounted = false;
+      unsubAtt();
+      unsubClasses();
     };
-  }, [currentUser.id]);
+  }, [currentUser.id, currentUser.enrolledClasses]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -60,9 +76,10 @@ export default function StudentHistoryRoute() {
   firestoreRecords.forEach((item) => {
     const key = `${item.sessionId}_${item.studentId}`;
     const existing = combinedMap.get(key);
+    const liveSess = firestoreSessions.find((s) => s.id === item.sessionId);
     combinedMap.set(key, {
       ...item,
-      session: existing?.session || getSessionById(item.sessionId),
+      session: liveSess || existing?.session || getSessionById(item.sessionId),
     });
   });
 

@@ -2,8 +2,10 @@ import { Href, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   TextInput,
   View,
@@ -64,6 +66,58 @@ export default function AssistantScheduleRoute() {
   const [selectedClassTab, setSelectedClassTab] = useState<string>('ALL');
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
   const [assignedClasses, setAssignedClasses] = useState<PracticalClass[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleCopyOrShareCode = async (
+    code: string,
+    kind: 'STUDENT' | 'ASSISTANT',
+    courseName?: string,
+    classCode?: string
+  ) => {
+    const titleLabel =
+      kind === 'STUDENT' ? 'Kode Kelas Praktikan' : 'Kode Spesial Invite Asprak';
+    const shareMessage =
+      kind === 'STUDENT'
+        ? `Kode Kelas Praktikum ${courseName || ''} (Kelas ${classCode || ''}): ${code}`
+        : `Kode Spesial Undangan Rekan Asprak ${courseName || ''} (Kelas ${classCode || ''}): ${code}`;
+
+    try {
+      if (
+        Platform.OS === 'web' &&
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(code);
+        setFeedbackState({
+          visible: true,
+          type: 'info',
+          title: `${titleLabel} Disalin!`,
+          message: `Kode "${code}" berhasil disalin ke clipboard. Silakan tempel (paste) dan bagikan ke ${
+            kind === 'STUDENT' ? 'praktikan kelas' : 'rekan asprak'
+          } Anda.`,
+        });
+        return;
+      }
+      await Share.share({
+        message: shareMessage,
+        title: titleLabel,
+      });
+    } catch {
+      setFeedbackState({
+        visible: true,
+        type: 'info',
+        title: titleLabel,
+        message: shareMessage,
+      });
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 350);
+  };
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -382,7 +436,11 @@ export default function AssistantScheduleRoute() {
   };
 
   return (
-    <Screen withBottomNavPadding>
+    <Screen
+      withBottomNavPadding
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerInfo}>
@@ -494,25 +552,51 @@ export default function AssistantScheduleRoute() {
                     </Pressable>
                   </View>
 
-                  {/* 2 Kode Undangan: Kode Praktikan & Kode Spesial Asprak */}
+                  {/* 2 Kode Undangan: Kode Praktikan & Kode Spesial Asprak (Ketuk untuk Salin / Bagikan) */}
                   <View style={styles.codesContainer}>
-                    <View style={styles.codePillStudent}>
+                    <Pressable
+                      style={styles.codePillStudent}
+                      onPress={() =>
+                        handleCopyOrShareCode(
+                          cls.studentJoinCode || '',
+                          'STUDENT',
+                          cls.courseName,
+                          cls.classCode
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Salin atau bagikan kode praktikan ${cls.studentJoinCode}`}
+                    >
+                      <Icon name="copy-outline" size={12} color={Colors.primary} />
                       <AppText variant="caption" color={Colors.textMuted}>
                         Kode Praktikan:
                       </AppText>
                       <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
                         {cls.studentJoinCode}
                       </AppText>
-                    </View>
+                    </Pressable>
 
-                    <View style={styles.codePillAssistant}>
+                    <Pressable
+                      style={styles.codePillAssistant}
+                      onPress={() =>
+                        handleCopyOrShareCode(
+                          cls.assistantInviteCode || '',
+                          'ASSISTANT',
+                          cls.courseName,
+                          cls.classCode
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Salin atau bagikan kode spesial asprak ${cls.assistantInviteCode}`}
+                    >
+                      <Icon name="share-social-outline" size={12} color={Colors.success} />
                       <AppText variant="caption" color={Colors.textMuted}>
                         Invite Asprak:
                       </AppText>
                       <AppText variant="caption" weight="bold" color={Colors.success}>
                         {cls.assistantInviteCode}
                       </AppText>
-                    </View>
+                    </Pressable>
                   </View>
                 </View>
               );
