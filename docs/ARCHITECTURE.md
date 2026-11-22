@@ -238,7 +238,59 @@ sequenceDiagram
 
 ---
 
-## 8. Why this structure
+## 8. Sprint 3 — Geolocation, Maps & Push Notifications (Zaidan & Ferdy)
+
+> Sprint 1 & Sprint 2 base code remains stable. Sprint 3 adds geolocation validation, interactive laboratory maps, targeted push notifications, and device permission handling divided strictly between **Zaidan** and **Ferdy**.
+
+### New files & folders (Sprint 3)
+
+```
+src/
+├── types/
+│   ├── lab.ts                        # LabLocation, Coordinates, LocationValidationResult (Zaidan)
+│   └── notification.ts               # AppNotification, NotificationEventType, DevicePermissionState (Ferdy)
+├── utils/
+│   └── geo.ts                        # Pure Haversine distance & isWithinRadius helpers (Zaidan)
+├── services/
+│   ├── labs.ts                       # Firestore CRUD for lab locations & radius (Zaidan)
+│   ├── permissions.ts                # Location & notification runtime permissions + edge-case checks (Ferdy)
+│   └── notifications.ts              # Push notifications (FCM/Expo Notifications) + Firestore targeted log (Ferdy)
+└── features/
+    ├── attendance/components/
+    │   ├── LocationStatusBanner.tsx  # Real-time distance & radius status badge (Zaidan)
+    │   └── LabLocationConfigModal.tsx# Assistant modal to configure lab coordinates & radius (Zaidan)
+    └── maps/components/              # Add 'maps' to features array in eslint.config.js (Ferdy)
+        ├── InteractiveLabMap.tsx     # MapView + lab markers + radius Circle + live user marker
+        ├── LabActivitySheet.tsx      # Ongoing & upcoming sessions at selected lab (Firestore)
+        └── PermissionAlertCard.tsx   # Graceful UI alert for denied permissions / disabled GPS
+```
+
+### New routes (Sprint 3)
+
+| Route | Purpose | Owner |
+|---|---|---|
+| `app/student/check-in/[id].tsx` | Dedicated check-in screen separated from session detail (`attendance/[id].tsx`), validates GPS radius + optional QR | Zaidan |
+| `app/student/(tabs)/maps.tsx` | Interactive laboratory map + live user position + ongoing/upcoming sessions | Ferdy |
+| `app/assistant/(tabs)/maps.tsx` | Interactive laboratory map + activity overview for assistants | Ferdy |
+
+### Expo SDK 58 Native Config Rule (CNG)
+
+Because this repository uses **Expo Continuous Native Generation (CNG)** (no committed `ios/` or `android/` directories):
+- Install native modules strictly via `npx expo install expo-location react-native-maps expo-notifications` (and optional `expo-camera`).
+- Configure Google Maps API key, location permission strings, and notification plugin strictly in `app.json` — **never** create or hand-edit `android/` or `ios/` folders.
+- Provide a clean web fallback for `react-native-maps` (`Platform.OS === 'web'`) so web preview never crashes.
+- When creating `src/features/maps/`, add `'maps'` to `const features = ['role', 'sessions', 'attendance', 'permits', 'maps']` in `eslint.config.js`.
+
+### Ownership Sprint 3 (Zaidan & Ferdy)
+
+| Member | Files |
+|---|---|
+| **Zaidan** | `types/lab.ts`, `utils/geo.ts`, `services/labs.ts`, `services/attendance.ts` (enforce radius check inside `submitAttendanceToFirestore`), `features/attendance/components/{LocationStatusBanner,LabLocationConfigModal}.tsx`, `app/student/check-in/[id].tsx`, `app/student/attendance/[id].tsx` (session detail -> navigate to check-in), `app/assistant/session/[id].tsx` (configure lab location & radius) |
+| **Ferdy** | `types/notification.ts`, `services/permissions.ts`, `services/notifications.ts`, `features/maps/components/{InteractiveLabMap,LabActivitySheet,PermissionAlertCard}.tsx`, `app/student/(tabs)/maps.tsx`, `app/assistant/(tabs)/maps.tsx`, `app/student/(tabs)/_layout.tsx` & `app/assistant/(tabs)/_layout.tsx` (add `maps` tab), `eslint.config.js` (register `'maps'` feature), `app/_layout.tsx` (foreground notification & deep link listener) |
+
+---
+
+## 9. Why this structure
 
 | Option | Decision | Reason |
 |---|---|---|
@@ -256,5 +308,7 @@ sequenceDiagram
 - Feature-Sliced Design. https://feature-sliced.design/
 - React: scaling up with reducer and context. https://react.dev/learn/scaling-up-with-reducer-and-context
 - Medium: hanifmhd, *React Native Structure Folder for Simplicity* (part 1 & 2); Sarmila Sivaraja, *Choosing the Right Project Structure for Your React Native App*; Silversky Technology, *React Native Project Structure for Scalable Applications*
+- Medium (Sprint 3 Push Notifications): Silversky Technology, *Rich Push Notifications in React Native: A Complete Guide* — https://medium.com/@silverskytechnology/rich-push-notifications-in-react-native-a-complete-guide-797dd9747366
+- Medium (Sprint 3 Maps & Geolocation): Silversky Technology, *Implementing Google Maps and Routes Tracking in React Native: A Starter Guide* — https://medium.com/@silverskytechnology/implementing-google-maps-and-routes-tracking-in-react-native-a-starter-guide-9768282594b8
 - Reference repo: `petelpop/findme-frontend` (features + shared)
 
