@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -17,12 +18,19 @@ import {
   SessionControlModal,
 } from '@/features/sessions/components/SessionControlModal';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
-import { requestSessionChange } from '@/services/admin';
+import { requestSessionChange, subscribeAllClasses } from '@/services/admin';
 import {
+  recordManualAttendanceByAssistant,
   setSessionStatus,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
-import { subscribeSessionDoc } from '@/services/sessions';
+import { AuthUser, subscribeAllUsers } from '@/services/auth';
+import {
+  PermitRequest,
+  recordManualPermitByAssistant,
+  subscribeIncomingPermits,
+} from '@/services/permits';
+import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canOpen, isSessionExpired } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
@@ -38,6 +46,10 @@ export default function AssistantSessionDetailRoute() {
   const [controlAction, setControlAction] = useState<SessionControlAction>('OPEN');
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
   const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
+  const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
+  const [allUsers, setAllUsers] = useState<AuthUser[]>([]);
+  const [sessionPermits, setSessionPermits] = useState<PermitRequest[]>([]);
+  const [manualActionLoadingId, setManualActionLoadingId] = useState<string | null>(null);
 
   // State Permintaan Reschedule / Hapus Sesi (Izin Admin)
   const [changeModalVisible, setChangeModalVisible] = useState(false);
@@ -61,13 +73,27 @@ export default function AssistantSessionDetailRoute() {
     return () => unsubSession();
   }, [id]);
 
-  // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01)
+  // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01) + kelas, user, & izin
   useEffect(() => {
     if (!id) return;
-    const unsubscribe = subscribeToSessionAttendance(id, (records) => {
+    const unsubscribeAtt = subscribeToSessionAttendance(id, (records) => {
       setRealtimeRecords(records);
     });
-    return () => unsubscribe();
+    const unsubClasses = subscribeAllClasses((cls) => {
+      setAllClasses(cls);
+    });
+    const unsubUsers = subscribeAllUsers((users) => {
+      setAllUsers(users);
+    });
+    const unsubPermits = subscribeIncomingPermits((permits) => {
+      setSessionPermits(permits.filter((p) => p.sessionId === id));
+    });
+    return () => {
+      unsubscribeAtt();
+      unsubClasses();
+      unsubUsers();
+      unsubPermits();
+    };
   }, [id]);
 
   const session = realtimeSession || (id ? getSessionById(id) : undefined);
@@ -429,6 +455,158 @@ export default function AssistantSessionDetailRoute() {
       {/* Attendance Recap Table */}
       <AttendanceTable records={attendanceRecords} />
 
+      {/* Kontrol Override Presensi & Izin Manual oleh Asisten (Untuk Praktikan Lupa Presensi / Telat Join / Surat Dokter Fisik) */}
+      <Card variant="default" padding="md" style={styles.rosterCard}>
+        <View style={styles.rosterHeader}>
+          <Icon name="people-outline" size={18} color={Colors.primary} />
+          <AppText variant="title">Status Peserta Kelas & Input Manual</AppText>
+        </View>
+        <AppText variant="caption" color={Colors.textMuted} style={styles.rosterDesc}>
+          Jika praktikan lupa presensi di aplikasi, telat bergabung kode kelas, atau menyerahkan surat izin/dokter fisik secara langsung, Asisten dapat mencatat statusnya di bawah ini:
+        </AppText>
+
+        {(() => {
+          const matchedClass = allClasses.find(
+            (c) =>
+              (session.classId && c.id === session.classId) ||
+              c.classCode.toUpperCase() === session.classCode.toUpperCase()
+          );
+          const classStudentIds = matchedClass?.studentIds || [];
+          const enrolledStudents = allUsers.filter(
+            (u) =>
+              u.role === 'STUDENT' &&
+              (classStudentIds.includes(u.uid) ||
+                (u.enrolledClasses || [])
+                  .map((c) => c.toUpperCase())
+                  .includes(session.classCode.toUpperCase()))
+          );
+
+          if (enrolledStudents.length === 0) {
+            return (
+              <AppText variant="caption" color={Colors.textMuted}>
+                Belum ada praktikan yang tergabung di Kelas {session.classCode}.
+              </AppText>
+            );
+          }
+
+          return (
+            <View style={styles.rosterList}>
+              {enrolledStudents.map((std) => {
+                const attendedRec = attendanceRecords.find(
+                  (r) =>
+                    r.studentId === std.uid ||
+                    r.studentNim === std.identifier
+                );
+                const permitRec = sessionPermits.find(
+                  (p) =>
+                    (p.studentId === std.uid ||
+                      p.studentNim === std.identifier) &&
+                    p.status !== 'REJECTED'
+                );
+                const isProcessing = manualActionLoadingId === std.uid;
+
+                return (
+                  <View key={std.uid} style={styles.rosterItem}>
+                    <View style={styles.rosterStudentCol}>
+                      <AppText variant="bodySm" weight="bold">
+                        {std.name}
+                      </AppText>
+                      <AppText variant="caption" color={Colors.textMuted}>
+                        NIM: {std.identifier}
+                      </AppText>
+                      {attendedRec ? (
+                        <Badge label="Sudah Hadir" variant="attended" size="sm" showDot />
+                      ) : permitRec ? (
+                        <Badge
+                          label={
+                            permitRec.status === 'APPROVED'
+                              ? 'Izin Disetujui'
+                              : 'Izin Menunggu Review'
+                          }
+                          variant={
+                            permitRec.status === 'APPROVED' ? 'open' : 'waiting'
+                          }
+                          size="sm"
+                          showDot
+                        />
+                      ) : (
+                        <Badge
+                          label="Belum Hadir / Alpha"
+                          variant="danger"
+                          size="sm"
+                        />
+                      )}
+                    </View>
+
+                    {!attendedRec && permitRec?.status !== 'APPROVED' ? (
+                      <View style={styles.rosterBtnCol}>
+                        <CustomButton
+                          title="Tandai Hadir"
+                          variant="primary"
+                          size="sm"
+                          fullWidth={false}
+                          loading={isProcessing}
+                          onPress={async () => {
+                            setManualActionLoadingId(std.uid);
+                            try {
+                              const res = await recordManualAttendanceByAssistant({
+                                sessionId: session.id,
+                                studentId: std.uid,
+                                studentName: std.name,
+                                studentNim: std.identifier,
+                                assistantName: currentUser.name,
+                              });
+                              setFeedbackType(res.success ? 'success' : 'error');
+                              setFeedbackTitle(
+                                res.success ? 'Hadir Manual Dicatat' : 'Gagal'
+                              );
+                              setFeedbackMessage(res.message);
+                              setFeedbackVisible(true);
+                            } finally {
+                              setManualActionLoadingId(null);
+                            }
+                          }}
+                        />
+                        <CustomButton
+                          title="Izin/Sakit Fisik"
+                          variant="outline"
+                          size="sm"
+                          fullWidth={false}
+                          disabled={isProcessing}
+                          onPress={async () => {
+                            setManualActionLoadingId(std.uid);
+                            try {
+                              const res = await recordManualPermitByAssistant({
+                                sessionId: session.id,
+                                classId: session.classId,
+                                classCode: session.classCode,
+                                courseName: session.courseName,
+                                studentId: std.uid,
+                                studentName: std.name,
+                                studentNim: std.identifier,
+                                assistantName: currentUser.name,
+                              });
+                              setFeedbackType(res.success ? 'success' : 'error');
+                              setFeedbackTitle(
+                                res.success ? 'Izin Fisik Dicatat' : 'Gagal'
+                              );
+                              setFeedbackMessage(res.message);
+                              setFeedbackVisible(true);
+                            } finally {
+                              setManualActionLoadingId(null);
+                            }
+                          }}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
+      </Card>
+
       {/* Confirmation Modal */}
       <SessionControlModal
         visible={controlModalVisible}
@@ -691,5 +869,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.sm,
     marginTop: Spacing.md,
+  },
+  rosterCard: {
+    marginBottom: Spacing.xl,
+  },
+  rosterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 4,
+  },
+  rosterDesc: {
+    marginBottom: Spacing.md,
+  },
+  rosterList: {
+    gap: Spacing.sm,
+  },
+  rosterItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.xs + 2,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    gap: Spacing.sm,
+  },
+  rosterStudentCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+    gap: 3,
+  },
+  rosterBtnCol: {
+    flexDirection: 'column',
+    gap: 6,
   },
 });

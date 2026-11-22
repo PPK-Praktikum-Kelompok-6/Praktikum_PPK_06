@@ -6,6 +6,7 @@ import {
   onSnapshot,
   query,
   runTransaction,
+  setDoc,
   where,
   type Transaction,
   type QuerySnapshot,
@@ -379,4 +380,61 @@ export async function isStudentAlreadyAttended(
  */
 export function getAttendanceBySessionSync(sessionId: string): AttendanceRecord[] {
   return localAttendanceStore.filter((r) => r.sessionId === sessionId);
+}
+
+/**
+ * 7. Input / Override Kehadiran Manual oleh Asisten Praktikum.
+ * Digunakan ketika praktikan hadir di lab namun lupa klik presensi sebelum sesi ditutup,
+ * atau praktikan baru join kode kelas setelah sesi dimulai.
+ * Asisten memiliki otorisasi penuh sehingga tetap dapat mencatat kehadiran meski sesi telah CLOSED.
+ */
+export async function recordManualAttendanceByAssistant(params: {
+  sessionId: string;
+  studentId: string;
+  studentName: string;
+  studentNim: string;
+  assistantName: string;
+  customNote?: string;
+}): Promise<{ success: boolean; message: string; record?: AttendanceRecord }> {
+  const { sessionId, studentId, studentName, studentNim, assistantName, customNote } = params;
+  if (!sessionId || !studentId) {
+    return {
+      success: false,
+      message: 'ID sesi dan data praktikan wajib diisi.',
+    };
+  }
+
+  const timestamp = new Date().toISOString();
+  const docId = `attendance_${sessionId}_${studentId}`;
+  const newRecord: AttendanceRecord = {
+    id: docId,
+    sessionId,
+    studentId,
+    studentName,
+    studentNim,
+    timestamp,
+    notes:
+      customNote?.trim() ||
+      `Dicatat hadir manual oleh Asprak ${assistantName}`,
+  };
+
+  if (isFirebaseConfigured) {
+    try {
+      await setDoc(doc(db, 'attendance', docId), newRecord, { merge: true });
+    } catch (err) {
+      console.warn('Gagal menyimpan presensi manual ke Firestore:', err);
+    }
+  }
+
+  localAttendanceStore = [
+    newRecord,
+    ...localAttendanceStore.filter((item) => item.id !== docId),
+  ];
+  notifyAttendanceListeners();
+
+  return {
+    success: true,
+    message: `Kehadiran ${studentName} (${studentNim}) berhasil dicatat oleh asisten.`,
+    record: newRecord,
+  };
 }

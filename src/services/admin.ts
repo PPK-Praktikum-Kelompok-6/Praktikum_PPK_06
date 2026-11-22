@@ -13,7 +13,15 @@ import {
 import { SessionChangeRequest } from '@/types/attendance';
 import { AuthUser } from './auth';
 import { db, isFirebaseConfigured } from './firebase';
-import { DEFAULT_CLASSES, deleteSession, PracticalClass, updateSession } from './sessions';
+import {
+  DEFAULT_CLASSES,
+  deleteSession,
+  getLocalClassesStore,
+  normalizePracticalClass,
+  PracticalClass,
+  subscribeSessions,
+  updateSession,
+} from './sessions';
 
 /**
  * Service Administrasi & Tata Kelola Lab (Admin & Perizinan Berjenjang).
@@ -169,51 +177,70 @@ export function subscribeAllClasses(
   if (isFirebaseConfigured) {
     try {
       const q = query(collection(db, 'classes'));
-      const unsub = onSnapshot(
+      let latestRemote: PracticalClass[] = [];
+
+      const emitMerged = () => {
+        const localNow = getLocalClassesStore();
+        const byId = new Map<string, PracticalClass>();
+
+        DEFAULT_CLASSES.forEach((def) => {
+          byId.set(def.id, normalizePracticalClass(def));
+        });
+        localNow.forEach((loc) => {
+          byId.set(loc.id, normalizePracticalClass(loc));
+        });
+        latestRemote.forEach((rem) => {
+          // Cocokkan juga apabila ada default class dengan classCode & courseName serupa
+          const existingById = byId.get(rem.id);
+          if (existingById) {
+            byId.set(rem.id, normalizePracticalClass({ ...existingById, ...rem }));
+          } else {
+            byId.set(rem.id, normalizePracticalClass(rem));
+          }
+        });
+
+        const merged = Array.from(byId.values());
+        merged.sort((a, b) => {
+          const courseCmp = (a.courseName || '').localeCompare(b.courseName || '');
+          if (courseCmp !== 0) return courseCmp;
+          return a.classCode.localeCompare(b.classCode);
+        });
+        onUpdate(merged);
+      };
+
+      const unsubFirestore = onSnapshot(
         q,
         (snap) => {
-          const list: PracticalClass[] = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<PracticalClass, 'id'>),
-          }));
-
-          // Pastikan semua 8 kelas standar (A1 s/d D2) selalu ada
-          const merged: PracticalClass[] = DEFAULT_CLASSES.map((def) => {
-            const found = list.find(
-              (c) => c.classCode.toUpperCase() === def.classCode.toUpperCase()
-            );
-            if (found) {
-              return {
-                ...def,
-                ...found,
-                isOpen: found.isOpen !== false,
-              };
-            }
-            return def;
-          });
-
-          list.forEach((c) => {
-            if (!merged.some((m) => m.classCode.toUpperCase() === c.classCode.toUpperCase())) {
-              merged.push(c);
-            }
-          });
-
-          merged.sort((a, b) => a.classCode.localeCompare(b.classCode));
-          onUpdate(merged);
+          latestRemote = snap.docs.map((d) =>
+            normalizePracticalClass({
+              id: d.id,
+              ...(d.data() as Omit<PracticalClass, 'id'>),
+            })
+          );
+          emitMerged();
         },
         (err) => {
           console.warn('Real-time classes error:', err);
-          onUpdate(DEFAULT_CLASSES);
+          onUpdate(getLocalClassesStore());
         }
       );
-      return unsub;
+
+      const unsubLocal = subscribeSessions(() => {
+        emitMerged();
+      });
+
+      return () => {
+        unsubFirestore();
+        unsubLocal();
+      };
     } catch (e) {
       console.warn('Could not setup classes listener:', e);
     }
   }
 
-  onUpdate(DEFAULT_CLASSES);
-  return () => {};
+  const sendLocal = () => onUpdate(getLocalClassesStore());
+  sendLocal();
+  return subscribeSessions(sendLocal);
 }
 
 export async function assignAssistantToClass(

@@ -130,13 +130,15 @@ export default function AdminClassesScreen() {
         </View>
         <View style={styles.summaryList}>
           {availableAssistants.map((ast) => {
-            const assignedClasses = classes.filter(
-              (c) =>
-                c.assistantId === ast.uid ||
-                (c.assistantName || '')
-                  .toLowerCase()
-                  .includes(ast.name.toLowerCase().split(' ')[0])
-            );
+            const assignedClasses = classes.filter((c) => {
+              const ids = c.assistantIds || (c.assistantId ? [c.assistantId] : []);
+              const names = c.assistantNames || (c.assistantName ? [c.assistantName] : []);
+              const firstName = ast.name.toLowerCase().split(' ')[0];
+              return (
+                ids.includes(ast.uid) ||
+                names.some((n) => n.toLowerCase().includes(firstName))
+              );
+            });
             return (
               <View key={ast.uid} style={styles.assistantSummaryRow}>
                 <View style={styles.astInfoCol}>
@@ -188,10 +190,10 @@ export default function AdminClassesScreen() {
                 <View style={styles.classDetails}>
                   <View style={styles.classTitleRow}>
                     <AppText variant="title" weight="bold">
-                      Kelas {cls.classCode}
+                      {cls.courseName ? `${cls.courseName} (${cls.classCode})` : `Kelas ${cls.classCode}`}
                     </AppText>
                     <Badge
-                      label={cls.isOpen !== false ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup'}
+                      label={cls.isOpen !== false ? 'Terbuka' : 'Ditutup'}
                       variant={cls.isOpen !== false ? 'open' : 'closed'}
                       size="sm"
                       showDot
@@ -200,10 +202,13 @@ export default function AdminClassesScreen() {
                   <AppText variant="caption" color={Colors.textMuted}>
                     Ruangan: {cls.room || 'Lab Komputer'} • {cls.studentIds?.length || 0} Praktikan Terdaftar
                   </AppText>
+                  <AppText variant="caption" color={Colors.textSecondary}>
+                    Kode Praktikan: {cls.studentJoinCode || '-'} • Invite Asprak: {cls.assistantInviteCode || '-'}
+                  </AppText>
                   <View style={styles.assistantBadgeRow}>
-                    <Icon name="person" size={13} color={Colors.primary} />
+                    <Icon name="people" size={13} color={Colors.primary} />
                     <AppText variant="caption" weight="semibold" color={Colors.primary}>
-                      PJ Asisten: {cls.assistantName || 'Belum Ditugaskan'}
+                      Asprak: {(cls.assistantNames && cls.assistantNames.length > 0 ? cls.assistantNames.join(', ') : cls.assistantName) || 'Belum Ditugaskan'}
                     </AppText>
                   </View>
                 </View>

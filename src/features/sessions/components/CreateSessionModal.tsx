@@ -14,7 +14,7 @@ import { AppText } from '@/components/ui/AppText';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { CreateSessionInput } from '@/types/attendance';
+import { CreateSessionInput, PracticalClass } from '@/types/attendance';
 
 export interface CreateSessionModalProps {
   visible: boolean;
@@ -26,6 +26,7 @@ export interface CreateSessionModalProps {
     | Promise<{ success: boolean; message: string }>;
   defaultClassCode?: string;
   availableClasses?: string[];
+  classObjects?: PracticalClass[];
 }
 
 const PRESET_COURSES = [
@@ -79,8 +80,10 @@ export function CreateSessionModal({
   onSubmit,
   defaultClassCode,
   availableClasses,
+  classObjects,
 }: CreateSessionModalProps) {
   const [courseName, setCourseName] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
   const classCode = selectedClassCode ?? defaultClassCode ?? 'A1';
 
@@ -103,6 +106,7 @@ export function CreateSessionModal({
 
   const resetForm = () => {
     setCourseName('');
+    setSelectedClassId(null);
     setSelectedClassCode(null);
     setDeliveryMode('OFFLINE');
     setRoom('');
@@ -151,6 +155,7 @@ export function CreateSessionModal({
     try {
       const result = await Promise.resolve(
         onSubmit({
+          classId: selectedClassId || undefined,
           courseName: courseName.trim(),
           classCode: classCode.trim() || 'A1',
           room: finalRoom,
@@ -279,27 +284,64 @@ export function CreateSessionModal({
                 PILIH KELAS PRAKTIKUM *
               </AppText>
               <View style={styles.chipsWrap}>
-                {(availableClasses && availableClasses.length > 0
-                  ? availableClasses
-                  : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']
-                ).map((code) => {
-                  const isSelected = classCode.toUpperCase() === code.toUpperCase();
-                  return (
-                    <Pressable
-                      key={code}
-                      style={[styles.chip, isSelected && styles.chipActive]}
-                      onPress={() => setSelectedClassCode(code)}
-                    >
-                      <AppText
-                        variant="caption"
-                        color={isSelected ? Colors.textWhite : Colors.textSecondary}
-                        weight={isSelected ? 'semibold' : 'regular'}
-                      >
-                        Kelas {code}
-                      </AppText>
-                    </Pressable>
-                  );
-                })}
+                {classObjects && classObjects.length > 0
+                  ? classObjects.map((cls) => {
+                      const isSelected =
+                        selectedClassId === cls.id ||
+                        (!selectedClassId &&
+                          classCode.toUpperCase() === cls.classCode.toUpperCase());
+                      return (
+                        <Pressable
+                          key={cls.id}
+                          style={[styles.chip, isSelected && styles.chipActive]}
+                          onPress={() => {
+                            setSelectedClassId(cls.id);
+                            setSelectedClassCode(cls.classCode);
+                            if (cls.courseName) setCourseName(cls.courseName);
+                            if (cls.room && deliveryMode === 'OFFLINE') {
+                              setRoom(cls.room);
+                            }
+                            if (error) setError(null);
+                          }}
+                        >
+                          <AppText
+                            variant="caption"
+                            color={
+                              isSelected ? Colors.textWhite : Colors.textSecondary
+                            }
+                            weight={isSelected ? 'semibold' : 'regular'}
+                          >
+                            {cls.courseName
+                              ? `${cls.courseName} (${cls.classCode})`
+                              : `Kelas ${cls.classCode}`}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })
+                  : (availableClasses && availableClasses.length > 0
+                      ? availableClasses
+                      : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']
+                    ).map((code) => {
+                      const isSelected =
+                        classCode.toUpperCase() === code.toUpperCase();
+                      return (
+                        <Pressable
+                          key={code}
+                          style={[styles.chip, isSelected && styles.chipActive]}
+                          onPress={() => setSelectedClassCode(code)}
+                        >
+                          <AppText
+                            variant="caption"
+                            color={
+                              isSelected ? Colors.textWhite : Colors.textSecondary
+                            }
+                            weight={isSelected ? 'semibold' : 'regular'}
+                          >
+                            Kelas {code}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
               </View>
             </View>
 
