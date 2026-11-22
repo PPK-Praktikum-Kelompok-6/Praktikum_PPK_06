@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Card } from '@/components/ui/Card';
@@ -243,13 +243,17 @@ export default function StudentAttendanceDetailRoute() {
         <View style={styles.metaGrid}>
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
-              <Icon name="location-outline" size={16} color={Colors.primary} />
+              <Icon
+                name={session.deliveryMode === 'ONLINE' ? 'videocam-outline' : 'location-outline'}
+                size={16}
+                color={Colors.primary}
+              />
               <View>
                 <AppText variant="caption" color={Colors.textMuted}>
-                  RUANGAN
+                  {session.deliveryMode === 'ONLINE' ? 'METODE' : 'RUANGAN'}
                 </AppText>
                 <AppText variant="bodySm" weight="semibold">
-                  {session.room}
+                  {session.deliveryMode === 'ONLINE' ? 'Daring (Online)' : session.room}
                 </AppText>
               </View>
             </View>
@@ -292,6 +296,24 @@ export default function StudentAttendanceDetailRoute() {
               </View>
             </View>
           </View>
+
+          {session.meetingLink ? (
+            <Pressable
+              style={styles.meetingLinkBox}
+              onPress={() => Linking.openURL(session.meetingLink!)}
+            >
+              <Icon name="link-outline" size={16} color={Colors.primary} />
+              <AppText
+                variant="caption"
+                weight="bold"
+                color={Colors.primaryDark}
+                numberOfLines={1}
+                style={styles.meetingLinkText}
+              >
+                Buka Link Praktikum: {session.meetingLink}
+              </AppText>
+            </Pressable>
+          ) : null}
 
           {session.description ? (
             <View style={styles.descriptionContainer}>
@@ -403,6 +425,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  meetingLinkBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    marginTop: Spacing.xxs,
+  },
+  meetingLinkText: {
+    flex: 1,
   },
   descriptionContainer: {
     flexDirection: 'row',

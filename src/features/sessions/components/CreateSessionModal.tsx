@@ -24,6 +24,8 @@ export interface CreateSessionModalProps {
   ) =>
     | { success: boolean; message: string }
     | Promise<{ success: boolean; message: string }>;
+  defaultClassCode?: string;
+  availableClasses?: string[];
 }
 
 const PRESET_COURSES = [
@@ -48,24 +50,64 @@ const PRESET_TIMES = [
   { start: '15.30', end: '17.30' },
 ];
 
+function getFormattedDate(offsetDays: number = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const yyyy = d.getFullYear();
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatReadableDate(dateStr: string): string {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+    return d.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+  return dateStr;
+}
+
 export function CreateSessionModal({
   visible,
   onClose,
   onSubmit,
+  defaultClassCode,
+  availableClasses,
 }: CreateSessionModalProps) {
   const [courseName, setCourseName] = useState('');
-  const [classCode, setClassCode] = useState('A1');
+  const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
+  const classCode = selectedClassCode ?? defaultClassCode ?? 'A1';
+
+  // Mode Praktikum: Tatap Muka (Offline) vs Daring (Online)
+  const [deliveryMode, setDeliveryMode] = useState<'OFFLINE' | 'ONLINE'>('OFFLINE');
   const [room, setRoom] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
+
+  // Tanggal Praktikum
+  const [sessionDate, setSessionDate] = useState(getFormattedDate(0));
+
+  // Waktu Mulai & Selesai
   const [startTime, setStartTime] = useState('08.00');
   const [endTime, setEndTime] = useState('10.00');
+
+  // Deskripsi opsional
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setCourseName('');
-    setClassCode('A1');
+    setSelectedClassCode(null);
+    setDeliveryMode('OFFLINE');
     setRoom('');
+    setMeetingLink('');
+    setSessionDate(getFormattedDate(0));
     setStartTime('08.00');
     setEndTime('10.00');
     setDescription('');
@@ -82,14 +124,27 @@ export function CreateSessionModal({
       setError('Nama mata kuliah wajib diisi atau dipilih.');
       return;
     }
-    if (!room.trim()) {
-      setError('Ruangan Lab praktikum wajib diisi atau dipilih.');
+    if (deliveryMode === 'OFFLINE' && !room.trim()) {
+      setError('Ruangan Lab praktikum tatap muka wajib diisi.');
+      return;
+    }
+    if (deliveryMode === 'ONLINE' && !meetingLink.trim()) {
+      setError('Link pertemuan praktikum online (Zoom / Google Meet) wajib diisi.');
+      return;
+    }
+    if (!sessionDate.trim()) {
+      setError('Tanggal pelaksanaan praktikum wajib dipilih atau diisi.');
       return;
     }
     if (!startTime.trim() || !endTime.trim()) {
       setError('Waktu mulai dan selesai praktikum wajib diisi.');
       return;
     }
+
+    const finalRoom =
+      deliveryMode === 'ONLINE'
+        ? room.trim() || 'Daring (Google Meet / Zoom)'
+        : room.trim();
 
     setError(null);
     setIsSubmitting(true);
@@ -98,9 +153,12 @@ export function CreateSessionModal({
         onSubmit({
           courseName: courseName.trim(),
           classCode: classCode.trim() || 'A1',
-          room: room.trim(),
+          room: finalRoom,
           startTime: startTime.trim(),
           endTime: endTime.trim(),
+          date: sessionDate.trim(),
+          deliveryMode,
+          meetingLink: meetingLink.trim() || undefined,
           description: description.trim() || undefined,
         })
       );
@@ -117,6 +175,10 @@ export function CreateSessionModal({
       setIsSubmitting(false);
     }
   };
+
+  const todayStr = getFormattedDate(0);
+  const tomorrowStr = getFormattedDate(1);
+  const lusaStr = getFormattedDate(2);
 
   return (
     <Modal
@@ -211,14 +273,104 @@ export function CreateSessionModal({
               </ScrollView>
             </View>
 
-            {/* Ruangan Lab */}
+            {/* Kelas Praktikum */}
             <View style={styles.fieldGroup}>
               <AppText variant="label" style={styles.fieldLabel}>
-                RUANGAN LAB *
+                PILIH KELAS PRAKTIKUM *
+              </AppText>
+              <View style={styles.chipsWrap}>
+                {(availableClasses && availableClasses.length > 0
+                  ? availableClasses
+                  : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']
+                ).map((code) => {
+                  const isSelected = classCode.toUpperCase() === code.toUpperCase();
+                  return (
+                    <Pressable
+                      key={code}
+                      style={[styles.chip, isSelected && styles.chipActive]}
+                      onPress={() => setSelectedClassCode(code)}
+                    >
+                      <AppText
+                        variant="caption"
+                        color={isSelected ? Colors.textWhite : Colors.textSecondary}
+                        weight={isSelected ? 'semibold' : 'regular'}
+                      >
+                        Kelas {code}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Mode Praktikum: Tatap Muka (Offline) vs Daring (Online) */}
+            <View style={styles.fieldGroup}>
+              <AppText variant="label" style={styles.fieldLabel}>
+                METODE PELAKSANAAN *
+              </AppText>
+              <View style={styles.modeToggleRow}>
+                <Pressable
+                  style={[
+                    styles.modeButton,
+                    deliveryMode === 'OFFLINE' && styles.modeButtonActive,
+                  ]}
+                  onPress={() => {
+                    setDeliveryMode('OFFLINE');
+                    if (error) setError(null);
+                  }}
+                >
+                  <Icon
+                    name="business-outline"
+                    size={16}
+                    color={deliveryMode === 'OFFLINE' ? Colors.textWhite : Colors.textSecondary}
+                  />
+                  <AppText
+                    variant="caption"
+                    weight="bold"
+                    color={deliveryMode === 'OFFLINE' ? Colors.textWhite : Colors.textSecondary}
+                  >
+                    Offline (Lab Fisik)
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.modeButton,
+                    deliveryMode === 'ONLINE' && styles.modeButtonActive,
+                  ]}
+                  onPress={() => {
+                    setDeliveryMode('ONLINE');
+                    if (error) setError(null);
+                  }}
+                >
+                  <Icon
+                    name="videocam-outline"
+                    size={16}
+                    color={deliveryMode === 'ONLINE' ? Colors.textWhite : Colors.textSecondary}
+                  />
+                  <AppText
+                    variant="caption"
+                    weight="bold"
+                    color={deliveryMode === 'ONLINE' ? Colors.textWhite : Colors.textSecondary}
+                  >
+                    Online (Daring / Meet)
+                  </AppText>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Ruangan Lab (Jika Offline) / Keterangan Ruang (Jika Online) */}
+            <View style={styles.fieldGroup}>
+              <AppText variant="label" style={styles.fieldLabel}>
+                {deliveryMode === 'OFFLINE' ? 'RUANGAN LAB *' : 'KETERANGAN RUANG VIRTUAL'}
               </AppText>
               <TextInput
                 style={styles.input}
-                placeholder="Contoh: Lab Komputer 2"
+                placeholder={
+                  deliveryMode === 'OFFLINE'
+                    ? 'Contoh: Lab Komputer 2'
+                    : 'Contoh: Google Meet / Zoom Conference'
+                }
                 placeholderTextColor={Colors.textLight}
                 value={room}
                 onChangeText={(text) => {
@@ -226,41 +378,126 @@ export function CreateSessionModal({
                   if (error) setError(null);
                 }}
               />
-              {/* Preset Rooms */}
-              <View style={styles.chipsWrap}>
-                {PRESET_ROOMS.map((r) => (
-                  <Pressable
-                    key={r}
-                    style={[styles.chip, room === r && styles.chipActive]}
-                    onPress={() => {
-                      setRoom(r);
-                      if (error) setError(null);
-                    }}
-                  >
-                    <AppText
-                      variant="caption"
-                      color={room === r ? Colors.textWhite : Colors.textSecondary}
-                      weight={room === r ? 'semibold' : 'regular'}
+              {deliveryMode === 'OFFLINE' && (
+                <View style={styles.chipsWrap}>
+                  {PRESET_ROOMS.map((r) => (
+                    <Pressable
+                      key={r}
+                      style={[styles.chip, room === r && styles.chipActive]}
+                      onPress={() => {
+                        setRoom(r);
+                        if (error) setError(null);
+                      }}
                     >
-                      {r}
-                    </AppText>
-                  </Pressable>
-                ))}
-              </View>
+                      <AppText
+                        variant="caption"
+                        color={room === r ? Colors.textWhite : Colors.textSecondary}
+                        weight={room === r ? 'semibold' : 'regular'}
+                      >
+                        {r}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </View>
 
-            {/* Row: Kelas & Preset Waktu */}
+            {/* Kolom Link Praktikum (Wajib jika Online, atau Link Tambahan jika Offline) */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.labelRow}>
+                <AppText variant="label" style={styles.fieldLabel}>
+                  {deliveryMode === 'ONLINE'
+                    ? 'LINK PERTEMUAN PRAKTIKUM (MEET/ZOOM) *'
+                    : 'LINK / TAUTAN PRAKTIKUM (OPSIONAL)'}
+                </AppText>
+                {deliveryMode === 'OFFLINE' && (
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    (Opsional)
+                  </AppText>
+                )}
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder={
+                  deliveryMode === 'ONLINE'
+                    ? 'https://meet.google.com/xyz-abcd-efg atau link Zoom'
+                    : 'https://... (Link modul/lokasi/meeting opsional)'
+                }
+                placeholderTextColor={Colors.textLight}
+                value={meetingLink}
+                autoCapitalize="none"
+                keyboardType="url"
+                onChangeText={(text) => {
+                  setMeetingLink(text);
+                  if (error) setError(null);
+                }}
+              />
+            </View>
+
+            {/* Tanggal Praktikum */}
             <View style={styles.fieldGroup}>
               <AppText variant="label" style={styles.fieldLabel}>
-                KELAS PRAKTIKUM
+                TANGGAL PELAKSANAAN *
               </AppText>
               <TextInput
                 style={styles.input}
-                placeholder="Contoh: A1, B2, atau C1"
+                placeholder="YYYY-MM-DD (Contoh: 2026-11-20)"
                 placeholderTextColor={Colors.textLight}
-                value={classCode}
-                onChangeText={setClassCode}
+                value={sessionDate}
+                onChangeText={(text) => {
+                  setSessionDate(text);
+                  if (error) setError(null);
+                }}
               />
+              {/* Quick Date Presets */}
+              <View style={styles.chipsWrap}>
+                <Pressable
+                  style={[styles.chip, sessionDate === todayStr && styles.chipActive]}
+                  onPress={() => setSessionDate(todayStr)}
+                >
+                  <AppText
+                    variant="caption"
+                    color={sessionDate === todayStr ? Colors.textWhite : Colors.textSecondary}
+                    weight={sessionDate === todayStr ? 'semibold' : 'regular'}
+                  >
+                    Hari Ini ({formatReadableDate(todayStr).split(',')[0]})
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.chip, sessionDate === tomorrowStr && styles.chipActive]}
+                  onPress={() => setSessionDate(tomorrowStr)}
+                >
+                  <AppText
+                    variant="caption"
+                    color={sessionDate === tomorrowStr ? Colors.textWhite : Colors.textSecondary}
+                    weight={sessionDate === tomorrowStr ? 'semibold' : 'regular'}
+                  >
+                    Besok ({formatReadableDate(tomorrowStr).split(',')[0]})
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.chip, sessionDate === lusaStr && styles.chipActive]}
+                  onPress={() => setSessionDate(lusaStr)}
+                >
+                  <AppText
+                    variant="caption"
+                    color={sessionDate === lusaStr ? Colors.textWhite : Colors.textSecondary}
+                    weight={sessionDate === lusaStr ? 'semibold' : 'regular'}
+                  >
+                    Lusa ({formatReadableDate(lusaStr).split(',')[0]})
+                  </AppText>
+                </Pressable>
+              </View>
+
+              {/* Formatted Date Preview */}
+              <View style={styles.datePreviewBox}>
+                <Icon name="calendar-outline" size={14} color={Colors.primary} />
+                <AppText variant="caption" color={Colors.primaryDark} weight="medium">
+                  {formatReadableDate(sessionDate)}
+                </AppText>
+              </View>
             </View>
 
             {/* Waktu Mulai & Waktu Selesai */}
@@ -328,7 +565,7 @@ export function CreateSessionModal({
               </View>
             </View>
 
-            {/* Deskripsi (Opsional) */}
+            {/* Deskripsi (Murni Opsional) */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
                 <AppText variant="label" style={styles.fieldLabel}>
@@ -340,7 +577,7 @@ export function CreateSessionModal({
               </View>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Tambahkan petunjuk, topik materi, atau instruksi praktikum bagi mahasiswa..."
+                placeholder="Tambahkan petunjuk, topik materi, atau instruksi praktikum bagi mahasiswa (boleh dikosongkan)..."
                 placeholderTextColor={Colors.textLight}
                 value={description}
                 onChangeText={setDescription}
@@ -392,7 +629,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
-    maxHeight: '90%',
+    maxHeight: '92%',
   },
   headerRow: {
     flexDirection: 'row',
@@ -461,7 +698,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 70,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -485,6 +722,37 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  modeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modeButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  datePreviewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primaryBg,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    marginTop: Spacing.xxs,
   },
   timeRow: {
     flexDirection: 'row',
@@ -510,4 +778,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

@@ -14,53 +14,114 @@ import {
 } from 'firebase/firestore';
 
 import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
-import { PracticalSession, UserProfile } from '@/types/attendance';
+import { isSessionExpired } from '@/store/rules';
+import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
 import { db, isFirebaseConfigured } from './firebase';
 
-export interface PracticalClass {
-  id: string;
-  classCode: string;
-  courseName: string;
-  room: string;
-  assistantId: string;
-  assistantName: string;
-  studentIds: string[];
+export { PracticalClass } from '@/types/attendance';
+
+/**
+ * Memastikan payload yang dikirim ke Cloud Firestore bebas dari nilai `undefined`.
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
 }
+
+export const DEFAULT_CLASSES: PracticalClass[] = [
+  {
+    id: 'class-a1',
+    classCode: 'A1',
+    courseName: 'Praktikum A1',
+    room: 'Lab Basis Data',
+    assistantId: 'ast-2',
+    assistantName: 'Crystiano Bayu Satya Alves',
+    studentIds: ['std-1', 'std-2', 'std-5'],
+    isOpen: true,
+  },
+  {
+    id: 'class-a2',
+    classCode: 'A2',
+    courseName: 'Praktikum A2',
+    room: 'Lab Basis Data',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-b1',
+    classCode: 'B1',
+    courseName: 'Praktikum B1',
+    room: 'Lab Komputer 1',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-b2',
+    classCode: 'B2',
+    courseName: 'Praktikum B2',
+    room: 'Lab Komputer 1',
+    assistantId: 'ast-1',
+    assistantName: 'Muhammad Zaidan Alfarizi',
+    studentIds: ['std-1', 'std-3', 'std-4'],
+    isOpen: true,
+  },
+  {
+    id: 'class-c1',
+    classCode: 'C1',
+    courseName: 'Praktikum C1',
+    room: 'Lab Komputer 2',
+    assistantId: 'ast-1',
+    assistantName: 'Muhammad Zaidan Alfarizi',
+    studentIds: ['std-1', 'std-2', 'std-3', 'std-4', 'std-5'],
+    isOpen: true,
+  },
+  {
+    id: 'class-c2',
+    classCode: 'C2',
+    courseName: 'Praktikum C2',
+    room: 'Lab Komputer 2',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-d1',
+    classCode: 'D1',
+    courseName: 'Praktikum D1',
+    room: 'Lab Jaringan',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+  {
+    id: 'class-d2',
+    classCode: 'D2',
+    courseName: 'Praktikum D2',
+    room: 'Lab Jaringan',
+    assistantId: '',
+    assistantName: 'Belum Ditugaskan',
+    studentIds: [],
+    isOpen: true,
+  },
+];
 
 export type SessionListener = () => void;
 
 const sessionListeners = new Set<SessionListener>();
 let localSessionsStore: PracticalSession[] = [...MOCK_SESSIONS];
 
-let localClassesStore: PracticalClass[] = [
-  {
-    id: 'class-c1',
-    classCode: 'C1',
-    courseName: 'Pemrograman Web & Mobile',
-    room: 'Lab Komputer 2',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-2', 'std-3', 'std-4', 'std-5'],
-  },
-  {
-    id: 'class-b2',
-    classCode: 'B2',
-    courseName: 'Struktur Data & Algoritma',
-    room: 'Lab Komputer 1',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-3', 'std-4'],
-  },
-  {
-    id: 'class-a1',
-    classCode: 'A1',
-    courseName: 'Basis Data Lanjut',
-    room: 'Lab Basis Data',
-    assistantId: 'ast-2',
-    assistantName: 'Crystiano Bayu Satya Alves',
-    studentIds: ['std-1', 'std-2', 'std-5'],
-  },
-];
+let localClassesStore: PracticalClass[] = [...DEFAULT_CLASSES];
 
 function notifySessionListeners() {
   sessionListeners.forEach((listener) => listener());
@@ -95,6 +156,9 @@ export function subscribeAssistantSessions(
             id: docSnap.id,
             ...(docSnap.data() as Omit<PracticalSession, 'id'>),
           }));
+
+          // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
+          checkAndAutoCloseExpiredSessions(allSessions);
 
           const filtered = allSessions.filter(
             (s) =>
@@ -219,6 +283,9 @@ export function subscribeStudentSessions(
             ...(docSnap.data() as Omit<PracticalSession, 'id'>),
           }));
 
+          // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
+          checkAndAutoCloseExpiredSessions(allSessions);
+
           const normalizedClasses = enrolledClasses.map((c) => c.toUpperCase());
           const filtered = allSessions.filter(
             (s) =>
@@ -251,6 +318,35 @@ export function getSessionById(sessionId: string): PracticalSession | undefined 
 }
 
 /**
+ * Memeriksa seluruh sesi yang berstatus 'OPEN'. Bila jam praktikum telah lewat,
+ * ubah status menjadi 'CLOSED' secara otomatis (baik di Firestore maupun lokal).
+ */
+let isAutoClosing = false;
+export async function checkAndAutoCloseExpiredSessions(
+  sessions?: PracticalSession[]
+): Promise<void> {
+  if (isAutoClosing) return;
+  isAutoClosing = true;
+  try {
+    const target = sessions || localSessionsStore;
+    const now = new Date();
+    for (const s of target) {
+      if (s.status === 'OPEN') {
+        const { expired } = isSessionExpired(s, now);
+        if (expired) {
+          // Tutup sesi otomatis
+          await updateSession(s.id, { status: 'CLOSED' });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Gagal memeriksa penutupan otomatis sesi:', err);
+  } finally {
+    isAutoClosing = false;
+  }
+}
+
+/**
  * 1. Membuat jadwal sesi praktikum baru di koleksi Firestore `sessions` (SRS-CRUD-01).
  */
 export async function createSession(
@@ -264,12 +360,15 @@ export async function createSession(
   }
 
   if (isFirebaseConfigured) {
-    const docRef = await addDoc(collection(db, 'sessions'), {
+    const rawData = {
       ...sessionData,
       courseName: sessionData.courseName.trim(),
       classCode: (sessionData.classCode || 'A1').trim(),
       room: sessionData.room.trim(),
-    });
+      deliveryMode: sessionData.deliveryMode || 'OFFLINE',
+    };
+    const cleanData = sanitizeForFirestore(rawData);
+    const docRef = await addDoc(collection(db, 'sessions'), cleanData);
     notifySessionListeners();
     return docRef.id;
   }
@@ -281,6 +380,7 @@ export async function createSession(
     courseName: sessionData.courseName.trim(),
     classCode: (sessionData.classCode || 'A1').trim(),
     room: sessionData.room.trim(),
+    deliveryMode: sessionData.deliveryMode || 'OFFLINE',
   };
   localSessionsStore = [created, ...localSessionsStore];
   notifySessionListeners();
@@ -393,7 +493,7 @@ export async function updateSession(
   }
 
   if (isFirebaseConfigured) {
-    const cleanUpdates = { ...updates };
+    const cleanUpdates = sanitizeForFirestore(updates);
     delete cleanUpdates.id;
     await updateDoc(doc(db, 'sessions', sessionId), cleanUpdates);
     notifySessionListeners();

@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   setDoc,
   where,
@@ -90,6 +91,25 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
     role: MOCK_USERS[4].role,
     identifier: MOCK_USERS[4].identifier,
     enrolledClasses: ['B2', 'C1'],
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
+    uid: 'iUuzqYziLZhWndnZdh9bx4NRsSe2',
+    email: 'herman@praktikum.ac.id',
+    name: 'Herman',
+    role: 'ASSISTANT',
+    identifier: 'AST-03',
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
+    uid: 'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    email: 'jeedan@praktikan.ac.id',
+    name: 'Jeedan',
+    role: 'STUDENT',
+    identifier: '24060124130102',
+    enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
     approvalStatus: 'APPROVED',
   },
@@ -350,9 +370,27 @@ export async function signUpUser(
       createdAt: new Date().toISOString(),
     });
 
-    currentAuthUser = newAuthUser;
-    signedOutExplicitly = false;
-    notifyAuthListeners();
+    // Simpan juga ke cache lokal agar langsung terlihat di Database Akun
+    const existingIndex = localAccountsStore.findIndex(
+      (acc) => acc.email.toLowerCase() === normalizedEmail
+    );
+    if (existingIndex >= 0) {
+      localAccountsStore[existingIndex] = { ...newAuthUser, password };
+    } else {
+      localAccountsStore.push({ ...newAuthUser, password });
+    }
+
+    if (approvalStatus !== 'APPROVED') {
+      // Akun membutuhkan persetujuan, jangan biarkan otomatis login
+      await signOut(auth);
+      currentAuthUser = null;
+      signedOutExplicitly = true;
+      notifyAuthListeners();
+    } else {
+      currentAuthUser = newAuthUser;
+      signedOutExplicitly = false;
+      notifyAuthListeners();
+    }
     return newAuthUser;
   }
 
@@ -379,10 +417,16 @@ export async function signUpUser(
   };
 
   localAccountsStore.push(newLocalRecord);
-  currentAuthUser = toAuthUser(newLocalRecord);
-  signedOutExplicitly = false;
-  notifyAuthListeners();
-  return currentAuthUser;
+  if (approvalStatus !== 'APPROVED') {
+    currentAuthUser = null;
+    signedOutExplicitly = true;
+    notifyAuthListeners();
+  } else {
+    currentAuthUser = toAuthUser(newLocalRecord);
+    signedOutExplicitly = false;
+    notifyAuthListeners();
+  }
+  return toAuthUser(newLocalRecord);
 }
 
 /**
@@ -489,4 +533,48 @@ export async function signOutUser(): Promise<void> {
   currentAuthUser = null;
   signedOutExplicitly = true;
   notifyAuthListeners();
+}
+
+/**
+ * Berlangganan secara realtime ke daftar seluruh akun pengguna di sistem (SRS-AUTH-LIVE-SYNC).
+ * Jika ada akun yang bertambah/berubah/dihapus di database Firestore, callback akan langsung dipanggil.
+ */
+export function subscribeAllUsers(
+  onUpdate: (users: AuthUser[]) => void
+): () => void {
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, 'users'));
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const list: AuthUser[] = snap.docs.map((d) => ({
+            uid: d.id,
+            ...(d.data() as Omit<AuthUser, 'uid'>),
+          }));
+          list.sort((a, b) => {
+            const roleOrder: Record<UserRole, number> = {
+              ADMIN: 0,
+              ASSISTANT: 1,
+              STUDENT: 2,
+            };
+            const diff = (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
+            if (diff !== 0) return diff;
+            return a.name.localeCompare(b.name);
+          });
+          onUpdate(list);
+        },
+        (err) => {
+          console.warn('Realtime users error:', err);
+          onUpdate(getDemoAccounts());
+        }
+      );
+      return unsub;
+    } catch (e) {
+      console.warn('Could not setup users realtime listener:', e);
+    }
+  }
+
+  onUpdate(getDemoAccounts());
+  return () => {};
 }

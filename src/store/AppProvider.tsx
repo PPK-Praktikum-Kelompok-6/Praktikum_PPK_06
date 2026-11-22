@@ -174,12 +174,15 @@ export function AppProvider({ children }: AppProviderProps) {
       classCode: (input.classCode || 'A1').trim(),
       room: input.room.trim(),
       timeSlot: `${input.startTime.trim()} - ${input.endTime.trim()} WIB`,
-      date: new Date().toISOString(),
+      date: input.date || new Date().toISOString().split('T')[0],
       status: 'NOT_STARTED',
       assistantId: state.currentUser.id,
       assistantName: state.currentUser.name,
       totalStudents: input.totalStudents ?? 30,
+      deliveryMode: input.deliveryMode || 'OFFLINE',
+      meetingLink: input.meetingLink?.trim() || undefined,
       description: input.description?.trim() || undefined,
+      createdAt: new Date().toISOString(),
     };
 
     dispatch({ type: 'ADD_SESSION', payload: newSession });

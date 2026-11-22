@@ -9,9 +9,25 @@ import {
   where,
 } from 'firebase/firestore';
 
-import { PermitRequest } from '@/types/permit';
+import { PermitAttachment, PermitRequest } from '@/types/permit';
 import { classifyPermitReason } from './ai';
 import { db, isFirebaseConfigured } from './firebase';
+
+export { PermitAttachment, PermitRequest };
+
+function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        result[key] = sanitizeForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
 
 /**
  * Service pengolahan data izin (SRS-IZIN-01, SRS-IZIN-02, SRS-AI-01).
@@ -174,7 +190,9 @@ let permitStore: PermitRequest[] = [
  * - Simpan permohonan ke dalam store.
  */
 export async function submitPermit(
-  permitData: Omit<PermitRequest, 'id' | 'submittedAt' | 'status' | 'aiClassification'>
+  permitData: Omit<PermitRequest, 'id' | 'submittedAt' | 'status' | 'aiClassification'> & {
+    attachment?: PermitAttachment;
+  }
 ): Promise<{ success: boolean; permitId?: string; message: string; data?: PermitRequest }> {
   const trimmedReason = permitData.reason?.trim() || '';
 
@@ -214,6 +232,7 @@ export async function submitPermit(
     submittedAt: new Date().toISOString(),
     status: 'PENDING',
     aiClassification: aiResult,
+    ...(permitData.attachment ? { attachment: permitData.attachment } : {}),
   };
 
   // Simpan ke Cloud Firestore jika terhubung
@@ -235,7 +254,7 @@ export async function submitPermit(
         };
       }
 
-      await setDoc(doc(db, 'permits', newPermit.id), newPermit);
+      await setDoc(doc(db, 'permits', newPermit.id), sanitizeForFirestore(newPermit));
     } catch (err) {
       console.warn('Gagal menyimpan izin ke Firestore:', err);
     }

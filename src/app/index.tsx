@@ -1,6 +1,13 @@
 import { Href, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -10,36 +17,46 @@ import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { subscribeAllClasses } from '@/services/admin';
 import {
   AuthUser,
-  getCurrentUser as getAuthUser,
-  onAuthChange,
+  getDemoAccounts,
   signInUser,
-  signOutUser,
   signUpUser,
+  subscribeAllUsers,
 } from '@/services/auth';
 import { isFirebaseConfigured } from '@/services/firebase';
+import { DEFAULT_CLASSES, PracticalClass } from '@/services/sessions';
 import { useCurrentUser } from '@/store/hooks';
 import { UserRole } from '@/types/attendance';
 
 type AuthMode = 'LOGIN' | 'REGISTER';
 
 export default function AuthAndRoleRoute() {
-  const { currentUser, setCurrentUser } = useCurrentUser();
-  const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
-    getAuthUser()
-  );
+  const { setCurrentUser } = useCurrentUser();
 
   const [mode, setMode] = useState<AuthMode>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // State khusus Registrasi (SRS-AUTH-01)
+  // State khusus Registrasi (SRS-AUTH-01 & Requirement 1)
   const [fullName, setFullName] = useState('');
   const [registerRole, setRegisterRole] = useState<UserRole>('STUDENT');
   const [identifier, setIdentifier] = useState('');
-  const [selectedClass, setSelectedClass] = useState('C1');
+  const [selectedClass, setSelectedClass] = useState('A1');
+  const [availableClasses, setAvailableClasses] =
+    useState<PracticalClass[]>(DEFAULT_CLASSES);
+
+  // State Database Akun Sistem Live Realtime (Requirement 4)
+  const [allSystemUsers, setAllSystemUsers] = useState<AuthUser[]>(() =>
+    getDemoAccounts()
+  );
+  const [systemDbModalVisible, setSystemDbModalVisible] = useState(false);
+  const [systemDbSearch, setSystemDbSearch] = useState('');
+  const [systemDbRoleFilter, setSystemDbRoleFilter] = useState<
+    'ALL' | UserRole
+  >('ALL');
 
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -54,11 +71,18 @@ export default function AuthAndRoleRoute() {
     message: '',
   });
 
+  // Sinkronisasi realtime ke kelas dan pengguna database
   useEffect(() => {
-    const unsubscribe = onAuthChange((user) => {
-      setAuthUser(user);
+    const unsubClasses = subscribeAllClasses((classes) => {
+      setAvailableClasses(classes);
     });
-    return unsubscribe;
+    const unsubUsers = subscribeAllUsers((users) => {
+      setAllSystemUsers(users);
+    });
+    return () => {
+      unsubClasses();
+      unsubUsers();
+    };
   }, []);
 
   /**
@@ -156,19 +180,22 @@ export default function AuthAndRoleRoute() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOutUser();
-    setFeedback({
-      visible: true,
-      type: 'info',
-      title: 'Berhasil Keluar',
-      message: 'Sesi Anda telah diakhiri. Silakan masuk kembali untuk melanjutkan.',
-    });
-  };
-
-  const activeRole = authUser?.role ?? currentUser.role;
-  const isAssistant = activeRole === 'ASSISTANT';
-  const isAdmin = activeRole === 'ADMIN';
+  const filteredSystemUsers = allSystemUsers.filter((u) => {
+    if (systemDbRoleFilter !== 'ALL' && u.role !== systemDbRoleFilter) {
+      return false;
+    }
+    if (systemDbSearch.trim()) {
+      const q = systemDbSearch.toLowerCase().trim();
+      const matchName = u.name.toLowerCase().includes(q);
+      const matchEmail = u.email.toLowerCase().includes(q);
+      const matchId = (u.identifier || '').toLowerCase().includes(q);
+      const matchCls = (u.enrolledClasses || [])
+        .concat(u.requestedClass ? [u.requestedClass] : [])
+        .some((c) => c.toLowerCase().includes(q));
+      return matchName || matchEmail || matchId || matchCls;
+    }
+    return true;
+  });
 
   return (
     <Screen style={styles.container}>
@@ -196,71 +223,6 @@ export default function AuthAndRoleRoute() {
           />
         </View>
       </View>
-
-      {/* Sesi Aktif (Jika pengguna sudah login dan kembali ke layar awal) */}
-      {authUser ? (
-        <Card variant="accent" padding="md" style={styles.activeSessionCard}>
-          <View style={styles.userCardHeader}>
-            <AppText
-              variant="caption"
-              color={Colors.primaryDark}
-              weight="semibold"
-            >
-              SESI LOGIN AKTIF
-            </AppText>
-            <Badge
-              label={isAdmin ? 'Admin Lab' : isAssistant ? 'Asisten' : 'Praktikan'}
-              variant={isAdmin ? 'closed' : isAssistant ? 'primary' : 'attended'}
-              size="sm"
-              showDot
-            />
-          </View>
-
-          <View style={styles.userInfoRow}>
-            <View style={styles.avatar}>
-              <Icon
-                name={isAdmin ? 'shield-checkmark' : isAssistant ? 'school' : 'person'}
-                size={20}
-                color={Colors.primary}
-              />
-            </View>
-            <View style={styles.userTextContainer}>
-              <AppText variant="body" weight="semibold">
-                {authUser.name}
-              </AppText>
-              <AppText variant="caption" color={Colors.textMuted}>
-                {authUser.email} • {isAdmin ? 'Role: ' : isAssistant ? 'Kode: ' : 'NIM: '}
-                {authUser.identifier}
-              </AppText>
-            </View>
-          </View>
-
-          <View style={styles.sessionActionsRow}>
-            <View style={styles.sessionActionCol}>
-              <CustomButton
-                title={
-                  isAdmin
-                    ? 'Dashboard Admin'
-                    : isAssistant
-                    ? 'Dashboard Asisten'
-                    : 'Dashboard Praktikan'
-                }
-                size="sm"
-                variant="primary"
-                onPress={() => routeByUserRole(authUser)}
-              />
-            </View>
-            <View style={styles.sessionActionCol}>
-              <CustomButton
-                title="Keluar (Logout)"
-                size="sm"
-                variant="danger"
-                onPress={handleSignOut}
-              />
-            </View>
-          </View>
-        </Card>
-      ) : null}
 
       {/* Kartu Utama: Form Login & Registrasi Firebase (SRS-AUTH-01 & SRS-AUTH-02) */}
       <Card variant="default" padding="lg" style={styles.authCard}>
@@ -415,40 +377,55 @@ export default function AuthAndRoleRoute() {
                   </View>
                 </View>
 
-                {/* Pemilihan Kelas yang ingin diikuti praktikan */}
+                {/* Pemilihan Kelas Praktikan (Requirement 1: Tanpa mata kuliah, diatur ketersediaan admin) */}
                 <View style={styles.fieldGroup}>
-                  <AppText variant="label" style={styles.fieldLabel}>
-                    PILIH KELAS PRAKTIKUM
-                  </AppText>
-                  <View style={styles.classChipsRow}>
-                    {[
-                      { code: 'C1', label: 'C1 - Web & Mobile' },
-                      { code: 'B2', label: 'B2 - Struktur Data' },
-                      { code: 'A1', label: 'A1 - Basis Data' },
-                    ].map((cls) => {
-                      const isSel = selectedClass === cls.code;
+                  <View style={styles.fieldLabelRow}>
+                    <AppText variant="label" style={styles.fieldLabel}>
+                      PILIH KELAS PRAKTIKUM
+                    </AppText>
+                    <AppText variant="caption" color={Colors.textMuted}>
+                      {availableClasses.filter((c) => c.isOpen !== false).length} Kelas Tersedia
+                    </AppText>
+                  </View>
+                  <View style={styles.classChipsGrid}>
+                    {availableClasses.map((cls) => {
+                      const isSel = selectedClass.toUpperCase() === cls.classCode.toUpperCase();
+                      const isClosed = cls.isOpen === false;
                       return (
                         <Pressable
-                          key={cls.code}
+                          key={cls.classCode}
+                          disabled={isClosed}
                           style={[
                             styles.classChip,
                             isSel && styles.classChipActive,
+                            isClosed && styles.classChipDisabled,
                           ]}
-                          onPress={() => setSelectedClass(cls.code)}
+                          onPress={() => setSelectedClass(cls.classCode)}
                         >
                           <AppText
                             variant="caption"
-                            weight={isSel ? 'semibold' : 'regular'}
-                            color={isSel ? Colors.textWhite : Colors.textSecondary}
+                            weight={isSel ? 'bold' : 'regular'}
+                            color={
+                              isClosed
+                                ? Colors.textLight
+                                : isSel
+                                ? Colors.textWhite
+                                : Colors.textSecondary
+                            }
                           >
-                            {cls.label}
+                            Kelas {cls.classCode}
                           </AppText>
+                          {isClosed ? (
+                            <AppText variant="caption" color={Colors.danger} style={styles.closedTag}>
+                              (Tutup)
+                            </AppText>
+                          ) : null}
                         </Pressable>
                       );
                     })}
                   </View>
                   <AppText variant="caption" color={Colors.textMuted} style={styles.classHint}>
-                    ⚠️ Pendaftaran praktikan memerlukan persetujuan asisten kelas terkait.
+                    ⚠️ Pendaftaran praktikan memerlukan persetujuan asisten kelas terkait. Ketersediaan kelas diatur oleh Admin.
                   </AppText>
                 </View>
               </>
@@ -542,6 +519,233 @@ export default function AuthAndRoleRoute() {
         />
       </Card>
 
+      {/* Tombol Database Akun Sistem di Pojok Kiri Bawah (Requirement 4) */}
+      <View style={styles.bottomBarRow}>
+        <Pressable
+          style={styles.systemDbBtn}
+          onPress={() => setSystemDbModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Buka Database Akun Sistem"
+        >
+          <View style={styles.livePulseDot} />
+          <Icon name="server-outline" size={15} color={Colors.primary} />
+          <AppText variant="caption" weight="bold" color={Colors.primary}>
+            Database Akun ({allSystemUsers.length})
+          </AppText>
+        </Pressable>
+      </View>
+
+      {/* Modal Database Akun Sistem Realtime (Requirement 4) */}
+      <Modal
+        visible={systemDbModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSystemDbModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setSystemDbModalVisible(false)}
+        />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeaderRow}>
+            <View style={styles.modalTitleCol}>
+              <View style={styles.liveSyncBadge}>
+                <View style={styles.livePulseDotGreen} />
+                <AppText variant="caption" weight="bold" color={Colors.success}>
+                  DATABASE AKTIF • REALTIME SYNC
+                </AppText>
+              </View>
+              <AppText variant="title" weight="bold">
+                Database Akun Sistem
+              </AppText>
+              <AppText variant="caption" color={Colors.textMuted}>
+                {allSystemUsers.length} Akun Terdaftar di Cloud Firestore
+              </AppText>
+            </View>
+
+            <Pressable
+              onPress={() => setSystemDbModalVisible(false)}
+              style={styles.modalCloseBtn}
+            >
+              <Icon name="close" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          {/* Search Box */}
+          <View style={styles.searchBox}>
+            <Icon name="search-outline" size={16} color={Colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari nama, email, NIM, atau kode..."
+              placeholderTextColor={Colors.textLight}
+              value={systemDbSearch}
+              onChangeText={setSystemDbSearch}
+            />
+            {systemDbSearch ? (
+              <Pressable onPress={() => setSystemDbSearch('')}>
+                <Icon name="close-circle" size={16} color={Colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Role Filter Tabs */}
+          <View style={styles.roleFilterRow}>
+            {(
+              [
+                { key: 'ALL', label: 'Semua' },
+                { key: 'ADMIN', label: 'Admin' },
+                { key: 'ASSISTANT', label: 'Asisten' },
+                { key: 'STUDENT', label: 'Praktikan' },
+              ] as const
+            ).map((rf) => {
+              const isRfActive = systemDbRoleFilter === rf.key;
+              return (
+                <Pressable
+                  key={rf.key}
+                  style={[
+                    styles.roleFilterChip,
+                    isRfActive && styles.roleFilterChipActive,
+                  ]}
+                  onPress={() => setSystemDbRoleFilter(rf.key)}
+                >
+                  <AppText
+                    variant="caption"
+                    weight={isRfActive ? 'bold' : 'regular'}
+                    color={isRfActive ? Colors.textWhite : Colors.textSecondary}
+                  >
+                    {rf.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* User List */}
+          <ScrollView
+            style={styles.userListScroll}
+            contentContainerStyle={styles.userListContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredSystemUsers.length === 0 ? (
+              <View style={styles.emptySearchWrap}>
+                <AppText variant="bodySm" color={Colors.textMuted} align="center">
+                  Tidak ada akun yang sesuai dengan pencarian.
+                </AppText>
+              </View>
+            ) : (
+              filteredSystemUsers.map((user) => {
+                const isAdmin = user.role === 'ADMIN';
+                const isAst = user.role === 'ASSISTANT';
+                const isApproved =
+                  user.approvalStatus === 'APPROVED' || !user.approvalStatus;
+                const isPendingAdmin = user.approvalStatus === 'PENDING_ADMIN';
+                const isPendingAst =
+                  user.approvalStatus === 'PENDING_ASSISTANT';
+                const isRejected = user.approvalStatus === 'REJECTED';
+
+                return (
+                  <View key={user.uid} style={styles.userCard}>
+                    <View style={styles.userCardTop}>
+                      <View style={styles.userCardAvatar}>
+                        <Icon
+                          name={
+                            isAdmin
+                              ? 'shield-checkmark'
+                              : isAst
+                              ? 'school'
+                              : 'person'
+                          }
+                          size={18}
+                          color={Colors.primary}
+                        />
+                      </View>
+                      <View style={styles.userCardDetails}>
+                        <View style={styles.userCardNameRow}>
+                          <AppText variant="bodySm" weight="bold" numberOfLines={1}>
+                            {user.name}
+                          </AppText>
+                          <Badge
+                            label={
+                              isAdmin ? 'Admin' : isAst ? 'Asisten' : 'Praktikan'
+                            }
+                            variant={
+                              isAdmin
+                                ? 'closed'
+                                : isAst
+                                ? 'primary'
+                                : 'attended'
+                            }
+                            size="sm"
+                          />
+                        </View>
+                        <AppText variant="caption" color={Colors.textMuted}>
+                          {user.email}
+                        </AppText>
+                        <View style={styles.userCardSubRow}>
+                          <AppText
+                            variant="caption"
+                            weight="semibold"
+                            color={Colors.textSecondary}
+                          >
+                            {isAdmin ? 'Kode: ' : isAst ? 'Kode: ' : 'NIM: '}
+                            {user.identifier || '-'}
+                          </AppText>
+                          {user.enrolledClasses && user.enrolledClasses.length > 0 ? (
+                            <AppText variant="caption" color={Colors.primary}>
+                              • Kelas: {user.enrolledClasses.join(', ')}
+                            </AppText>
+                          ) : user.requestedClass ? (
+                            <AppText variant="caption" color={Colors.warning}>
+                              • Kelas: {user.requestedClass}
+                            </AppText>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.userCardBottom}>
+                      <Badge
+                        label={
+                          isApproved
+                            ? 'Disetujui'
+                            : isPendingAdmin
+                            ? 'Menunggu Admin'
+                            : isPendingAst
+                            ? 'Menunggu Asisten'
+                            : 'Ditolak'
+                        }
+                        variant={
+                          isApproved
+                            ? 'open'
+                            : isRejected
+                            ? 'danger'
+                            : 'waiting'
+                        }
+                        size="sm"
+                        showDot={!isRejected}
+                      />
+
+                      <CustomButton
+                        title="Gunakan Akun"
+                        size="sm"
+                        variant="outline"
+                        fullWidth={false}
+                        onPress={() => {
+                          setEmail(user.email);
+                          setPassword('password123');
+                          setMode('LOGIN');
+                          setSystemDbModalVisible(false);
+                        }}
+                      />
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Feedback Modal (FR-07 / SRS-UI-01) */}
       <FeedbackModal
         visible={feedback.visible}
@@ -579,40 +783,6 @@ const styles = StyleSheet.create({
   },
   connectionBadgeWrap: {
     marginTop: Spacing.xs,
-  },
-  activeSessionCard: {
-    marginBottom: Spacing.md,
-  },
-  userCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  userInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userTextContainer: {
-    flex: 1,
-  },
-  sessionActionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
-  sessionActionCol: {
-    flex: 1,
   },
   authCard: {
     marginBottom: Spacing.md,
@@ -698,6 +868,18 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: 2,
   },
+  classChipsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: 2,
+  },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
   classChip: {
     paddingHorizontal: Spacing.sm + 2,
     paddingVertical: Spacing.xs + 2,
@@ -705,12 +887,181 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surfaceSecondary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   classChipActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
+  classChipDisabled: {
+    opacity: 0.5,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  closedTag: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   classHint: {
     marginTop: Spacing.xs,
+  },
+  bottomBarRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+    paddingHorizontal: 2,
+  },
+  systemDbBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primary,
+  },
+  livePulseDotGreen: {
+    width: 6,
+    height: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.success,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
+    maxHeight: '85%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  modalTitleCol: {
+    flex: 1,
+    gap: 2,
+  },
+  liveSyncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.successBg,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  modalCloseBtn: {
+    padding: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm + 2,
+    height: 42,
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Typography.sm,
+    color: Colors.text,
+    paddingVertical: 4,
+  },
+  roleFilterRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  roleFilterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  roleFilterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  userListScroll: {
+    maxHeight: 420,
+  },
+  userListContainer: {
+    gap: Spacing.sm,
+    paddingBottom: Spacing.lg,
+  },
+  emptySearchWrap: {
+    paddingVertical: Spacing.xl,
+  },
+  userCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Spacing.sm + 2,
+    gap: Spacing.xs,
+  },
+  userCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  userCardAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userCardDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  userCardNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  userCardSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  userCardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: Spacing.xs,
+    marginTop: 2,
   },
 });

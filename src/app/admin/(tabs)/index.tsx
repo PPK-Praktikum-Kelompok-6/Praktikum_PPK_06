@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
+import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
@@ -102,6 +103,9 @@ export default function AdminSessionRequestsScreen() {
           Otorisasi penghapusan atau penjadwalan ulang (reschedule) sesi praktikum yang diajukan oleh asisten
         </AppText>
       </View>
+
+      {/* Live Real-time Clock */}
+      <LiveClock variant="light" />
 
       {/* Filter Tabs */}
       <View style={styles.filterRow}>

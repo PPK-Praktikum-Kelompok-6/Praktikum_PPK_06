@@ -67,6 +67,27 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
         </AppText>
       </View>
 
+      {/* Lampiran Bukti */}
+      {permit.attachment && (
+        <View style={styles.attachmentBox}>
+          <View style={styles.attachmentIconCircle}>
+            <Icon
+              name={permit.attachment.mimeType.includes('pdf') ? 'document-text' : 'image'}
+              size={18}
+              color={Colors.primary}
+            />
+          </View>
+          <View style={styles.attachmentTexts}>
+            <AppText variant="caption" weight="bold" color={Colors.text} numberOfLines={1}>
+              {permit.attachment.name}
+            </AppText>
+            <AppText variant="caption" color={Colors.textMuted}>
+              {(permit.attachment.size / 1024).toFixed(1)} KB • Bukti Lampiran
+            </AppText>
+          </View>
+        </View>
+      )}
+
       {/* Widget Analisis AI (SRS-AI-01: Informasi Pendukung) */}
       <View style={styles.aiBox}>
         <View style={styles.aiBoxHeader}>
@@ -229,6 +250,29 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   decisionNoteContent: {
+    flex: 1,
+  },
+  attachmentBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs + 2,
+    marginBottom: Spacing.sm,
+  },
+  attachmentIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentTexts: {
     flex: 1,
   },
 });

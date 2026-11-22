@@ -40,6 +40,8 @@ export interface PracticalSession {
   totalStudents: number;
   description?: string;
   createdAt?: string;
+  deliveryMode?: 'OFFLINE' | 'ONLINE';
+  meetingLink?: string;
   pendingChangeRequest?: 'DELETE' | 'RESCHEDULE';
 }
 
@@ -49,6 +51,9 @@ export interface CreateSessionInput {
   room: string;
   startTime: string;
   endTime: string;
+  date?: string;
+  deliveryMode?: 'OFFLINE' | 'ONLINE';
+  meetingLink?: string;
   description?: string;
   totalStudents?: number;
 }
@@ -70,4 +75,15 @@ export interface SessionChangeRequest {
   reviewedAt?: string;
   reviewedBy?: string;
   adminNote?: string;
+}
+
+export interface PracticalClass {
+  id: string;
+  classCode: string; // 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2'
+  courseName?: string;
+  room?: string;
+  assistantId: string;
+  assistantName: string;
+  studentIds: string[];
+  isOpen?: boolean; // Dikendalikan oleh admin untuk membuka/menutup ketersediaan kelas
 }

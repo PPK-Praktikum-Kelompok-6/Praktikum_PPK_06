@@ -1,12 +1,13 @@
 import { Href, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
+import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CreateSessionModal } from '@/features/sessions/components/CreateSessionModal';
@@ -36,6 +37,7 @@ export default function AssistantScheduleRoute() {
   const { currentUser } = useCurrentUser();
   const { sessions, addSession } = useSessions();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
+  const [selectedClassTab, setSelectedClassTab] = useState<string>('ALL');
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
   const [assignedClasses, setAssignedClasses] = useState<PracticalClass[]>([]);
   const [pendingStudents, setPendingStudents] = useState<AuthUser[]>([]);
@@ -71,7 +73,7 @@ export default function AssistantScheduleRoute() {
           c.assistantId === currentUser.id ||
           c.assistantId === 'ast-1' ||
           (currentUser.name &&
-            c.assistantName
+            (c.assistantName || '')
               .toLowerCase()
               .includes(currentUser.name.toLowerCase().split(' ')[0]))
       );
@@ -97,30 +99,50 @@ export default function AssistantScheduleRoute() {
 
   const handleCreateSession = async (input: CreateSessionInput) => {
     try {
+      const finalClassCode = (
+        input.classCode || (selectedClassTab !== 'ALL' ? selectedClassTab : 'A1')
+      )
+        .trim()
+        .toUpperCase();
+      const finalDate = input.date?.trim() || new Date().toISOString().split('T')[0];
+      const finalDeliveryMode = input.deliveryMode || 'OFFLINE';
+      const finalRoom =
+        finalDeliveryMode === 'ONLINE'
+          ? input.room?.trim() || 'Daring (Google Meet / Zoom)'
+          : input.room.trim();
+
       const newSessionData: Omit<PracticalSession, 'id'> = {
         courseName: input.courseName.trim(),
-        classCode: (input.classCode || 'A1').trim(),
-        room: input.room.trim(),
+        classCode: finalClassCode,
+        room: finalRoom,
         timeSlot: `${input.startTime.trim()} - ${input.endTime.trim()} WIB`,
-        date: new Date().toISOString(),
+        date: finalDate,
         status: 'NOT_STARTED',
         assistantId: currentUser.id,
         assistantName: currentUser.name,
         totalStudents: input.totalStudents ?? 30,
+        deliveryMode: finalDeliveryMode,
+        meetingLink: input.meetingLink?.trim() || undefined,
         description: input.description?.trim() || undefined,
+        createdAt: new Date().toISOString(),
       };
 
-      // 1. Tulis langsung ke Cloud Firestore
+      // 1. Tulis langsung ke Cloud Firestore (bebas undefined)
       await createSession(newSessionData);
 
       // 2. Selaraskan juga dengan in-memory store
-      addSession(input);
+      addSession({
+        ...input,
+        classCode: finalClassCode,
+        room: finalRoom,
+        date: finalDate,
+      });
 
       setFeedbackState({
         visible: true,
         type: 'success',
         title: 'Praktikum Ditambahkan!',
-        message: `Sesi ${input.courseName} (${input.classCode || 'A1'}) berhasil dijadwalkan di ${input.room} dan tersimpan di Cloud Firestore.`,
+        message: `Sesi ${input.courseName} (Kelas ${finalClassCode}) berhasil dijadwalkan untuk ${finalDate} di ${finalRoom}.`,
       });
       return { success: true, message: 'Berhasil' };
     } catch (err: any) {
@@ -161,7 +183,21 @@ export default function AssistantScheduleRoute() {
             s.assistantName === currentUser.name
         );
 
-  const displayedSessions = sourceSessions.filter((s) => {
+  // Daftar opsi kelas yang diampu / tersedia untuk asisten (Requirement 2)
+  const classTabOptions: string[] = Array.from(
+    new Set([
+      ...assignedClasses.map((c) => c.classCode),
+      ...sourceSessions.map((s) => s.classCode).filter(Boolean),
+    ])
+  ).sort();
+
+  // Filter sesi berdasarkan tab kelas yang dipilih
+  const classFilteredSessions = sourceSessions.filter((s) => {
+    if (selectedClassTab === 'ALL') return true;
+    return (s.classCode || '').toUpperCase() === selectedClassTab.toUpperCase();
+  });
+
+  const displayedSessions = classFilteredSessions.filter((s) => {
     if (activeFilter === 'ALL') return true;
     return s.status === activeFilter;
   });
@@ -235,6 +271,9 @@ export default function AssistantScheduleRoute() {
         </Pressable>
       </View>
 
+      {/* Live Real-Time Clock */}
+      <LiveClock variant="light" />
+
       {/* Tanggung Jawab Kelas Praktikum (Ditetapkan Admin) */}
       <View style={styles.assignedClassesCard}>
         <View style={styles.assignedHeader}>
@@ -304,6 +343,66 @@ export default function AssistantScheduleRoute() {
           ))}
         </View>
       ) : null}
+
+      {/* Pilihan Kelas Praktikum yang Ingin Dibuka / Dikelola (Requirement 2) */}
+      <View style={styles.classSelectorWrap}>
+        <View style={styles.classSelectorHeader}>
+          <Icon name="layers-outline" size={16} color={Colors.primary} />
+          <AppText variant="caption" weight="bold" color={Colors.primary}>
+            PILIH KELAS PRAKTIKUM
+          </AppText>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.classTabsScroll}
+        >
+          <Pressable
+            style={[
+              styles.classTabChip,
+              selectedClassTab === 'ALL' && styles.classTabChipActive,
+            ]}
+            onPress={() => setSelectedClassTab('ALL')}
+          >
+            <AppText
+              variant="caption"
+              weight={selectedClassTab === 'ALL' ? 'bold' : 'regular'}
+              color={selectedClassTab === 'ALL' ? Colors.textWhite : Colors.textSecondary}
+            >
+              Semua Kelas
+            </AppText>
+          </Pressable>
+
+          {classTabOptions.map((code) => {
+            const isTabActive = selectedClassTab.toUpperCase() === code.toUpperCase();
+            return (
+              <Pressable
+                key={code}
+                style={[styles.classTabChip, isTabActive && styles.classTabChipActive]}
+                onPress={() => setSelectedClassTab(code)}
+              >
+                <AppText
+                  variant="caption"
+                  weight={isTabActive ? 'bold' : 'regular'}
+                  color={isTabActive ? Colors.textWhite : Colors.textSecondary}
+                >
+                  Kelas {code}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Banner Konteks Kelas yang Aktif */}
+      {selectedClassTab !== 'ALL' && (
+        <View style={styles.activeClassBanner}>
+          <Icon name="folder-open" size={16} color={Colors.primary} />
+          <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
+            Menampilkan sesi praktikum khusus Kelas {selectedClassTab} ({classFilteredSessions.length} sesi)
+          </AppText>
+        </View>
+      )}
 
       {/* Filter Chips */}
       <View style={styles.filterRow}>
@@ -387,6 +486,8 @@ export default function AssistantScheduleRoute() {
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
         onSubmit={handleCreateSession}
+        defaultClassCode={selectedClassTab !== 'ALL' ? selectedClassTab : (classTabOptions[0] || 'A1')}
+        availableClasses={classTabOptions.length > 0 ? classTabOptions : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']}
       />
 
       {/* Feedback Modal */}
@@ -529,5 +630,49 @@ const styles = StyleSheet.create({
   pendingStudentActions: {
     flexDirection: 'row',
     gap: Spacing.xs,
+  },
+  classSelectorWrap: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  classSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
+  classTabsScroll: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    paddingVertical: 2,
+  },
+  classTabChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  classTabChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  activeClassBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
 });

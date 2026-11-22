@@ -6,6 +6,7 @@ import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
+import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import {
   Colors,
@@ -84,7 +85,7 @@ export default function StudentScheduleRoute() {
   );
 
   const sourceSessions = rawSessions.filter((s) => {
-    if (enrolledClassesNormalized.length === 0) return true;
+    if (enrolledClassesNormalized.length === 0) return false;
     return enrolledClassesNormalized.includes((s.classCode || '').toUpperCase());
   });
 
@@ -146,6 +147,9 @@ export default function StudentScheduleRoute() {
         </View>
       </View>
 
+      {/* Live Real-time Clock */}
+      <LiveClock variant="light" />
+
       {/* Filter Chips */}
       <View style={styles.filterRow}>
         {(
@@ -177,10 +181,16 @@ export default function StudentScheduleRoute() {
 
       {filteredSessions.length === 0 ? (
         <EmptyState
-          title="Belum Ada Sesi"
+          title={
+            enrolledClassesNormalized.length === 0
+              ? 'Belum Terdaftar di Kelas'
+              : 'Belum Ada Sesi Praktikum'
+          }
           message={
-            activeFilter === 'ALL'
-              ? 'Saat ini belum ada jadwal sesi praktikum yang terdaftar.'
+            enrolledClassesNormalized.length === 0
+              ? 'Akun Anda belum terdaftar di kelas praktikum manapun. Silakan hubungi asisten pengampu kelas terkait.'
+              : activeFilter === 'ALL'
+              ? `Saat ini belum ada jadwal praktikum yang dibuat asisten untuk kelas Anda (${enrolledClassesNormalized.join(', ')}).`
               : 'Tidak ada sesi praktikum dengan status ini.'
           }
           gestureName={resolveEmptyGesture(activeFilter)}

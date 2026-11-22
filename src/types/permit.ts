@@ -15,6 +15,14 @@ export interface AIClassificationResult {
   rawResponse?: string;
 }
 
+export interface PermitAttachment {
+  name: string;
+  size: number; // in bytes
+  mimeType: string;
+  uri: string;
+  base64?: string;
+}
+
 export interface PermitRequest {
   id: string;
   sessionId: string;
@@ -29,4 +37,5 @@ export interface PermitRequest {
   decisionNote?: string; // Catatan manual asisten
   reviewedBy?: string; // Nama / ID asisten
   reviewedAt?: string;
+  attachment?: PermitAttachment;
 }
