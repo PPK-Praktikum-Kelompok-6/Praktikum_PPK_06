@@ -37,84 +37,142 @@ export const DEFAULT_CLASSES: PracticalClass[] = [
   {
     id: 'class-a1',
     classCode: 'A1',
-    courseName: 'Praktikum A1',
+    courseName: 'Basis Data Lanjut',
     room: 'Lab Basis Data',
-    assistantId: 'ast-2',
-    assistantName: 'Crystiano Bayu Satya Alves',
-    studentIds: ['std-1', 'std-2', 'std-5'],
-    isOpen: true,
-  },
-  {
-    id: 'class-a2',
-    classCode: 'A2',
-    courseName: 'Praktikum A2',
-    room: 'Lab Basis Data',
-    assistantId: '',
-    assistantName: 'Belum Ditugaskan',
-    studentIds: [],
-    isOpen: true,
-  },
-  {
-    id: 'class-b1',
-    classCode: 'B1',
-    courseName: 'Praktikum B1',
-    room: 'Lab Komputer 1',
-    assistantId: '',
-    assistantName: 'Belum Ditugaskan',
-    studentIds: [],
+    assistantId: 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2',
+    assistantName: 'Crystiano Bayu Satya Alves, Herman',
+    assistantIds: ['EW1rsd5cTZR6iW0xDQdchJ4CYdd2', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
+    assistantNames: ['Crystiano Bayu Satya Alves', 'Herman'],
+    studentJoinCode: 'BDL-A1-101',
+    assistantInviteCode: 'ASP-BDL-A1-201',
+    studentIds: [
+      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
+      'JptPsdlcQPeUg9tVahmaaJGFcR23',
+      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    ],
     isOpen: true,
   },
   {
     id: 'class-b2',
     classCode: 'B2',
-    courseName: 'Praktikum B2',
+    courseName: 'Struktur Data & Algoritma',
     room: 'Lab Komputer 1',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-3', 'std-4'],
+    assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
+    assistantName: 'Muhammad Zaidan Alfarizi, Herman',
+    assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
+    assistantNames: ['Muhammad Zaidan Alfarizi', 'Herman'],
+    studentJoinCode: 'SDA-B2-102',
+    assistantInviteCode: 'ASP-SDA-B2-202',
+    studentIds: [
+      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
+      'MMu4kWP6WKaAhKvSDDiCJ5Jjhxw1',
+      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    ],
     isOpen: true,
   },
   {
     id: 'class-c1',
     classCode: 'C1',
-    courseName: 'Praktikum C1',
+    courseName: 'Pemrograman Perangkat Keras',
     room: 'Lab Komputer 2',
-    assistantId: 'ast-1',
-    assistantName: 'Muhammad Zaidan Alfarizi',
-    studentIds: ['std-1', 'std-2', 'std-3', 'std-4', 'std-5'],
-    isOpen: true,
-  },
-  {
-    id: 'class-c2',
-    classCode: 'C2',
-    courseName: 'Praktikum C2',
-    room: 'Lab Komputer 2',
-    assistantId: '',
-    assistantName: 'Belum Ditugaskan',
-    studentIds: [],
-    isOpen: true,
-  },
-  {
-    id: 'class-d1',
-    classCode: 'D1',
-    courseName: 'Praktikum D1',
-    room: 'Lab Jaringan',
-    assistantId: '',
-    assistantName: 'Belum Ditugaskan',
-    studentIds: [],
-    isOpen: true,
-  },
-  {
-    id: 'class-d2',
-    classCode: 'D2',
-    courseName: 'Praktikum D2',
-    room: 'Lab Jaringan',
-    assistantId: '',
-    assistantName: 'Belum Ditugaskan',
-    studentIds: [],
+    assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
+    assistantName: 'Muhammad Zaidan Alfarizi, Crystiano Bayu Satya Alves',
+    assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2'],
+    assistantNames: ['Muhammad Zaidan Alfarizi', 'Crystiano Bayu Satya Alves'],
+    studentJoinCode: 'PPK-C1-103',
+    assistantInviteCode: 'ASP-PPK-C1-203',
+    studentIds: [
+      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
+      'JptPsdlcQPeUg9tVahmaaJGFcR23',
+      'MMu4kWP6WKaAhKvSDDiCJ5Jjhxw1',
+      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    ],
     isOpen: true,
   },
 ];
+
+const STOPWORDS = new Set(['DAN', 'ATAU', 'DENGAN', 'UNTUK', 'PADA', 'DI', 'KE', 'DARI', 'OF', 'AND']);
+
+/**
+ * Menghasilkan singkatan nama mata kuliah (contoh: "Pemrograman Perangkat Keras" -> "PPK",
+ * "Basis Data Lanjut" -> "BDL", "Struktur Data & Algoritma" -> "SDA", "Jaringan Komputer" -> "JK").
+ */
+export function generateCoursePrefix(courseName: string): string {
+  const words = courseName
+    .trim()
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.toUpperCase())
+    .filter((w) => w.length > 0 && !STOPWORDS.has(w));
+
+  if (words.length >= 2) {
+    return words
+      .slice(0, 4)
+      .map((w) => w[0])
+      .join('');
+  }
+  if (words.length === 1) {
+    return words[0].slice(0, 3).toUpperCase();
+  }
+  return 'PPK';
+}
+
+function randomDigits(len: number = 3): string {
+  const min = Math.pow(10, len - 1);
+  const max = Math.pow(10, len) - 1;
+  return String(Math.floor(min + Math.random() * (max - min + 1)));
+}
+
+/**
+ * Memastikan setiap objek PracticalClass memiliki field assistantIds, assistantNames,
+ * studentJoinCode, dan assistantInviteCode dengan format: [SINGKATAN]-[KELAS]-[NOMOR_RANDOM].
+ */
+export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
+  const assistantIds =
+    cls.assistantIds && cls.assistantIds.length > 0
+      ? cls.assistantIds
+      : cls.assistantId
+      ? [cls.assistantId]
+      : [];
+  const assistantNames =
+    cls.assistantNames && cls.assistantNames.length > 0
+      ? cls.assistantNames
+      : cls.assistantName && cls.assistantName !== 'Belum Ditugaskan'
+      ? cls.assistantName.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+
+  const prefix = generateCoursePrefix(cls.courseName || 'Praktikum');
+  const codeClean = (cls.classCode || 'A1').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Deterministic 3-digit number fallback jika dokumen belum punya kode
+  let hashNum = 100;
+  const seedStr = `${cls.id || ''}-${prefix}-${codeClean}`;
+  for (let i = 0; i < seedStr.length; i++) {
+    hashNum = (hashNum * 31 + seedStr.charCodeAt(i)) % 900;
+  }
+  const deterministic3Digit = String(100 + Math.abs(hashNum));
+  const deterministicAst3Digit = String(100 + ((Math.abs(hashNum) + 137) % 900));
+
+  const studentJoinCode = (
+    cls.studentJoinCode || `${prefix}-${codeClean}-${deterministic3Digit}`
+  ).toUpperCase();
+  const assistantInviteCode = (
+    cls.assistantInviteCode || `ASP-${prefix}-${codeClean}-${deterministicAst3Digit}`
+  ).toUpperCase();
+
+  return {
+    ...cls,
+    assistantId: assistantIds[0] || '',
+    assistantName:
+      assistantNames.length > 0 ? assistantNames.join(', ') : 'Belum Ditugaskan',
+    assistantIds,
+    assistantNames,
+    studentJoinCode,
+    assistantInviteCode,
+    studentIds: cls.studentIds || [],
+    isOpen: cls.isOpen !== false,
+  };
+}
 
 export type SessionListener = () => void;
 
@@ -694,4 +752,378 @@ export async function getStudentsByClass(
   return MOCK_USERS.filter(
     (u) => u.role === 'STUDENT' && targetClass.studentIds.includes(u.id)
   );
+}
+
+// ==========================================
+// 13. SISTEM KELAS ALA GOOGLE CLASSROOM (BUAT KELAS, KODE UNDANGAN & KELUAR KELAS)
+// ==========================================
+
+export function getLocalClassesStore(): PracticalClass[] {
+  return localClassesStore.map(normalizePracticalClass);
+}
+
+/**
+ * Asisten membuat Kelas Praktikum baru dan otomatis men-generate:
+ * 1. `studentJoinCode` (Kode Kelas Praktikan)
+ * 2. `assistantInviteCode` (Kode Spesial Undangan Rekan Asprak)
+ */
+export async function createClassroomByAssistant(input: {
+  courseName: string;
+  classCode: string;
+  room: string;
+  assistantId: string;
+  assistantName: string;
+}): Promise<PracticalClass> {
+  const trimmedCourse = input.courseName.trim();
+  const trimmedCode = input.classCode.trim().toUpperCase();
+  const trimmedRoom = input.room.trim();
+
+  if (!trimmedCourse) {
+    throw new Error('Nama mata kuliah praktikum wajib diisi.');
+  }
+  if (!trimmedCode) {
+    throw new Error('Kode kelas (misal A1, B2) wajib diisi.');
+  }
+  if (!trimmedRoom) {
+    throw new Error('Ruangan praktikum wajib diisi.');
+  }
+
+  const prefix = generateCoursePrefix(trimmedCourse);
+  const codeClean = trimmedCode.replace(/[^A-Z0-9]/g, '');
+  const studentJoinCode = `${prefix}-${codeClean}-${randomDigits(3)}`;
+  const assistantInviteCode = `ASP-${prefix}-${codeClean}-${randomDigits(3)}`;
+
+  const payload: Omit<PracticalClass, 'id'> = {
+    courseName: trimmedCourse,
+    classCode: trimmedCode,
+    room: trimmedRoom,
+    assistantId: input.assistantId,
+    assistantName: input.assistantName,
+    assistantIds: [input.assistantId],
+    assistantNames: [input.assistantName],
+    studentJoinCode,
+    assistantInviteCode,
+    studentIds: [],
+    isOpen: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (isFirebaseConfigured) {
+    try {
+      const docRef = await addDoc(
+        collection(db, 'classes'),
+        sanitizeForFirestore(payload)
+      );
+      const created: PracticalClass = { ...payload, id: docRef.id };
+      localClassesStore = [created, ...localClassesStore];
+      notifySessionListeners();
+      return created;
+    } catch (err) {
+      console.warn('Fallback local createClassroomByAssistant:', err);
+    }
+  }
+
+  const newId = `class-${Date.now()}`;
+  const created: PracticalClass = { ...payload, id: newId };
+  localClassesStore = [created, ...localClassesStore];
+  notifySessionListeners();
+  return created;
+}
+
+/**
+ * Mencari kelas berdasarkan kode undangan (`studentJoinCode` untuk STUDENT, `assistantInviteCode` untuk ASSISTANT)
+ * untuk menampilkan modal pratinjau konfirmasi sebelum benar-benar bergabung.
+ */
+export async function lookupClassByInviteCode(
+  rawCode: string,
+  targetRole: 'STUDENT' | 'ASSISTANT'
+): Promise<PracticalClass> {
+  const cleaned = rawCode.trim().toUpperCase();
+  if (!cleaned) {
+    throw new Error('Silakan masukkan kode kelas terlebih dahulu.');
+  }
+
+  let candidateList: PracticalClass[] = localClassesStore.map(normalizePracticalClass);
+
+  if (isFirebaseConfigured) {
+    try {
+      const snap = await getDocs(collection(db, 'classes'));
+      const remoteList = snap.docs.map((d) =>
+        normalizePracticalClass({
+          id: d.id,
+          ...(d.data() as Omit<PracticalClass, 'id'>),
+        })
+      );
+      const mergedMap = new Map<string, PracticalClass>();
+      candidateList.forEach((c) => mergedMap.set(c.id, c));
+      remoteList.forEach((c) => mergedMap.set(c.id, c));
+      candidateList = Array.from(mergedMap.values());
+    } catch {
+      // Fallback to local
+    }
+  }
+
+  if (targetRole === 'ASSISTANT') {
+    const matched = candidateList.find(
+      (c) => (c.assistantInviteCode || '').toUpperCase() === cleaned
+    );
+    if (!matched) {
+      // Cek apakah asprak salah memasukkan kode praktikan
+      const wrongStudentCode = candidateList.find(
+        (c) => (c.studentJoinCode || '').toUpperCase() === cleaned
+      );
+      if (wrongStudentCode) {
+        throw new Error(
+          'Kode yang Anda masukkan adalah Kode Praktikan. Gunakan Kode Spesial Asprak (diawali ASP-) dari rekan asprak kelas tersebut.'
+        );
+      }
+      throw new Error(
+        'Kode Spesial Asprak tidak ditemukan. Pastikan kode undangan dari rekan asprak sudah benar.'
+      );
+    }
+    return matched;
+  } else {
+    const matched = candidateList.find(
+      (c) => (c.studentJoinCode || '').toUpperCase() === cleaned
+    );
+    if (!matched) {
+      const wrongAstCode = candidateList.find(
+        (c) => (c.assistantInviteCode || '').toUpperCase() === cleaned
+      );
+      if (wrongAstCode) {
+        throw new Error(
+          'Kode tersebut adalah Kode Spesial Asisten. Praktikan hanya dapat bergabung menggunakan Kode Kelas Praktikan.'
+        );
+      }
+      throw new Error(
+        'Kode Kelas Praktikan tidak ditemukan. Periksa kembali kode yang diberikan oleh asisten praktikum Anda.'
+      );
+    }
+    if (matched.isOpen === false) {
+      throw new Error(
+        `Kelas ${matched.courseName} (${matched.classCode}) saat ini sedang ditutup untuk pendaftaran baru.`
+      );
+    }
+    return matched;
+  }
+}
+
+/**
+ * Asisten bergabung ke kelas yang dibuat rekan asprak lain menggunakan konfirmasi setelah lookup.
+ */
+export async function confirmJoinClassAsAssistant(
+  targetClass: PracticalClass,
+  assistantId: string,
+  assistantName: string
+): Promise<PracticalClass> {
+  const norm = normalizePracticalClass(targetClass);
+  const existingIds = norm.assistantIds || [];
+  const existingNames = norm.assistantNames || [];
+
+  if (
+    existingIds.includes(assistantId) ||
+    existingNames.some((n) => n.toLowerCase() === assistantName.toLowerCase())
+  ) {
+    throw new Error(
+      `Anda sudah terdaftar sebagai asisten di kelas ${norm.courseName} (${norm.classCode}).`
+    );
+  }
+
+  const nextIds = [...existingIds, assistantId];
+  const nextNames = [...existingNames, assistantName];
+  const updates: Partial<PracticalClass> = {
+    assistantId: nextIds[0] || assistantId,
+    assistantName: nextNames.join(', '),
+    assistantIds: nextIds,
+    assistantNames: nextNames,
+  };
+
+  if (isFirebaseConfigured) {
+    try {
+      await updateDoc(
+        doc(db, 'classes', norm.id),
+        sanitizeForFirestore(updates)
+      );
+    } catch {
+      // Fallback
+    }
+  }
+
+  const existsLocally = localClassesStore.some((c) => c.id === norm.id);
+  if (existsLocally) {
+    localClassesStore = localClassesStore.map((c) =>
+      c.id === norm.id ? normalizePracticalClass({ ...c, ...updates }) : c
+    );
+  } else {
+    localClassesStore = [
+      normalizePracticalClass({ ...norm, ...updates }),
+      ...localClassesStore,
+    ];
+  }
+
+  // Update juga assistantName pada semua sesi yang berada di kelas ini
+  const combinedAssistantName = nextNames.join(', ');
+  localSessionsStore = localSessionsStore.map((s) =>
+    s.classId === norm.id ||
+    (s.classCode.toUpperCase() === norm.classCode.toUpperCase() &&
+      (!norm.courseName ||
+        s.courseName.toLowerCase() === norm.courseName.toLowerCase()))
+      ? { ...s, assistantName: combinedAssistantName }
+      : s
+  );
+
+  if (isFirebaseConfigured) {
+    try {
+      const sessSnap = await getDocs(
+        query(collection(db, 'sessions'), where('classCode', '==', norm.classCode))
+      );
+      for (const sDoc of sessSnap.docs) {
+        const sData = sDoc.data();
+        if (
+          sData.classId === norm.id ||
+          !norm.courseName ||
+          (sData.courseName || '').toLowerCase() === norm.courseName.toLowerCase()
+        ) {
+          await updateDoc(doc(db, 'sessions', sDoc.id), {
+            assistantName: combinedAssistantName,
+          });
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  notifySessionListeners();
+  return normalizePracticalClass({ ...norm, ...updates });
+}
+
+/**
+ *Asisten keluar dari kelas praktikum (misal saat semester telah berakhir atau pindah kelas).
+ */
+export async function leaveClassAsAssistant(
+  classId: string,
+  assistantId: string,
+  assistantName: string
+): Promise<void> {
+  let target = localClassesStore.find((c) => c.id === classId);
+  if (isFirebaseConfigured) {
+    try {
+      const snap = await getDoc(doc(db, 'classes', classId));
+      if (snap.exists()) {
+        target = {
+          id: snap.id,
+          ...(snap.data() as Omit<PracticalClass, 'id'>),
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  if (!target) {
+    throw new Error('Data kelas tidak ditemukan.');
+  }
+
+  const norm = normalizePracticalClass(target);
+  const nextIds = (norm.assistantIds || []).filter((id) => id !== assistantId);
+  const firstName = assistantName.toLowerCase().split(' ')[0];
+  const nextNames = (norm.assistantNames || []).filter(
+    (name) =>
+      name.toLowerCase() !== assistantName.toLowerCase() &&
+      !name.toLowerCase().includes(firstName)
+  );
+
+  const updates: Partial<PracticalClass> = {
+    assistantId: nextIds[0] || '',
+    assistantName:
+      nextNames.length > 0 ? nextNames.join(', ') : 'Belum Ditugaskan',
+    assistantIds: nextIds,
+    assistantNames: nextNames,
+  };
+
+  if (isFirebaseConfigured) {
+    try {
+      await updateDoc(doc(db, 'classes', classId), sanitizeForFirestore(updates));
+    } catch {
+      // Fallback
+    }
+  }
+
+  localClassesStore = localClassesStore.map((c) =>
+    c.id === classId ? normalizePracticalClass({ ...c, ...updates }) : c
+  );
+  notifySessionListeners();
+}
+
+/**
+ * Praktikan bergabung ke kelas setelah melihat konfirmasi Nama Kelas + Nama Asprak.
+ */
+export async function confirmJoinClassAsStudent(
+  targetClass: PracticalClass,
+  studentId: string
+): Promise<PracticalClass> {
+  const norm = normalizePracticalClass(targetClass);
+  const existingStudents = norm.studentIds || [];
+
+  if (existingStudents.includes(studentId)) {
+    throw new Error(
+      `Anda sudah tergabung di kelas ${norm.courseName} (${norm.classCode}).`
+    );
+  }
+
+  const nextStudents = [...existingStudents, studentId];
+
+  if (isFirebaseConfigured) {
+    try {
+      await updateDoc(doc(db, 'classes', norm.id), {
+        studentIds: arrayUnion(studentId),
+      });
+      await updateDoc(doc(db, 'users', studentId), {
+        enrolledClasses: arrayUnion(norm.classCode.toUpperCase()),
+      });
+    } catch {
+      // Fallback
+    }
+  }
+
+  const existsLocally = localClassesStore.some((c) => c.id === norm.id);
+  if (existsLocally) {
+    localClassesStore = localClassesStore.map((c) =>
+      c.id === norm.id ? { ...c, studentIds: nextStudents } : c
+    );
+  } else {
+    localClassesStore = [
+      { ...norm, studentIds: nextStudents },
+      ...localClassesStore,
+    ];
+  }
+  notifySessionListeners();
+  return { ...norm, studentIds: nextStudents };
+}
+
+/**
+ * Praktikan keluar dari kelas praktikum (misal jika jadwal mata kuliah berganti/tabrakan atau semester selesai).
+ */
+export async function leaveClassAsStudent(
+  targetClass: PracticalClass,
+  studentId: string
+): Promise<void> {
+  const norm = normalizePracticalClass(targetClass);
+  const nextStudents = (norm.studentIds || []).filter((id) => id !== studentId);
+
+  if (isFirebaseConfigured) {
+    try {
+      await updateDoc(doc(db, 'classes', norm.id), {
+        studentIds: arrayRemove(studentId),
+      });
+    } catch {
+      // Fallback
+    }
+  }
+
+  localClassesStore = localClassesStore.map((c) =>
+    c.id === norm.id ? { ...c, studentIds: nextStudents } : c
+  );
+  notifySessionListeners();
 }

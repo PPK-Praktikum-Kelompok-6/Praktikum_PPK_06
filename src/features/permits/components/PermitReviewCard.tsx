@@ -74,6 +74,7 @@ export function PermitReviewCard({
           </AppText>
           <AppText variant="caption" color={Colors.textSecondary}>
             NIM: {permit.studentNim} • {permit.courseName}
+            {permit.classCode ? ` (Kelas ${permit.classCode})` : ''}
           </AppText>
           <AppText variant="caption" color={Colors.textMuted}>
             Waktu Pengajuan: {formatTime(permit.submittedAt)}

@@ -19,6 +19,8 @@ export interface PermitFormProps {
   sessions: PracticalSession[];
   onSubmit: (data: {
     sessionId: string;
+    classId?: string;
+    classCode?: string;
     courseName: string;
     reason: string;
     attachment?: PermitAttachment;
@@ -99,6 +101,8 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
     try {
       await onSubmit({
         sessionId: selectedSessionId,
+        classId: selectedSession?.classId,
+        classCode: selectedSession?.classCode,
         courseName: selectedSession?.courseName || 'Praktikum',
         reason: trimmed,
         attachment: attachment ?? undefined,

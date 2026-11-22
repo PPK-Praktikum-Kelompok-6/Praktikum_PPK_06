@@ -1,9 +1,7 @@
 import { Href, router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -17,16 +15,8 @@ import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { subscribeAllClasses } from '@/services/admin';
-import {
-  AuthUser,
-  getDemoAccounts,
-  signInUser,
-  signUpUser,
-  subscribeAllUsers,
-} from '@/services/auth';
+import { signInUser, signUpUser } from '@/services/auth';
 import { isFirebaseConfigured } from '@/services/firebase';
-import { DEFAULT_CLASSES, PracticalClass } from '@/services/sessions';
 import { useCurrentUser } from '@/store/hooks';
 import { UserRole } from '@/types/attendance';
 
@@ -40,23 +30,10 @@ export default function AuthAndRoleRoute() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // State khusus Registrasi (SRS-AUTH-01 & Requirement 1)
+  // State khusus Registrasi (SRS-AUTH-01)
   const [fullName, setFullName] = useState('');
   const [registerRole, setRegisterRole] = useState<UserRole>('STUDENT');
   const [identifier, setIdentifier] = useState('');
-  const [selectedClass, setSelectedClass] = useState('A1');
-  const [availableClasses, setAvailableClasses] =
-    useState<PracticalClass[]>(DEFAULT_CLASSES);
-
-  // State Database Akun Sistem Live Realtime (Requirement 4)
-  const [allSystemUsers, setAllSystemUsers] = useState<AuthUser[]>(() =>
-    getDemoAccounts()
-  );
-  const [systemDbModalVisible, setSystemDbModalVisible] = useState(false);
-  const [systemDbSearch, setSystemDbSearch] = useState('');
-  const [systemDbRoleFilter, setSystemDbRoleFilter] = useState<
-    'ALL' | UserRole
-  >('ALL');
 
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -70,20 +47,6 @@ export default function AuthAndRoleRoute() {
     title: '',
     message: '',
   });
-
-  // Sinkronisasi realtime ke kelas dan pengguna database
-  useEffect(() => {
-    const unsubClasses = subscribeAllClasses((classes) => {
-      setAvailableClasses(classes);
-    });
-    const unsubUsers = subscribeAllUsers((users) => {
-      setAllSystemUsers(users);
-    });
-    return () => {
-      unsubClasses();
-      unsubUsers();
-    };
-  }, []);
 
   /**
    * Auto-routing RBAC berdasarkan peran pengguna (SRS-AUTH-02 & SRS-AUTH-ADMIN).
@@ -141,7 +104,7 @@ export default function AuthAndRoleRoute() {
         name: fullName,
         role: registerRole,
         identifier: registerRole === 'ASSISTANT' ? '' : identifier,
-        requestedClass: registerRole === 'STUDENT' ? selectedClass : undefined,
+        enrolledClasses: [],
       });
 
       if (createdUser.approvalStatus === 'PENDING_ADMIN') {
@@ -151,14 +114,6 @@ export default function AuthAndRoleRoute() {
           title: 'Pendaftaran Berhasil!',
           message:
             'Akun Asisten Anda berhasil diajukan dan sedang menunggu persetujuan dari Admin Lab.',
-        });
-        setMode('LOGIN');
-      } else if (createdUser.approvalStatus === 'PENDING_ASSISTANT') {
-        setFeedback({
-          visible: true,
-          type: 'success',
-          title: 'Pendaftaran Berhasil!',
-          message: `Akun Praktikan Anda berhasil diajukan dan sedang menunggu persetujuan dari Asisten Pengampu Kelas ${selectedClass}.`,
         });
         setMode('LOGIN');
       } else {
@@ -179,23 +134,6 @@ export default function AuthAndRoleRoute() {
       setSubmitting(false);
     }
   };
-
-  const filteredSystemUsers = allSystemUsers.filter((u) => {
-    if (systemDbRoleFilter !== 'ALL' && u.role !== systemDbRoleFilter) {
-      return false;
-    }
-    if (systemDbSearch.trim()) {
-      const q = systemDbSearch.toLowerCase().trim();
-      const matchName = u.name.toLowerCase().includes(q);
-      const matchEmail = u.email.toLowerCase().includes(q);
-      const matchId = (u.identifier || '').toLowerCase().includes(q);
-      const matchCls = (u.enrolledClasses || [])
-        .concat(u.requestedClass ? [u.requestedClass] : [])
-        .some((c) => c.toLowerCase().includes(q));
-      return matchName || matchEmail || matchId || matchCls;
-    }
-    return true;
-  });
 
   return (
     <Screen style={styles.container}>
@@ -353,99 +291,29 @@ export default function AuthAndRoleRoute() {
               </View>
             </View>
 
-            {/* Input NIM Praktikan atau Pemberitahuan Kode Asisten Otomatis */}
+            {/* Input NIM Praktikan */}
             {registerRole === 'STUDENT' ? (
-              <>
-                <View style={styles.fieldGroup}>
-                  <AppText variant="label" style={styles.fieldLabel}>
-                    NIM PRAKTIKAN
-                  </AppText>
-                  <View style={styles.inputBox}>
-                    <Icon
-                      name="card-outline"
-                      size={18}
-                      color={Colors.textMuted}
-                    />
-                    <TextInput
-                      value={identifier}
-                      onChangeText={setIdentifier}
-                      placeholder="Contoh: 24060124140130"
-                      placeholderTextColor={Colors.textLight}
-                      style={styles.textInput}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-
-                {/* Pemilihan Kelas Praktikan (Requirement 1: Tanpa mata kuliah, diatur ketersediaan admin) */}
-                <View style={styles.fieldGroup}>
-                  <View style={styles.fieldLabelRow}>
-                    <AppText variant="label" style={styles.fieldLabel}>
-                      PILIH KELAS PRAKTIKUM
-                    </AppText>
-                    <AppText variant="caption" color={Colors.textMuted}>
-                      {availableClasses.filter((c) => c.isOpen !== false).length} Kelas Tersedia
-                    </AppText>
-                  </View>
-                  <View style={styles.classChipsGrid}>
-                    {availableClasses.map((cls) => {
-                      const isSel = selectedClass.toUpperCase() === cls.classCode.toUpperCase();
-                      const isClosed = cls.isOpen === false;
-                      return (
-                        <Pressable
-                          key={cls.classCode}
-                          disabled={isClosed}
-                          style={[
-                            styles.classChip,
-                            isSel && styles.classChipActive,
-                            isClosed && styles.classChipDisabled,
-                          ]}
-                          onPress={() => setSelectedClass(cls.classCode)}
-                        >
-                          <AppText
-                            variant="caption"
-                            weight={isSel ? 'bold' : 'regular'}
-                            color={
-                              isClosed
-                                ? Colors.textLight
-                                : isSel
-                                ? Colors.textWhite
-                                : Colors.textSecondary
-                            }
-                          >
-                            Kelas {cls.classCode}
-                          </AppText>
-                          {isClosed ? (
-                            <AppText variant="caption" color={Colors.danger} style={styles.closedTag}>
-                              (Tutup)
-                            </AppText>
-                          ) : null}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <AppText variant="caption" color={Colors.textMuted} style={styles.classHint}>
-                    ⚠️ Pendaftaran praktikan memerlukan persetujuan asisten kelas terkait. Ketersediaan kelas diatur oleh Admin.
-                  </AppText>
-                </View>
-              </>
-            ) : (
-              <View style={styles.autoAstCard}>
-                <Icon
-                  name="shield-checkmark"
-                  size={18}
-                  color={Colors.primary}
-                />
-                <View style={styles.autoAstTextCol}>
-                  <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
-                    Pendaftaran Asisten Lab
-                  </AppText>
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    Kode asisten akan diberikan otomatis dan memerlukan persetujuan Administrator Lab.
-                  </AppText>
+              <View style={styles.fieldGroup}>
+                <AppText variant="label" style={styles.fieldLabel}>
+                  NIM PRAKTIKAN
+                </AppText>
+                <View style={styles.inputBox}>
+                  <Icon
+                    name="card-outline"
+                    size={18}
+                    color={Colors.textMuted}
+                  />
+                  <TextInput
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    placeholder="Contoh: 24060124140130"
+                    placeholderTextColor={Colors.textLight}
+                    style={styles.textInput}
+                    keyboardType="numeric"
+                  />
                 </View>
               </View>
-            )}
+            ) : null}
           </>
         ) : null}
 
@@ -519,233 +387,6 @@ export default function AuthAndRoleRoute() {
         />
       </Card>
 
-      {/* Tombol Database Akun Sistem di Pojok Kiri Bawah (Requirement 4) */}
-      <View style={styles.bottomBarRow}>
-        <Pressable
-          style={styles.systemDbBtn}
-          onPress={() => setSystemDbModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Buka Database Akun Sistem"
-        >
-          <View style={styles.livePulseDot} />
-          <Icon name="server-outline" size={15} color={Colors.primary} />
-          <AppText variant="caption" weight="bold" color={Colors.primary}>
-            Database Akun ({allSystemUsers.length})
-          </AppText>
-        </Pressable>
-      </View>
-
-      {/* Modal Database Akun Sistem Realtime (Requirement 4) */}
-      <Modal
-        visible={systemDbModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSystemDbModalVisible(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setSystemDbModalVisible(false)}
-        />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeaderRow}>
-            <View style={styles.modalTitleCol}>
-              <View style={styles.liveSyncBadge}>
-                <View style={styles.livePulseDotGreen} />
-                <AppText variant="caption" weight="bold" color={Colors.success}>
-                  DATABASE AKTIF • REALTIME SYNC
-                </AppText>
-              </View>
-              <AppText variant="title" weight="bold">
-                Database Akun Sistem
-              </AppText>
-              <AppText variant="caption" color={Colors.textMuted}>
-                {allSystemUsers.length} Akun Terdaftar di Cloud Firestore
-              </AppText>
-            </View>
-
-            <Pressable
-              onPress={() => setSystemDbModalVisible(false)}
-              style={styles.modalCloseBtn}
-            >
-              <Icon name="close" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-
-          {/* Search Box */}
-          <View style={styles.searchBox}>
-            <Icon name="search-outline" size={16} color={Colors.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Cari nama, email, NIM, atau kode..."
-              placeholderTextColor={Colors.textLight}
-              value={systemDbSearch}
-              onChangeText={setSystemDbSearch}
-            />
-            {systemDbSearch ? (
-              <Pressable onPress={() => setSystemDbSearch('')}>
-                <Icon name="close-circle" size={16} color={Colors.textMuted} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          {/* Role Filter Tabs */}
-          <View style={styles.roleFilterRow}>
-            {(
-              [
-                { key: 'ALL', label: 'Semua' },
-                { key: 'ADMIN', label: 'Admin' },
-                { key: 'ASSISTANT', label: 'Asisten' },
-                { key: 'STUDENT', label: 'Praktikan' },
-              ] as const
-            ).map((rf) => {
-              const isRfActive = systemDbRoleFilter === rf.key;
-              return (
-                <Pressable
-                  key={rf.key}
-                  style={[
-                    styles.roleFilterChip,
-                    isRfActive && styles.roleFilterChipActive,
-                  ]}
-                  onPress={() => setSystemDbRoleFilter(rf.key)}
-                >
-                  <AppText
-                    variant="caption"
-                    weight={isRfActive ? 'bold' : 'regular'}
-                    color={isRfActive ? Colors.textWhite : Colors.textSecondary}
-                  >
-                    {rf.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* User List */}
-          <ScrollView
-            style={styles.userListScroll}
-            contentContainerStyle={styles.userListContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            {filteredSystemUsers.length === 0 ? (
-              <View style={styles.emptySearchWrap}>
-                <AppText variant="bodySm" color={Colors.textMuted} align="center">
-                  Tidak ada akun yang sesuai dengan pencarian.
-                </AppText>
-              </View>
-            ) : (
-              filteredSystemUsers.map((user) => {
-                const isAdmin = user.role === 'ADMIN';
-                const isAst = user.role === 'ASSISTANT';
-                const isApproved =
-                  user.approvalStatus === 'APPROVED' || !user.approvalStatus;
-                const isPendingAdmin = user.approvalStatus === 'PENDING_ADMIN';
-                const isPendingAst =
-                  user.approvalStatus === 'PENDING_ASSISTANT';
-                const isRejected = user.approvalStatus === 'REJECTED';
-
-                return (
-                  <View key={user.uid} style={styles.userCard}>
-                    <View style={styles.userCardTop}>
-                      <View style={styles.userCardAvatar}>
-                        <Icon
-                          name={
-                            isAdmin
-                              ? 'shield-checkmark'
-                              : isAst
-                              ? 'school'
-                              : 'person'
-                          }
-                          size={18}
-                          color={Colors.primary}
-                        />
-                      </View>
-                      <View style={styles.userCardDetails}>
-                        <View style={styles.userCardNameRow}>
-                          <AppText variant="bodySm" weight="bold" numberOfLines={1}>
-                            {user.name}
-                          </AppText>
-                          <Badge
-                            label={
-                              isAdmin ? 'Admin' : isAst ? 'Asisten' : 'Praktikan'
-                            }
-                            variant={
-                              isAdmin
-                                ? 'closed'
-                                : isAst
-                                ? 'primary'
-                                : 'attended'
-                            }
-                            size="sm"
-                          />
-                        </View>
-                        <AppText variant="caption" color={Colors.textMuted}>
-                          {user.email}
-                        </AppText>
-                        <View style={styles.userCardSubRow}>
-                          <AppText
-                            variant="caption"
-                            weight="semibold"
-                            color={Colors.textSecondary}
-                          >
-                            {isAdmin ? 'Kode: ' : isAst ? 'Kode: ' : 'NIM: '}
-                            {user.identifier || '-'}
-                          </AppText>
-                          {user.enrolledClasses && user.enrolledClasses.length > 0 ? (
-                            <AppText variant="caption" color={Colors.primary}>
-                              • Kelas: {user.enrolledClasses.join(', ')}
-                            </AppText>
-                          ) : user.requestedClass ? (
-                            <AppText variant="caption" color={Colors.warning}>
-                              • Kelas: {user.requestedClass}
-                            </AppText>
-                          ) : null}
-                        </View>
-                      </View>
-                    </View>
-
-                    <View style={styles.userCardBottom}>
-                      <Badge
-                        label={
-                          isApproved
-                            ? 'Disetujui'
-                            : isPendingAdmin
-                            ? 'Menunggu Admin'
-                            : isPendingAst
-                            ? 'Menunggu Asisten'
-                            : 'Ditolak'
-                        }
-                        variant={
-                          isApproved
-                            ? 'open'
-                            : isRejected
-                            ? 'danger'
-                            : 'waiting'
-                        }
-                        size="sm"
-                        showDot={!isRejected}
-                      />
-
-                      <CustomButton
-                        title="Gunakan Akun"
-                        size="sm"
-                        variant="outline"
-                        fullWidth={false}
-                        onPress={() => {
-                          setEmail(user.email);
-                          setPassword('password123');
-                          setMode('LOGIN');
-                          setSystemDbModalVisible(false);
-                        }}
-                      />
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-
       {/* Feedback Modal (FR-07 / SRS-UI-01) */}
       <FeedbackModal
         visible={feedback.visible}
@@ -785,7 +426,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   authCard: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   modeTabRow: {
     flexDirection: 'row',
@@ -846,222 +487,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.md,
     color: Colors.text,
     paddingVertical: Spacing.xs,
-  },
-  autoAstCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    backgroundColor: Colors.primaryBg,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: Spacing.md,
-  },
-  autoAstTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  classChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginTop: 2,
-  },
-  classChipsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginTop: 2,
-  },
-  fieldLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  classChip: {
-    paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: Spacing.xs + 2,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surfaceSecondary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  classChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  classChipDisabled: {
-    opacity: 0.5,
-    backgroundColor: Colors.surfaceMuted,
-  },
-  closedTag: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  classHint: {
-    marginTop: Spacing.xs,
-  },
-  bottomBarRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-    paddingHorizontal: 2,
-  },
-  systemDbBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.primaryBg,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-  },
-  livePulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.primary,
-  },
-  livePulseDotGreen: {
-    width: 6,
-    height: 6,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.success,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    padding: Spacing.lg,
-    maxHeight: '85%',
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.sm,
-  },
-  modalTitleCol: {
-    flex: 1,
-    gap: 2,
-  },
-  liveSyncBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.successBg,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-  },
-  modalCloseBtn: {
-    padding: Spacing.xs,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.sm + 2,
-    height: 42,
-    gap: Spacing.xs,
-    marginBottom: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: Typography.sm,
-    color: Colors.text,
-    paddingVertical: 4,
-  },
-  roleFilterRow: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-    marginBottom: Spacing.md,
-  },
-  roleFilterChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  roleFilterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  userListScroll: {
-    maxHeight: 420,
-  },
-  userListContainer: {
-    gap: Spacing.sm,
-    paddingBottom: Spacing.lg,
-  },
-  emptySearchWrap: {
-    paddingVertical: Spacing.xl,
-  },
-  userCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.sm + 2,
-    gap: Spacing.xs,
-  },
-  userCardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-  },
-  userCardAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.primaryBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userCardDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  userCardNameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  userCardSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  userCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingTop: Spacing.xs,
-    marginTop: 2,
   },
 });

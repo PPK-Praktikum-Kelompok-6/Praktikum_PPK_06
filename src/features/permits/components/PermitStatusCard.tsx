@@ -44,6 +44,7 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
         <View style={styles.courseWrap}>
           <AppText variant="title" weight="bold" numberOfLines={1}>
             {permit.courseName}
+            {permit.classCode ? ` (${permit.classCode})` : ''}
           </AppText>
           <AppText variant="caption" color={Colors.textSecondary}>
             Diajukan: {formatTime(permit.submittedAt)}

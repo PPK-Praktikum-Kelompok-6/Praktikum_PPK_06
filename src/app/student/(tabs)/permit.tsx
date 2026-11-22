@@ -8,12 +8,14 @@ import { Screen } from '@/components/ui/Screen';
 import { Colors, Spacing } from '@/constants/theme';
 import { PermitForm } from '@/features/permits/components/PermitForm';
 import { PermitStatusCard } from '@/features/permits/components/PermitStatusCard';
+import { subscribeAllClasses } from '@/services/admin';
 import {
+  getStudentPermits,
   getStudentPermitsSync,
   submitPermit,
   subscribeStudentPermits,
 } from '@/services/permits';
-import { subscribeStudentSessions } from '@/services/sessions';
+import { PracticalClass, subscribeStudentSessions } from '@/services/sessions';
 import { useCurrentUser, useSessions } from '@/store/hooks';
 import { PracticalSession } from '@/types/attendance';
 import { PermitAttachment, PermitRequest } from '@/types/permit';
@@ -26,6 +28,7 @@ export default function StudentPermitScreen() {
     getStudentPermitsSync(currentUser.id)
   );
   const [liveSessions, setLiveSessions] = useState<PracticalSession[]>([]);
+  const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -44,12 +47,18 @@ export default function StudentPermitScreen() {
 
   useEffect(() => {
     if (!currentUser.id) return;
-    // Sinkronisasi otomatis data permohonan izin dari Firestore
+
+    // 1. Berlangganan daftar kelas di Firestore untuk mengetahui kelas yang diikuti praktikan
+    const unsubClasses = subscribeAllClasses((clsList) => {
+      setAllClasses(clsList);
+    });
+
+    // 2. Sinkronisasi real-time data permohonan izin dari Firestore
     const unsubPermits = subscribeStudentPermits(currentUser.id, (loaded) => {
       setPermits(loaded);
     });
 
-    // Sinkronisasi daftar sesi yang diikuti mahasiswa secara real-time
+    // 3. Sinkronisasi daftar sesi secara real-time dari Firestore
     const unsubSessions = subscribeStudentSessions(
       currentUser.id,
       currentUser.enrolledClasses || [],
@@ -59,21 +68,54 @@ export default function StudentPermitScreen() {
     );
 
     return () => {
+      unsubClasses();
       unsubPermits();
       unsubSessions();
     };
   }, [currentUser.id, currentUser.enrolledClasses]);
 
+  // Kelas yang diikuti praktikan (baik via Kode Kelas maupun enrolledClasses)
+  const myJoinedClasses = allClasses.filter((cls) => {
+    const inStudentIds = (cls.studentIds || []).includes(currentUser.id);
+    const inEnrolledCodes = (currentUser.enrolledClasses || [])
+      .map((c) => c.toUpperCase())
+      .includes(cls.classCode.toUpperCase());
+    return inStudentIds || inEnrolledCodes;
+  });
+
+  const joinedClassIds = myJoinedClasses.map((c) => c.id);
+  const joinedClassCodes = Array.from(
+    new Set([
+      ...myJoinedClasses.map((c) => c.classCode.toUpperCase()),
+      ...(currentUser.enrolledClasses || []).map((c) => c.toUpperCase()),
+    ])
+  );
+
+  const rawSessions = liveSessions.length > 0 ? liveSessions : sessions;
+  const studentAvailableSessions = rawSessions.filter((s) => {
+    if (myJoinedClasses.length === 0 && joinedClassCodes.length === 0) {
+      return false;
+    }
+    if (s.classId && joinedClassIds.includes(s.classId)) {
+      return true;
+    }
+    return joinedClassCodes.includes((s.classCode || '').toUpperCase());
+  });
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    setPermits(getStudentPermitsSync(currentUser.id));
-    setTimeout(() => {
+    try {
+      const latest = await getStudentPermits(currentUser.id);
+      setPermits(latest);
+    } finally {
       setRefreshing(false);
-    }, 300);
+    }
   };
 
   const handleSubmitPermit = async (data: {
     sessionId: string;
+    classId?: string;
+    classCode?: string;
     courseName: string;
     reason: string;
     attachment?: PermitAttachment;
@@ -82,6 +124,8 @@ export default function StudentPermitScreen() {
     try {
       const result = await submitPermit({
         sessionId: data.sessionId,
+        classId: data.classId,
+        classCode: data.classCode,
         courseName: data.courseName,
         studentId: currentUser.id,
         studentName: currentUser.name,
@@ -94,9 +138,9 @@ export default function StudentPermitScreen() {
         setFeedback({
           visible: true,
           type: 'success',
-          title: 'Izin Terkirim',
+          title: 'Izin Tersimpan di Database!',
           message:
-            'Permohonan izin Anda berhasil dianalisis oleh AI dan terkirim ke asisten untuk ditinjau.',
+            'Permohonan izin Anda berhasil dianalisis oleh AI, tersimpan di Cloud Firestore, dan terkirim ke asisten kelas untuk ditinjau.',
         });
         setPermits(getStudentPermitsSync(currentUser.id));
       } else {
@@ -112,7 +156,10 @@ export default function StudentPermitScreen() {
         visible: true,
         type: 'error',
         title: 'Kesalahan Sistem',
-        message: err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses izin.',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Terjadi kesalahan saat memproses izin.',
       });
     } finally {
       setLoading(false);
@@ -134,13 +181,13 @@ export default function StudentPermitScreen() {
             Pengajuan Izin
           </AppText>
           <AppText variant="bodySm" color={Colors.textSecondary}>
-            Ajukan permohonan ketidakhadiran praktikum dan pantau status persetujuannya
+            Ajukan permohonan ketidakhadiran praktikum dan pantau status persetujuannya secara real-time
           </AppText>
         </View>
 
         {/* Form Pengajuan Izin */}
         <PermitForm
-          sessions={liveSessions.length > 0 ? liveSessions : sessions}
+          sessions={studentAvailableSessions}
           onSubmit={handleSubmitPermit}
           isLoading={loading}
         />
@@ -148,13 +195,13 @@ export default function StudentPermitScreen() {
         {/* Riwayat & Status Pengajuan Izin */}
         <View style={styles.historySection}>
           <AppText variant="title" weight="bold" style={styles.sectionTitle}>
-            Status Permohonan Saya
+            Status Permohonan Saya ({permits.length})
           </AppText>
 
           {permits.length === 0 ? (
             <EmptyState
               title="Belum Ada Permohonan Izin"
-              message="Riwayat permohonan izin praktikum Anda akan ditampilkan di sini."
+              message="Riwayat permohonan izin praktikum yang Anda ajukan akan langsung tampil dan tersinkronisasi di sini."
               iconName="document-text-outline"
             />
           ) : (

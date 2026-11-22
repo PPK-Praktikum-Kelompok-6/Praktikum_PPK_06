@@ -38,9 +38,9 @@ interface LocalAccountRecord extends AuthUser {
 
 const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
   {
-    uid: 'adm-01',
+    uid: 'XrAUkALRqxeKOSjBxpgCDCGQ4Bn2',
     email: 'admin@praktikum.ac.id',
-    name: 'Administrator Lab',
+    name: 'Administrator Lab PPK',
     role: 'ADMIN',
     identifier: 'ADM-01',
     password: 'password123',
@@ -66,49 +66,49 @@ const DEFAULT_DEMO_ACCOUNTS: LocalAccountRecord[] = [
   },
   {
     uid: MOCK_USERS[2].id,
-    email: 'bahir@student.ac.id',
+    email: 'herman@praktikum.ac.id',
     name: MOCK_USERS[2].name,
     role: MOCK_USERS[2].role,
     identifier: MOCK_USERS[2].identifier,
-    enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
     approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[3].id,
-    email: 'ahmad@student.ac.id',
+    email: 'bahir@student.ac.id',
     name: MOCK_USERS[3].name,
     role: MOCK_USERS[3].role,
     identifier: MOCK_USERS[3].identifier,
-    enrolledClasses: ['A1', 'C1'],
+    enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
     approvalStatus: 'APPROVED',
   },
   {
     uid: MOCK_USERS[4].id,
-    email: 'siti@student.ac.id',
+    email: 'ahmad@student.ac.id',
     name: MOCK_USERS[4].name,
     role: MOCK_USERS[4].role,
     identifier: MOCK_USERS[4].identifier,
+    enrolledClasses: ['A1', 'C1'],
+    password: 'password123',
+    approvalStatus: 'APPROVED',
+  },
+  {
+    uid: MOCK_USERS[5].id,
+    email: 'siti@student.ac.id',
+    name: MOCK_USERS[5].name,
+    role: MOCK_USERS[5].role,
+    identifier: MOCK_USERS[5].identifier,
     enrolledClasses: ['B2', 'C1'],
     password: 'password123',
     approvalStatus: 'APPROVED',
   },
   {
-    uid: 'iUuzqYziLZhWndnZdh9bx4NRsSe2',
-    email: 'herman@praktikum.ac.id',
-    name: 'Herman',
-    role: 'ASSISTANT',
-    identifier: 'AST-03',
-    password: 'password123',
-    approvalStatus: 'APPROVED',
-  },
-  {
-    uid: 'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
+    uid: MOCK_USERS[6].id,
     email: 'jeedan@praktikan.ac.id',
-    name: 'Jeedan',
-    role: 'STUDENT',
-    identifier: '24060124130102',
+    name: MOCK_USERS[6].name,
+    role: MOCK_USERS[6].role,
+    identifier: MOCK_USERS[6].identifier,
     enrolledClasses: ['A1', 'B2', 'C1'],
     password: 'password123',
     approvalStatus: 'APPROVED',
@@ -334,8 +334,9 @@ export async function signUpUser(
     if (!trimmedIdentifier) {
       throw new Error('NIM Praktikan wajib diisi.');
     }
-    approvalStatus = 'PENDING_ASSISTANT';
-    requestedClass = profile.requestedClass || profile.enrolledClasses?.[0] || 'C1';
+    // Praktikan langsung dapat masuk ke dashboard dan gabung kelas via Kode Kelas
+    approvalStatus = 'APPROVED';
+    requestedClass = undefined;
   } else if (profile.role === 'ADMIN') {
     trimmedIdentifier = 'ADM-01';
     approvalStatus = 'APPROVED';
@@ -356,7 +357,7 @@ export async function signUpUser(
       approvalStatus,
       requestedClass,
       enrolledClasses:
-        approvalStatus === 'APPROVED' ? (profile.enrolledClasses ?? ['C1']) : [],
+        approvalStatus === 'APPROVED' ? (profile.enrolledClasses ?? []) : [],
     };
 
     await setDoc(doc(db, 'users', credential.user.uid), {

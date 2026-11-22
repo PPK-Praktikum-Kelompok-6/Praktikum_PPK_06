@@ -26,6 +26,8 @@ export interface PermitAttachment {
 export interface PermitRequest {
   id: string;
   sessionId: string;
+  classId?: string;
+  classCode?: string;
   courseName: string;
   studentId: string;
   studentName: string;

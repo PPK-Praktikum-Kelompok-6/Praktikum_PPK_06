@@ -29,6 +29,7 @@ export interface AttendanceRecord {
 
 export interface PracticalSession {
   id: string;
+  classId?: string;
   courseName: string;
   classCode: string;
   room: string;
@@ -46,6 +47,7 @@ export interface PracticalSession {
 }
 
 export interface CreateSessionInput {
+  classId?: string;
   courseName: string;
   classCode?: string;
   room: string;
@@ -84,6 +86,11 @@ export interface PracticalClass {
   room?: string;
   assistantId: string;
   assistantName: string;
+  assistantIds?: string[];
+  assistantNames?: string[];
+  studentJoinCode?: string; // Kode kelas untuk Praktikan (misal "BDA1-7K2")
+  assistantInviteCode?: string; // Kode spesial undangan rekan Asprak (misal "ASP-BDA1-9X")
   studentIds: string[];
-  isOpen?: boolean; // Dikendalikan oleh admin untuk membuka/menutup ketersediaan kelas
+  isOpen?: boolean; // Dikendalikan oleh admin/asprak untuk membuka/menutup ketersediaan kelas
+  createdAt?: string;
 }
