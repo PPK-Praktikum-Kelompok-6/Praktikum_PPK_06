@@ -17,6 +17,7 @@ import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
 import { isSessionExpired } from '@/store/rules';
 import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
 import { db, isFirebaseConfigured } from './firebase';
+import { notifyScheduleChanged, notifySessionOpened } from './notifications';
 
 export { PracticalClass } from '@/types/attendance';
 
@@ -193,6 +194,55 @@ export function subscribeSessions(listener: SessionListener): () => void {
   return () => {
     sessionListeners.delete(listener);
   };
+}
+
+/**
+ * Berlangganan (subscribe) real-time seluruh daftar sesi praktikum di semua laboratorium (SRS-S3-05).
+ * Dipakai pada halaman Peta Laboratorium Interaktif untuk menampilkan praktikum berlangsung & berikutnya.
+ */
+export function subscribeAllSessions(
+  onUpdate: (sessions: PracticalSession[]) => void
+): () => void {
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, 'sessions'));
+      const unsubFirestore = onSnapshot(
+        q,
+        (snapshot) => {
+          const allSessions: PracticalSession[] = snapshot.docs.map(
+            (docSnap) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+            })
+          );
+          if (allSessions.length > 0) {
+            localSessionsStore = allSessions;
+          }
+          checkAndAutoCloseExpiredSessions(allSessions);
+          onUpdate(allSessions);
+        },
+        (error) => {
+          console.warn('Real-time all sessions listener error:', error);
+          onUpdate([...localSessionsStore]);
+        }
+      );
+
+      const unsubLocal = subscribeSessions(() => {
+        onUpdate([...localSessionsStore]);
+      });
+
+      return () => {
+        unsubFirestore();
+        unsubLocal();
+      };
+    } catch (err) {
+      console.warn('Could not setup all sessions onSnapshot:', err);
+    }
+  }
+
+  const sendLocal = () => onUpdate([...localSessionsStore]);
+  sendLocal();
+  return subscribeSessions(sendLocal);
 }
 
 /**
@@ -549,7 +599,7 @@ export async function getSessionsForStudent(
 }
 
 /**
- * 4. Memperbarui data jadwal atau status sesi praktikum di Firestore (SRS-CRUD-01).
+ * 4. Memperbarui data jadwal atau status sesi praktikum di Firestore (SRS-CRUD-01 & SRS-S3-06).
  */
 export async function updateSession(
   sessionId: string,
@@ -559,18 +609,48 @@ export async function updateSession(
     throw new Error('ID sesi wajib disertakan untuk pembaruan.');
   }
 
+  const prevSession = await getSessionDoc(sessionId);
+
   if (isFirebaseConfigured) {
     const cleanUpdates = sanitizeForFirestore(updates);
     delete cleanUpdates.id;
     await updateDoc(doc(db, 'sessions', sessionId), cleanUpdates);
-    notifySessionListeners();
-    return;
   }
 
   localSessionsStore = localSessionsStore.map((session) =>
     session.id === sessionId ? { ...session, ...updates, id: sessionId } : session
   );
   notifySessionListeners();
+
+  const mergedSession: PracticalSession | undefined = prevSession
+    ? { ...prevSession, ...updates, id: sessionId }
+    : localSessionsStore.find((s) => s.id === sessionId);
+
+  if (mergedSession) {
+    // 1. Trigger notifikasi terarah apabila sesi dibuka (SRS-S3-06)
+    if (updates.status === 'OPEN' && prevSession?.status !== 'OPEN') {
+      void notifySessionOpened(mergedSession);
+    }
+
+    // 2. Trigger notifikasi terarah apabila jadwal (waktu, tanggal, atau ruangan) berubah (SRS-S3-06)
+    const timeChanged =
+      updates.timeSlot !== undefined &&
+      Boolean(prevSession?.timeSlot) &&
+      updates.timeSlot !== prevSession?.timeSlot;
+    const dateChanged =
+      updates.date !== undefined &&
+      Boolean(prevSession?.date) &&
+      updates.date !== prevSession?.date;
+    const roomChanged =
+      updates.room !== undefined &&
+      Boolean(prevSession?.room) &&
+      updates.room !== prevSession?.room;
+
+    if (timeChanged || dateChanged || roomChanged) {
+      const changeSummary = `Jadwal praktikum ${mergedSession.courseName} (Kelas ${mergedSession.classCode}) diperbarui ke ${mergedSession.date} pukul ${mergedSession.timeSlot} di ${mergedSession.room}.`;
+      void notifyScheduleChanged(mergedSession, changeSummary);
+    }
+  }
 }
 
 /**

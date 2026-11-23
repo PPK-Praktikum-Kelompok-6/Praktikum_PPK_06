@@ -131,5 +131,27 @@ service cloud.firestore {
       allow update: if isAssistant() || isAdmin();
       allow delete: if isAdmin();
     }
+
+    // =========================================================================
+    // LABS COLLECTION (SRS-S3-03, SRS-S3-04, SRS-S3-05)
+    // =========================================================================
+    match /labs/{labId} {
+      // Semua pengguna dapat melihat daftar lokasi & radius laboratorium di halaman Maps
+      allow read: if true;
+      // Asisten/Admin dapat mengatur titik koordinat & radius lab (serta auto-seed saat kosong)
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // NOTIFICATIONS COLLECTION (SRS-S3-06 — Targeted Push Notification Log)
+    // =========================================================================
+    match /notifications/{notificationId} {
+      // Pengguna terautentikasi dapat menerima event notifikasi terarah
+      allow read: if isSignedIn();
+      // Pembuatan event notifikasi & penandaan readBy oleh pengguna terkait
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
   }
 }

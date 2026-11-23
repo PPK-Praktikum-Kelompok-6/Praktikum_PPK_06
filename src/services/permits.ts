@@ -12,6 +12,7 @@ import {
 import { PermitAttachment, PermitRequest } from '@/types/permit';
 import { classifyPermitReason } from './ai';
 import { db, isFirebaseConfigured } from './firebase';
+import { notifyPermitReviewed } from './notifications';
 
 export { PermitAttachment, PermitRequest };
 
@@ -377,6 +378,9 @@ export async function reviewPermit(
 
   notifyListeners();
 
+  // Kirim push notification terarah hanya kepada praktikan pemilik izin (SRS-S3-06)
+  void notifyPermitReviewed(updatedPermit, decision, decisionNote);
+
   const actionText = decision === 'APPROVED' ? 'disetujui' : 'ditolak';
 
   return {
@@ -456,6 +460,13 @@ export async function recordManualPermitByAssistant(params: {
     ...permitStore.filter((p) => p.id !== permitId),
   ];
   notifyListeners();
+
+  // Beri tahu praktikan terkait bahwa surat izin fisiknya telah diverifikasi asisten
+  void notifyPermitReviewed(
+    manualPermit,
+    'APPROVED',
+    manualPermit.decisionNote
+  );
 
   return {
     success: true,

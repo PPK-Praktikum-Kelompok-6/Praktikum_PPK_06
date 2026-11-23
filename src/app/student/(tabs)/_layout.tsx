@@ -112,6 +112,19 @@ export default function StudentTabsLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="maps"
+          options={{
+            title: 'Peta Lab',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Icon
+                name={focused ? 'map' : 'map-outline'}
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
       </Tabs>
 
       {/* Tombol Logout Mengambang di Samping Navigasi Bawah */}
