@@ -1,3 +1,5 @@
+import { Coordinates } from './lab';
+
 export type SessionStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
 export type UserRole = 'ADMIN' | 'ASSISTANT' | 'STUDENT';
 export type ApprovalStatus =
@@ -25,6 +27,9 @@ export interface AttendanceRecord {
   studentNim: string;
   timestamp: string; // ISO string format
   notes?: string;
+  distanceMeters?: number | null;
+  userCoords?: Coordinates | null;
+  verifiedLocation?: boolean;
 }
 
 export interface PracticalSession {
@@ -44,6 +49,8 @@ export interface PracticalSession {
   deliveryMode?: 'OFFLINE' | 'ONLINE';
   meetingLink?: string;
   pendingChangeRequest?: 'DELETE' | 'RESCHEDULE';
+  labId?: string;
+  radiusMeters?: number;
 }
 
 export interface CreateSessionInput {
@@ -58,6 +65,8 @@ export interface CreateSessionInput {
   meetingLink?: string;
   description?: string;
   totalStudents?: number;
+  labId?: string;
+  radiusMeters?: number;
 }
 
 export interface SessionChangeRequest {

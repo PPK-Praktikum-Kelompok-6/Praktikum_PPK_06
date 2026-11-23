@@ -5,25 +5,21 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { AttendanceForm } from '@/features/attendance/components/AttendanceForm';
 import { AttendanceSuccessCard } from '@/features/attendance/components/AttendanceSuccessCard';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
 import { subscribeAllClasses } from '@/services/admin';
-import {
-  submitAttendanceToFirestore,
-  subscribeToSessionAttendance,
-} from '@/services/attendance';
+import { subscribeToSessionAttendance } from '@/services/attendance';
 import { PermitRequest, subscribeStudentPermits } from '@/services/permits';
 import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
-import { canAttend } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
-import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
+import { formatDateIndonesian } from '@/utils/formatTime';
 
 export default function StudentAttendanceDetailRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -31,9 +27,8 @@ export default function StudentAttendanceDetailRoute() {
 
   const { currentUser } = useCurrentUser();
   const { getSessionById } = useSessions();
-  const { attendanceRecords, submitAttendance, isAlreadyAttended } = useAttendance();
+  const { attendanceRecords, isAlreadyAttended } = useAttendance();
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
   const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(undefined);
   const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
@@ -108,63 +103,9 @@ export default function StudentAttendanceDetailRoute() {
     ])
   );
 
-  // Evaluasi aturan bisnis murni dari store/rules.ts
-  const rule = canAttend(
-    session,
-    attendanceRecords,
-    currentUser.id,
-    effectiveEnrolledCodes.length > 0 ? effectiveEnrolledCodes : undefined
-  );
-
   const sessionPermit = session
     ? myPermits.find((p) => p.sessionId === session.id && p.status !== 'REJECTED')
     : undefined;
-
-  const handleAttendanceSubmit = async (notes: string) => {
-    if (!session) return;
-
-    setIsSubmitting(true);
-    try {
-      // 1. Submit ke Firestore dengan proteksi Anti-Bocor (SRS-PRES-02)
-      const res = await submitAttendanceToFirestore({
-        sessionId: session.id,
-        studentId: currentUser.id,
-        studentName: currentUser.name,
-        studentNim: currentUser.identifier,
-        notes,
-      });
-
-      // 2. Selaraskan juga ke store lokal Sprint 1
-      submitAttendance(session.id, currentUser, notes);
-
-      if (res.success) {
-        const nowIso = new Date().toISOString();
-        const timeStr = formatTime(nowIso);
-        setFeedbackState({
-          visible: true,
-          type: 'success',
-          title: 'Presensi Berhasil!',
-          message: `Kehadiran Anda pada sesi ${session.courseName} (${session.classCode}) telah tercatat pada pukul ${timeStr}.`,
-        });
-      } else {
-        setFeedbackState({
-          visible: true,
-          type: 'error',
-          title: 'Presensi Tidak Dapat Diproses',
-          message: res.message,
-        });
-      }
-    } catch (err: any) {
-      setFeedbackState({
-        visible: true,
-        type: 'error',
-        title: 'Kesalahan Sistem',
-        message: err?.message || 'Terjadi kesalahan saat memproses presensi.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleCloseFeedback = () => {
     setFeedbackState((prev) => ({ ...prev, visible: false }));
@@ -399,15 +340,82 @@ export default function StudentAttendanceDetailRoute() {
             ) : null}
           </Card>
         ) : (
-          <AttendanceForm
-            session={session}
-            currentUser={currentUser}
-            isAttended={attended}
-            canSubmit={rule.allowed}
-            disabledReason={rule.reason}
-            loading={isSubmitting}
-            onSubmit={handleAttendanceSubmit}
-          />
+          <Card variant="flat" padding="lg" style={styles.actionCard}>
+            <View style={styles.actionCardHeader}>
+              <View style={styles.actionCardIconWrap}>
+                <Icon name="finger-print" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.actionCardTitleWrap}>
+                <AppText variant="h2">Presensi Praktikum</AppText>
+                <AppText variant="caption" color={Colors.textMuted}>
+                  {session.status === 'OPEN'
+                    ? 'Sesi sedang dibuka. Silakan lakukan check-in kehadiran.'
+                    : session.status === 'NOT_STARTED'
+                    ? 'Sesi belum dibuka oleh Asisten Praktikum.'
+                    : 'Sesi praktikum telah ditutup.'}
+                </AppText>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.actionCardBody}>
+              {session.deliveryMode !== 'ONLINE' && (
+                <View style={styles.locationNoticeBox}>
+                  <Icon name="location-outline" size={16} color={Colors.primary} />
+                  <AppText variant="caption" color={Colors.textSecondary} style={styles.locationNoticeText}>
+                    Presensi tatap muka (luring) memvalidasi keberadaan fisik Anda di dalam radius {session.room}.
+                  </AppText>
+                </View>
+              )}
+
+              {session.status === 'OPEN' ? (
+                <CustomButton
+                  title="Masuk ke Halaman Presensi"
+                  variant="primary"
+                  size="lg"
+                  icon={<Icon name="arrow-forward-circle" size={20} color={Colors.textWhite} />}
+                  iconPosition="right"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/student/check-in/[id]' as any,
+                      params: { id: session.id },
+                    })
+                  }
+                />
+              ) : session.status === 'NOT_STARTED' ? (
+                <CustomButton
+                  title="Sesi Belum Dibuka"
+                  variant="secondary"
+                  size="lg"
+                  disabled
+                  icon={<Icon name="time-outline" size={20} color={Colors.textMuted} />}
+                  onPress={() => {}}
+                />
+              ) : (
+                <CustomButton
+                  title="Presensi Ditutup"
+                  variant="secondary"
+                  size="lg"
+                  disabled
+                  icon={<Icon name="lock-closed-outline" size={20} color={Colors.textMuted} />}
+                  onPress={() => {}}
+                />
+              )}
+
+              {session.status !== 'CLOSED' && (
+                <Pressable
+                  style={styles.permitLinkBtn}
+                  onPress={() => router.push('/student/permit')}
+                >
+                  <Icon name="document-text-outline" size={16} color={Colors.primary} />
+                  <AppText variant="caption" weight="semibold" color={Colors.primary}>
+                    Berhalangan hadir? Ajukan Izin Ketidakhadiran
+                  </AppText>
+                </Pressable>
+              )}
+            </View>
+          </Card>
         )}
       </View>
 
@@ -556,6 +564,51 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
     gap: 2,
+  },
+  actionCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  actionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  actionCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionCardTitleWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  actionCardBody: {
+    gap: Spacing.md,
+  },
+  locationNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  locationNoticeText: {
+    flex: 1,
+    lineHeight: 18,
+  },
+  permitLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
 });
 

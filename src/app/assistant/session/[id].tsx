@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { AttendanceTable } from '@/features/attendance/components/AttendanceTable';
+import { LabLocationConfigModal } from '@/features/attendance/components/LabLocationConfigModal';
 import { StatSummaryCard } from '@/features/attendance/components/StatSummaryCard';
 import {
   SessionControlAction,
@@ -25,6 +26,7 @@ import {
   subscribeToSessionAttendance,
 } from '@/services/attendance';
 import { AuthUser, subscribeAllUsers } from '@/services/auth';
+import { subscribeLabs } from '@/services/labs';
 import {
   PermitRequest,
   recordManualPermitByAssistant,
@@ -34,6 +36,7 @@ import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canOpen, isSessionExpired } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
+import { LabLocation } from '@/types/lab';
 import { formatDateIndonesian } from '@/utils/formatTime';
 
 export default function AssistantSessionDetailRoute() {
@@ -63,6 +66,10 @@ export default function AssistantSessionDetailRoute() {
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('success');
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  // State Konfigurasi Lokasi & Radius Laboratorium (SRS-S3-03)
+  const [currentLab, setCurrentLab] = useState<LabLocation | null>(null);
+  const [labModalVisible, setLabModalVisible] = useState(false);
 
   // Real-time listener dokumen sesi praktikum dari Firestore
   useEffect(() => {
@@ -108,6 +115,26 @@ export default function AssistantSessionDetailRoute() {
       }
     }
   }, [session, closeSession]);
+
+  // Real-time listener data laboratorium & sinkronisasi lokasi ruangan sesi (SRS-S3-03)
+  useEffect(() => {
+    if (!session?.room) return;
+    const unsubLabs = subscribeLabs((labs) => {
+      const cleaned = session.room.trim().toLowerCase();
+      const found = labs.find(
+        (l) =>
+          (session.labId && l.id.toLowerCase() === session.labId.toLowerCase()) ||
+          l.id.toLowerCase() === cleaned ||
+          l.name.trim().toLowerCase() === cleaned ||
+          cleaned.includes(l.name.trim().toLowerCase()) ||
+          l.name.trim().toLowerCase().includes(cleaned)
+      );
+      if (found) {
+        setCurrentLab(found);
+      }
+    });
+    return () => unsubLabs();
+  }, [session?.room, session?.labId]);
 
   // Batasan peran: Praktikan tidak boleh mengakses detail dan kontrol sesi asisten
   if (currentUser.role !== 'ASSISTANT') {
@@ -403,6 +430,60 @@ export default function AssistantSessionDetailRoute() {
               icon={<Icon name="checkmark-done-circle" size={20} color={Colors.textMuted} />}
             />
           )}
+        </View>
+      </Card>
+
+      {/* Konfigurasi Lokasi & Radius Laboratorium (SRS-S3-03) */}
+      <Card variant="default" padding="md" style={styles.labConfigCard}>
+        <View style={styles.labConfigHeader}>
+          <View style={styles.labConfigTitleRow}>
+            <Icon name="location-outline" size={18} color={Colors.primary} />
+            <AppText variant="title">Lokasi & Radius Presensi</AppText>
+          </View>
+          <Badge
+            label={
+              session.deliveryMode === 'ONLINE'
+                ? 'Mode Daring'
+                : `${currentLab?.radiusMeters || session.radiusMeters || 60} Meter`
+            }
+            variant={session.deliveryMode === 'ONLINE' ? 'closed' : 'attended'}
+            size="sm"
+          />
+        </View>
+
+        <AppText variant="caption" color={Colors.textMuted} style={styles.labConfigDesc}>
+          {session.deliveryMode === 'ONLINE'
+            ? 'Sesi ini diadakan daring (online). Validasi radius GPS praktikan dilewati.'
+            : `Praktikan wajib berada dalam radius maksimal ${
+                currentLab?.radiusMeters || session.radiusMeters || 60
+              } m dari ${currentLab?.name || session.room} untuk dapat mengisi presensi.`}
+        </AppText>
+
+        {currentLab && session.deliveryMode !== 'ONLINE' ? (
+          <View style={styles.labMetaBox}>
+            <View style={styles.labMetaRow}>
+              <Icon name="business-outline" size={14} color={Colors.textMuted} />
+              <AppText variant="caption" color={Colors.textSecondary}>
+                {currentLab.building}
+              </AppText>
+            </View>
+            <View style={styles.labMetaRow}>
+              <Icon name="navigate-outline" size={14} color={Colors.textMuted} />
+              <AppText variant="caption" color={Colors.textMuted}>
+                Koordinat: {currentLab.latitude.toFixed(5)}, {currentLab.longitude.toFixed(5)}
+              </AppText>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.labConfigBtnWrap}>
+          <CustomButton
+            title="Atur Lokasi & Radius Lab"
+            variant="outline"
+            size="sm"
+            icon={<Icon name="locate-outline" size={16} color={Colors.primary} />}
+            onPress={() => setLabModalVisible(true)}
+          />
         </View>
       </Card>
 
@@ -708,6 +789,24 @@ export default function AssistantSessionDetailRoute() {
         primaryLabel="Mengerti"
         onPrimary={() => setFeedbackVisible(false)}
       />
+
+      {/* Modal Pengaturan Lokasi & Radius Lab (SRS-S3-03) */}
+      <LabLocationConfigModal
+        visible={labModalVisible}
+        onClose={() => setLabModalVisible(false)}
+        initialLab={currentLab}
+        currentRoomName={session.room}
+        sessionId={session.id}
+        onSuccess={(updatedLab) => {
+          setCurrentLab(updatedLab);
+          setFeedbackType('success');
+          setFeedbackTitle('Lokasi Lab Diperbarui!');
+          setFeedbackMessage(
+            `Koordinat dan radius ${updatedLab.name} (${updatedLab.radiusMeters} m) berhasil disimpan ke Cloud Firestore.`
+          );
+          setFeedbackVisible(true);
+        }}
+      />
     </Screen>
   );
 }
@@ -902,5 +1001,37 @@ const styles = StyleSheet.create({
   rosterBtnCol: {
     flexDirection: 'column',
     gap: 6,
+  },
+  labConfigCard: {
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  labConfigHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  labConfigTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  labConfigDesc: {
+    lineHeight: 18,
+  },
+  labMetaBox: {
+    backgroundColor: Colors.surfaceSecondary,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    gap: Spacing.xxs,
+    marginTop: Spacing.xxs,
+  },
+  labMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  labConfigBtnWrap: {
+    marginTop: Spacing.xs,
   },
 });
