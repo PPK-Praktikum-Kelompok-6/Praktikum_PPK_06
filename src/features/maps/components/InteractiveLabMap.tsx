@@ -14,7 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 import { PracticalSession } from '@/types/attendance';
 import { Coordinates, LabLocation } from '@/types/lab';
-import { calculateDistanceMeters } from '@/utils/geo';
+import { calculateDistanceMeters, isRoomMatchingLab } from '@/utils/geo';
 
 // Resolusi komponen native react-native-maps hanya pada perangkat iOS/Android
 // untuk menjaga kompatibilitas Web Preview (Expo Web Fallback — SRS-S3-04).
@@ -33,18 +33,14 @@ export interface InteractiveLabMapProps {
 }
 
 const DEFAULT_CAMPUS_CENTER: Coordinates = {
-  latitude: -7.04992,
-  longitude: 110.44078,
+  latitude: -7.04841,
+  longitude: 110.44104,
 };
 
 function getLabSessionStats(lab: LabLocation, sessions: PracticalSession[]) {
-  const labName = (lab.name || '').trim().toLowerCase();
-  const matched = sessions.filter((s) => {
-    const room = (s.room || '').trim().toLowerCase();
-    return (
-      room === labName || room.includes(labName) || labName.includes(room)
-    );
-  });
+  const matched = sessions.filter((s) =>
+    isRoomMatchingLab(s.room, lab, s.labId)
+  );
 
   const openCount = matched.filter((s) => s.status === 'OPEN').length;
   const upcomingCount = matched.filter((s) => s.status === 'NOT_STARTED').length;
@@ -220,10 +216,10 @@ export function InteractiveLabMap({
   const spatialBounds = useMemo(() => {
     const lats = labs.map((l) => l.latitude);
     const lngs = labs.map((l) => l.longitude);
-    const minLat = lats.length > 0 ? Math.min(...lats) - 0.00035 : -7.0506;
-    const maxLat = lats.length > 0 ? Math.max(...lats) + 0.00035 : -7.0493;
-    const minLng = lngs.length > 0 ? Math.min(...lngs) - 0.00035 : 110.4401;
-    const maxLng = lngs.length > 0 ? Math.max(...lngs) + 0.00035 : 110.4414;
+    const minLat = lats.length > 0 ? Math.min(...lats) - 0.00035 : -7.0494;
+    const maxLat = lats.length > 0 ? Math.max(...lats) + 0.00035 : -7.0477;
+    const minLng = lngs.length > 0 ? Math.min(...lngs) - 0.00035 : 110.4404;
+    const maxLng = lngs.length > 0 ? Math.max(...lngs) + 0.00035 : 110.4420;
     return { minLat, maxLat, minLng, maxLng };
   }, [labs]);
 

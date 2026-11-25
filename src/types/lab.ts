@@ -4,9 +4,9 @@ export interface Coordinates {
 }
 
 export interface LabLocation {
-  id: string; // misal: "lab-komputer-1", "lab-komputer-2", "lab-basis-data"
-  name: string; // harus cocok dengan field `room` di PracticalSession, misal: "Lab Komputer 2"
-  building: string; // misal: "Gedung E Departemen Informatika"
+  id: string; // misal: "lab-d", "lab-c", "lab-b", "lab-ap"
+  name: string; // harus cocok dengan field `room` di PracticalSession, misal: "Lab D"
+  building: string; // misal: "Gedung E" atau "Gedung AP"
   latitude: number;
   longitude: number;
   radiusMeters: number; // default misal: 50 (meter)

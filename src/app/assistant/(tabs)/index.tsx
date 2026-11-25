@@ -52,12 +52,7 @@ const PRESET_COURSE_NAMES = [
 
 const PRESET_CLASS_CODES = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2'];
 
-const PRESET_LAB_ROOMS = [
-  'Lab Basis Data',
-  'Lab Komputer 1',
-  'Lab Komputer 2',
-  'Lab Jaringan',
-];
+const PRESET_LAB_ROOMS = ['Lab D', 'Lab C', 'Lab B', 'Lab AP'];
 
 export default function AssistantScheduleRoute() {
   const { currentUser } = useCurrentUser();
@@ -126,7 +121,7 @@ export default function AssistantScheduleRoute() {
   const [createClassModalVisible, setCreateClassModalVisible] = useState(false);
   const [newClassCourse, setNewClassCourse] = useState('');
   const [newClassCode, setNewClassCode] = useState('A1');
-  const [newClassRoom, setNewClassRoom] = useState('Lab Basis Data');
+  const [newClassRoom, setNewClassRoom] = useState('Lab D');
   const [creatingClass, setCreatingClass] = useState(false);
 
   // State Gabung Kelas Asprak via Kode Spesial (dengan Pratinjau Konfirmasi)
@@ -498,7 +493,7 @@ export default function AssistantScheduleRoute() {
               onPress={() => {
                 setNewClassCourse('');
                 setNewClassCode('A1');
-                setNewClassRoom('Lab Basis Data');
+                setNewClassRoom('Lab D');
                 setCreateClassModalVisible(true);
               }}
             >
@@ -535,7 +530,7 @@ export default function AssistantScheduleRoute() {
                         {cls.courseName || 'Praktikum'} • Kelas {cls.classCode}
                       </AppText>
                       <AppText variant="caption" color={Colors.textSecondary}>
-                        📍 {cls.room || 'Lab Komputer'} • 👥 {cls.studentIds?.length || 0} Praktikan
+                        📍 {cls.room || 'Lab D'} • 👥 {cls.studentIds?.length || 0} Praktikan
                       </AppText>
                       <AppText variant="caption" color={Colors.primaryDark} weight="medium">
                         👨‍🏫 Asprak: {assistantsList}
@@ -829,7 +824,7 @@ export default function AssistantScheduleRoute() {
             <TextInput
               value={newClassRoom}
               onChangeText={setNewClassRoom}
-              placeholder="Contoh: Lab Basis Data"
+              placeholder="Contoh: Lab D"
               placeholderTextColor={Colors.textLight}
               style={styles.modalInput}
             />
@@ -968,7 +963,7 @@ export default function AssistantScheduleRoute() {
                   <View style={styles.previewMetaRow}>
                     <Icon name="location-outline" size={16} color={Colors.primary} />
                     <AppText variant="bodySm" color={Colors.textSecondary}>
-                      Ruangan: {previewClassToJoin.room || 'Lab Komputer'}
+                      Ruangan: {previewClassToJoin.room || 'Lab D'}
                     </AppText>
                   </View>
 

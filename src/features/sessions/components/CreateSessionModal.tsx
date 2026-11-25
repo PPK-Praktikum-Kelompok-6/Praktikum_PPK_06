@@ -37,12 +37,7 @@ const PRESET_COURSES = [
   'Jaringan Komputer',
 ];
 
-const PRESET_ROOMS = [
-  'Lab Komputer 1',
-  'Lab Komputer 2',
-  'Lab Basis Data',
-  'Lab Jaringan',
-];
+const PRESET_ROOMS = ['Lab D', 'Lab C', 'Lab B', 'Lab AP'];
 
 const PRESET_TIMES = [
   { start: '08.00', end: '10.00' },
@@ -410,7 +405,7 @@ export function CreateSessionModal({
                 style={styles.input}
                 placeholder={
                   deliveryMode === 'OFFLINE'
-                    ? 'Contoh: Lab Komputer 2'
+                    ? 'Contoh: Lab D'
                     : 'Contoh: Google Meet / Zoom Conference'
                 }
                 placeholderTextColor={Colors.textLight}

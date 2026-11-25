@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -28,13 +27,12 @@ import {
   subscribeUserNotificationHistory,
   subscribeUserNotifications,
 } from '@/services/notifications';
+import { getExpoNotifications } from '@/services/permissions';
 import { subscribeAllSessions } from '@/services/sessions';
 import { AppProvider } from '@/store/AppProvider';
 import { useCurrentUser } from '@/store/hooks';
 import { AppNotification } from '@/types/notification';
 import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
-
-configureForegroundNotificationHandler();
 
 function GlobalNotificationCoordinator() {
   const insets = useSafeAreaInsets();
@@ -153,7 +151,10 @@ function GlobalNotificationCoordinator() {
   // Deep Linking saat pengguna mengetuk OS Push Notification (Foreground, Background, & Killed state)
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    const Notifications = getExpoNotifications();
+    if (!Notifications) return;
 
+    configureForegroundNotificationHandler();
     let isMounted = true;
 
     Notifications.getLastNotificationResponseAsync()

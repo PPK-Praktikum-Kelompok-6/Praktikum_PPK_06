@@ -16,6 +16,7 @@ import {
 import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
 import { isSessionExpired } from '@/store/rules';
 import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
+import { normalizeLabRoomName } from '@/utils/geo';
 import { db, isFirebaseConfigured } from './firebase';
 import { notifyScheduleChanged, notifySessionOpened } from './notifications';
 
@@ -39,7 +40,7 @@ export const DEFAULT_CLASSES: PracticalClass[] = [
     id: 'class-a1',
     classCode: 'A1',
     courseName: 'Basis Data Lanjut',
-    room: 'Lab Basis Data',
+    room: 'Lab D',
     assistantId: 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2',
     assistantName: 'Crystiano Bayu Satya Alves, Herman',
     assistantIds: ['EW1rsd5cTZR6iW0xDQdchJ4CYdd2', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
@@ -57,7 +58,7 @@ export const DEFAULT_CLASSES: PracticalClass[] = [
     id: 'class-b2',
     classCode: 'B2',
     courseName: 'Struktur Data & Algoritma',
-    room: 'Lab Komputer 1',
+    room: 'Lab B',
     assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
     assistantName: 'Muhammad Zaidan Alfarizi, Herman',
     assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
@@ -75,7 +76,7 @@ export const DEFAULT_CLASSES: PracticalClass[] = [
     id: 'class-c1',
     classCode: 'C1',
     courseName: 'Pemrograman Perangkat Keras',
-    room: 'Lab Komputer 2',
+    room: 'Lab C',
     assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
     assistantName: 'Muhammad Zaidan Alfarizi, Crystiano Bayu Satya Alves',
     assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2'],
@@ -161,8 +162,21 @@ export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
     cls.assistantInviteCode || `ASP-${prefix}-${codeClean}-${deterministicAst3Digit}`
   ).toUpperCase();
 
+  const normalizedRoom = cls.room ? normalizeLabRoomName(cls.room) : cls.room;
+  if (
+    isFirebaseConfigured &&
+    cls.id &&
+    cls.room &&
+    normalizedRoom !== cls.room
+  ) {
+    updateDoc(doc(db, 'classes', cls.id), { room: normalizedRoom }).catch(
+      () => {}
+    );
+  }
+
   return {
     ...cls,
+    room: normalizedRoom,
     assistantId: assistantIds[0] || '',
     assistantName:
       assistantNames.length > 0 ? assistantNames.join(', ') : 'Belum Ditugaskan',
@@ -173,6 +187,29 @@ export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
     studentIds: cls.studentIds || [],
     isOpen: cls.isOpen !== false,
   };
+}
+
+const migratedSessionRoomIds = new Set<string>();
+
+function normalizeSessionRecord(session: PracticalSession): PracticalSession {
+  if (!session.room || session.deliveryMode === 'ONLINE') {
+    return session;
+  }
+  const normalizedRoom = normalizeLabRoomName(session.room);
+  if (normalizedRoom !== session.room) {
+    if (
+      isFirebaseConfigured &&
+      session.id &&
+      !migratedSessionRoomIds.has(session.id)
+    ) {
+      migratedSessionRoomIds.add(session.id);
+      updateDoc(doc(db, 'sessions', session.id), {
+        room: normalizedRoom,
+      }).catch(() => {});
+    }
+    return { ...session, room: normalizedRoom };
+  }
+  return session;
 }
 
 export type SessionListener = () => void;
@@ -210,10 +247,11 @@ export function subscribeAllSessions(
         q,
         (snapshot) => {
           const allSessions: PracticalSession[] = snapshot.docs.map(
-            (docSnap) => ({
-              id: docSnap.id,
-              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-            })
+            (docSnap) =>
+              normalizeSessionRecord({
+                id: docSnap.id,
+                ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+              })
           );
           if (allSessions.length > 0) {
             localSessionsStore = allSessions;
@@ -290,10 +328,12 @@ export function subscribeAssistantSessions(
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-          }));
+          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) =>
+            normalizeSessionRecord({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+            })
+          );
 
           // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
           checkAndAutoCloseExpiredSessions(allSessions);
@@ -333,10 +373,12 @@ export function subscribeSessionDoc(
         doc(db, 'sessions', sessionId),
         (docSnap) => {
           if (docSnap.exists()) {
-            onUpdate({
-              id: docSnap.id,
-              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-            });
+            onUpdate(
+              normalizeSessionRecord({
+                id: docSnap.id,
+                ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+              })
+            );
           } else {
             onUpdate(localSessionsStore.find((s) => s.id === sessionId));
           }
@@ -346,14 +388,27 @@ export function subscribeSessionDoc(
           onUpdate(localSessionsStore.find((s) => s.id === sessionId));
         }
       );
-      return unsubscribe;
+      const unsubLocal = subscribeSessions(() => {
+        const localMatch = localSessionsStore.find((s) => s.id === sessionId);
+        if (localMatch) {
+          onUpdate(localMatch);
+        }
+      });
+
+      return () => {
+        unsubscribe();
+        unsubLocal();
+      };
     } catch (err) {
       console.warn('Could not setup session doc onSnapshot:', err);
     }
   }
 
-  onUpdate(localSessionsStore.find((s) => s.id === sessionId));
-  return () => {};
+  const sendLocal = () => {
+    onUpdate(localSessionsStore.find((s) => s.id === sessionId));
+  };
+  sendLocal();
+  return subscribeSessions(sendLocal);
 }
 
 /**
@@ -395,10 +450,12 @@ export function subscribeStudentSessions(
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-          }));
+          const allSessions: PracticalSession[] = snapshot.docs.map((docSnap) =>
+            normalizeSessionRecord({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+            })
+          );
 
           // Periksa dan otomatis tutup sesi yang telah berakhir jam praktikumnya
           checkAndAutoCloseExpiredSessions(allSessions);

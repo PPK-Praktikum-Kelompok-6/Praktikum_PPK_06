@@ -1,7 +1,5 @@
-import * as Location from 'expo-location';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -15,7 +13,6 @@ import { Badge } from '@/components/ui/Badge';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { upsertLabLocation } from '@/services/labs';
 import { updateSession } from '@/services/sessions';
 import { LabLocation } from '@/types/lab';
 
@@ -24,87 +21,51 @@ export interface LabLocationConfigModalProps {
   onClose: () => void;
   initialLab?: LabLocation | null;
   currentRoomName?: string;
+  initialRadiusMeters?: number;
   sessionId?: string;
-  onSuccess?: (lab: LabLocation) => void;
+  onSuccess?: (newRadiusMeters: number) => void;
 }
 
-const RADIUS_PRESETS = [30, 50, 60, 100];
+const RADIUS_PRESETS = [30, 50, 60, 100, 150];
 
 export function LabLocationConfigModal({
   visible,
   onClose,
   initialLab,
   currentRoomName,
+  initialRadiusMeters,
   sessionId,
   onSuccess,
 }: LabLocationConfigModalProps) {
-  const [labName, setLabName] = useState('');
-  const [building, setBuilding] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [radiusMeters, setRadiusMeters] = useState('60');
-
-  const [loadingGps, setLoadingGps] = useState(false);
+  const [draftRadius, setDraftRadius] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => {
-    if (!visible) return;
-    const timer = setTimeout(() => {
-      setLabName(initialLab?.name || currentRoomName || 'Lab Komputer 1');
-      setBuilding(initialLab?.building || 'Gedung E Departemen Informatika');
-      setLatitude(initialLab ? String(initialLab.latitude) : '-7.04975');
-      setLongitude(initialLab ? String(initialLab.longitude) : '110.44045');
-      setRadiusMeters(initialLab ? String(initialLab.radiusMeters) : '60');
-      setErrorMsg('');
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [visible, initialLab, currentRoomName]);
+  const defaultRadius = initialRadiusMeters ?? initialLab?.radiusMeters ?? 60;
+  const radiusMeters = draftRadius ?? String(defaultRadius);
 
-  const handleUseCurrentLocation = async () => {
-    setLoadingGps(true);
+  const displayLabName = initialLab?.name || currentRoomName || 'Lab D';
+  const displayBuilding = initialLab?.building || 'Gedung E';
+  const displayCoords = initialLab
+    ? `${initialLab.latitude.toFixed(5)}, ${initialLab.longitude.toFixed(5)}`
+    : 'Mengikuti titik master laboratorium';
+
+  const handleCloseModal = () => {
+    setDraftRadius(null);
     setErrorMsg('');
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Izin lokasi ditolak. Aktifkan izin lokasi di pengaturan perangkat.');
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setLatitude(loc.coords.latitude.toFixed(6));
-      setLongitude(loc.coords.longitude.toFixed(6));
-    } catch (err: any) {
-      setErrorMsg(
-        err?.message || 'Gagal memperoleh lokasi GPS saat ini. Pastikan GPS aktif.'
-      );
-    } finally {
-      setLoadingGps(false);
-    }
+    onClose();
   };
 
   const handleSave = async () => {
-    const lat = parseFloat(latitude);
-    const lon = parseFloat(longitude);
     const rad = parseInt(radiusMeters, 10);
 
-    if (!labName.trim()) {
-      setErrorMsg('Nama laboratorium/ruangan tidak boleh kosong.');
-      return;
-    }
-    if (isNaN(lat) || lat < -90 || lat > 90) {
-      setErrorMsg('Nilai Latitude tidak valid (rentang -90 s/d 90).');
-      return;
-    }
-    if (isNaN(lon) || lon < -180 || lon > 180) {
-      setErrorMsg('Nilai Longitude tidak valid (rentang -180 s/d 180).');
-      return;
-    }
     if (isNaN(rad) || rad < 5 || rad > 1000) {
       setErrorMsg('Radius harus berupa angka antara 5 hingga 1000 meter.');
+      return;
+    }
+
+    if (!sessionId) {
+      setErrorMsg('ID sesi praktikum tidak ditemukan.');
       return;
     }
 
@@ -112,43 +73,18 @@ export function LabLocationConfigModal({
     setErrorMsg('');
 
     try {
-      const labPayload: Omit<LabLocation, 'updatedAt'> = {
-        id:
-          initialLab?.id ||
-          `lab-${labName
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')}`,
-        name: labName.trim(),
-        building: building.trim() || 'Gedung E Departemen Informatika',
-        latitude: lat,
-        longitude: lon,
+      // Hanya memperbarui batas radius untuk sesi praktikum ini saja,
+      // tanpa mengubah master data lokasi/koordinat laboratorium di koleksi `labs`.
+      await updateSession(sessionId, {
+        labId: initialLab?.id,
         radiusMeters: rad,
-        updatedBy: 'Asisten Praktikum',
-      };
+      });
 
-      // 1. Simpan/perbarui ke koleksi labs di Firestore (SRS-S3-03)
-      await upsertLabLocation(labPayload);
-
-      // 2. Jika dipanggil dari sesi tertentu, perbarui sesi di Firestore
-      if (sessionId) {
-        await updateSession(sessionId, {
-          labId: labPayload.id,
-          radiusMeters: rad,
-        });
-      }
-
-      const savedLab: LabLocation = {
-        ...labPayload,
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (onSuccess) {
-        onSuccess(savedLab);
-      }
+      onSuccess?.(rad);
+      setDraftRadius(null);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Gagal menyimpan konfigurasi lokasi lab.');
+      setErrorMsg(err?.message || 'Gagal menyimpan radius presensi sesi.');
     } finally {
       setSaving(false);
     }
@@ -159,7 +95,7 @@ export function LabLocationConfigModal({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleCloseModal}
     >
       <View style={styles.backdrop}>
         <View style={styles.modalContainer}>
@@ -167,17 +103,17 @@ export function LabLocationConfigModal({
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.iconCircle}>
-                <Icon name="location-outline" size={22} color={Colors.primary} />
+                <Icon name="locate-outline" size={22} color={Colors.primary} />
               </View>
-              <View>
-                <AppText variant="h2">Lokasi & Radius Lab</AppText>
+              <View style={styles.headerTextCol}>
+                <AppText variant="h2">Atur Radius Presensi</AppText>
                 <AppText variant="caption" color={Colors.textMuted}>
-                  Kelola koordinat GPS dan batas presensi praktikan
+                  Berlaku khusus untuk sesi praktikum ini saja
                 </AppText>
               </View>
             </View>
             <Pressable
-              onPress={onClose}
+              onPress={handleCloseModal}
               style={styles.closeButton}
               accessibilityRole="button"
               accessibilityLabel="Tutup"
@@ -186,102 +122,79 @@ export function LabLocationConfigModal({
             </Pressable>
           </View>
 
-          <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+          >
             {errorMsg ? (
               <View style={styles.errorBox}>
                 <Icon name="alert-circle" size={18} color={Colors.danger} />
-                <AppText variant="caption" color={Colors.danger} style={styles.errorText}>
+                <AppText
+                  variant="caption"
+                  color={Colors.danger}
+                  style={styles.errorText}
+                >
                   {errorMsg}
                 </AppText>
               </View>
             ) : null}
 
-            {/* Nama Ruangan & Gedung */}
-            <View style={styles.formGroup}>
-              <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                NAMA LABORATORIUM / RUANG
-              </AppText>
-              <TextInput
-                style={styles.textInput}
-                value={labName}
-                onChangeText={setLabName}
-                placeholder="Contoh: Lab Komputer 1"
-                placeholderTextColor={Colors.textLight}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                GEDUNG / KETERANGAN
-              </AppText>
-              <TextInput
-                style={styles.textInput}
-                value={building}
-                onChangeText={setBuilding}
-                placeholder="Contoh: Gedung E Lt. 2 Departemen Informatika"
-                placeholderTextColor={Colors.textLight}
-              />
-            </View>
-
-            {/* Koordinat GPS */}
-            <View style={styles.coordsHeaderRow}>
-              <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                TITIK KOORDINAT PUSAT
-              </AppText>
-              <Pressable
-                onPress={handleUseCurrentLocation}
-                disabled={loadingGps}
-                style={({ pressed }) => [
-                  styles.gpsButton,
-                  pressed && styles.gpsButtonPressed,
-                  loadingGps && styles.gpsButtonDisabled,
-                ]}
-              >
-                {loadingGps ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : (
-                  <Icon name="locate" size={14} color={Colors.primary} />
-                )}
-                <AppText variant="caption" weight="semibold" color={Colors.primary}>
-                  {loadingGps ? 'Membaca GPS...' : 'Gunakan Posisi Saya'}
+            {/* Info Lokasi Lab Terkunci (Read-Only Master Data) */}
+            <View style={styles.lockedInfoCard}>
+              <View style={styles.lockedHeaderRow}>
+                <AppText variant="caption" color={Colors.textMuted} weight="bold">
+                  INFORMASI LABORATORIUM (TETAP)
                 </AppText>
-              </Pressable>
-            </View>
-
-            <View style={styles.coordsRow}>
-              <View style={styles.coordCol}>
-                <AppText variant="caption" color={Colors.textSecondary}>
-                  Latitude
-                </AppText>
-                <TextInput
-                  style={styles.textInput}
-                  value={latitude}
-                  onChangeText={setLatitude}
-                  placeholder="-7.04975"
-                  keyboardType="numeric"
-                  placeholderTextColor={Colors.textLight}
-                />
+                <View style={styles.lockedTag}>
+                  <Icon name="lock-closed" size={12} color={Colors.textMuted} />
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Terkunci
+                  </AppText>
+                </View>
               </View>
-              <View style={styles.coordCol}>
-                <AppText variant="caption" color={Colors.textSecondary}>
-                  Longitude
-                </AppText>
-                <TextInput
-                  style={styles.textInput}
-                  value={longitude}
-                  onChangeText={setLongitude}
-                  placeholder="110.44045"
-                  keyboardType="numeric"
-                  placeholderTextColor={Colors.textLight}
-                />
+
+              <View style={styles.lockedRow}>
+                <Icon name="desktop-outline" size={16} color={Colors.primary} />
+                <View style={styles.lockedCol}>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Nama Ruangan / Lab
+                  </AppText>
+                  <AppText variant="bodySm" weight="semibold">
+                    {displayLabName}
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={styles.lockedRow}>
+                <Icon name="business-outline" size={16} color={Colors.primary} />
+                <View style={styles.lockedCol}>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Gedung
+                  </AppText>
+                  <AppText variant="bodySm" color={Colors.textSecondary}>
+                    {displayBuilding}
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={styles.lockedRow}>
+                <Icon name="navigate-outline" size={16} color={Colors.primary} />
+                <View style={styles.lockedCol}>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Titik Koordinat Pusat (Lat, Long)
+                  </AppText>
+                  <AppText variant="bodySm" color={Colors.textSecondary}>
+                    {displayCoords}
+                  </AppText>
+                </View>
               </View>
             </View>
 
-            {/* Batas Radius Presensi */}
+            {/* Batas Radius Presensi (Editable untuk sesi ini) */}
             <View style={styles.formGroup}>
               <View style={styles.radiusHeaderRow}>
                 <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                  BATAS RADIUS PRESENSI (METER)
+                  BATAS RADIUS PRESENSI SESI INI (METER)
                 </AppText>
                 <Badge
                   label={`${radiusMeters || '0'} meter`}
@@ -297,7 +210,7 @@ export function LabLocationConfigModal({
                   return (
                     <Pressable
                       key={preset}
-                      onPress={() => setRadiusMeters(String(preset))}
+                      onPress={() => setDraftRadius(String(preset))}
                       style={[
                         styles.presetChip,
                         isSelected && styles.presetChipSelected,
@@ -306,7 +219,9 @@ export function LabLocationConfigModal({
                       <AppText
                         variant="caption"
                         weight={isSelected ? 'bold' : 'regular'}
-                        color={isSelected ? Colors.textWhite : Colors.textSecondary}
+                        color={
+                          isSelected ? Colors.textWhite : Colors.textSecondary
+                        }
                       >
                         {preset} m
                       </AppText>
@@ -318,13 +233,17 @@ export function LabLocationConfigModal({
               <TextInput
                 style={styles.textInput}
                 value={radiusMeters}
-                onChangeText={setRadiusMeters}
+                onChangeText={setDraftRadius}
                 placeholder="60"
                 keyboardType="number-pad"
                 placeholderTextColor={Colors.textLight}
               />
-              <AppText variant="caption" color={Colors.textMuted} style={styles.helperText}>
-                Praktikan hanya dapat presensi jika berada dalam batas radius ini dari titik lab.
+              <AppText
+                variant="caption"
+                color={Colors.textMuted}
+                style={styles.helperText}
+              >
+                Perubahan radius ini hanya berlaku pada sesi praktikum ini dan tidak mengubah data utama laboratorium maupun sesi lainnya.
               </AppText>
             </View>
           </ScrollView>
@@ -335,12 +254,12 @@ export function LabLocationConfigModal({
               title="Batal"
               variant="outline"
               size="md"
-              onPress={onClose}
+              onPress={handleCloseModal}
               disabled={saving}
               style={styles.cancelBtn}
             />
             <CustomButton
-              title={saving ? 'Menyimpan...' : 'Simpan Lokasi Lab'}
+              title={saving ? 'Menyimpan...' : 'Simpan Radius Sesi'}
               variant="primary"
               size="md"
               loading={saving}
@@ -383,6 +302,9 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     flex: 1,
   },
+  headerTextCol: {
+    flex: 1,
+  },
   iconCircle: {
     width: 40,
     height: 40,
@@ -420,37 +342,43 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
-  formGroup: {
-    gap: Spacing.xxs,
+  lockedInfoCard: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
   },
-  coordsHeaderRow: {
+  lockedHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingBottom: Spacing.xxs,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
   },
-  gpsButton: {
+  lockedTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xxs,
-    backgroundColor: Colors.primaryBg,
-    paddingVertical: Spacing.xxs,
-    paddingHorizontal: Spacing.sm,
+    gap: 4,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: Colors.primaryBorder,
+    borderColor: Colors.border,
   },
-  gpsButtonPressed: {
-    opacity: 0.7,
-  },
-  gpsButtonDisabled: {
-    opacity: 0.5,
-  },
-  coordsRow: {
+  lockedRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
   },
-  coordCol: {
+  lockedCol: {
     flex: 1,
+    gap: 1,
+  },
+  formGroup: {
     gap: Spacing.xxs,
   },
   textInput: {

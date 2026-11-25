@@ -1,18 +1,6 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import {
-  AndroidImportance,
-  cancelScheduledNotificationAsync,
-  getExpoPushTokenAsync,
-  getPermissionsAsync,
-  IosAuthorizationStatus,
-  SchedulableTriggerInputTypes,
-  scheduleNotificationAsync,
-  setBadgeCountAsync,
-  setNotificationChannelAsync,
-  setNotificationHandler,
-} from 'expo-notifications';
-import {
   arrayUnion,
   collection,
   doc,
@@ -28,7 +16,10 @@ import { PracticalSession } from '@/types/attendance';
 import { AppNotification, NotificationEventType } from '@/types/notification';
 import { PermitRequest } from '@/types/permit';
 import { db, isFirebaseConfigured } from './firebase';
-import { ensureNotificationPermission } from './permissions';
+import {
+  ensureNotificationPermission,
+  getExpoNotifications,
+} from './permissions';
 
 /**
  * Konfigurasi Android Notification Channels sesuai kategori peristiwa praktikum
@@ -83,8 +74,10 @@ function getChannelIdForEvent(type: NotificationEventType): string {
  */
 export function configureForegroundNotificationHandler(): void {
   if (foregroundHandlerConfigured || Platform.OS === 'web') return;
+  const Notifications = getExpoNotifications();
+  if (!Notifications) return;
   try {
-    setNotificationHandler({
+    Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
         shouldShowBanner: true,
@@ -135,41 +128,46 @@ export async function initializeNotificationsForUser(
 ): Promise<string | null> {
   configureForegroundNotificationHandler();
 
+  const Notifications = getExpoNotifications();
+  if (!Notifications) {
+    return null;
+  }
+
   if (Platform.OS === 'android') {
     try {
-      await setNotificationChannelAsync(
+      await Notifications.setNotificationChannelAsync(
         NOTIFICATION_CHANNELS.SESSION_OPENED,
         {
           name: 'Pembukaan Sesi Praktikum',
           description:
             'Pemberitahuan segera saat asisten membuka sesi presensi praktikum',
-          importance: AndroidImportance.MAX,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 200, 250],
           lightColor: Colors.primary,
           enableVibrate: true,
         }
       );
 
-      await setNotificationChannelAsync(
+      await Notifications.setNotificationChannelAsync(
         NOTIFICATION_CHANNELS.SCHEDULE_UPDATES,
         {
           name: 'Perubahan Jadwal Praktikum',
           description:
             'Pemberitahuan ketika jadwal, waktu, atau ruangan praktikum berubah',
-          importance: AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 200, 150, 200],
           lightColor: Colors.warning,
           enableVibrate: true,
         }
       );
 
-      await setNotificationChannelAsync(
+      await Notifications.setNotificationChannelAsync(
         NOTIFICATION_CHANNELS.PERMIT_DECISIONS,
         {
           name: 'Status Permohonan Izin',
           description:
             'Pemberitahuan keputusan asisten atas pengajuan izin praktikum Anda',
-          importance: AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250],
           lightColor: Colors.success,
           enableVibrate: true,
@@ -186,13 +184,16 @@ export async function initializeNotificationsForUser(
   }
 
   let pushToken: string | null = null;
+  const isExpoGoAndroid =
+    Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient';
+
   try {
-    if (Device.isDevice) {
+    if (Device.isDevice && !isExpoGoAndroid) {
       const projectId =
         Constants.expoConfig?.extra?.eas?.projectId ??
         Constants.easConfig?.projectId;
       if (projectId) {
-        const tokenResp = await getExpoPushTokenAsync({
+        const tokenResp = await Notifications.getExpoPushTokenAsync({
           projectId,
         });
         pushToken = tokenResp.data;
@@ -238,15 +239,18 @@ async function triggerDeviceOsNotification(
     return;
   }
 
+  const Notifications = getExpoNotifications();
+  if (!Notifications) return;
+
   try {
-    const perm = await getPermissionsAsync();
+    const perm = await Notifications.getPermissionsAsync();
     const granted =
       Boolean(perm.granted) ||
-      perm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+      perm.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
     if (!granted) return;
 
     const channelId = getChannelIdForEvent(notif.type);
-    await scheduleNotificationAsync({
+    await Notifications.scheduleNotificationAsync({
       content: {
         title: notif.title,
         body: notif.body,
@@ -444,8 +448,10 @@ export async function markAllNotificationsRead(
  */
 export async function syncAppBadgeCount(count: number): Promise<void> {
   if (Platform.OS === 'web') return;
+  const Notifications = getExpoNotifications();
+  if (!Notifications) return;
   try {
-    await setBadgeCountAsync(Math.max(0, count));
+    await Notifications.setBadgeCountAsync(Math.max(0, count));
   } catch {
     // Abaikan jika launcher tidak mendukung badge count
   }
@@ -480,12 +486,14 @@ export async function scheduleUpcomingSessionReminders(
   enrolledClasses: string[]
 ): Promise<number> {
   if (Platform.OS === 'web') return 0;
+  const Notifications = getExpoNotifications();
+  if (!Notifications) return 0;
 
   try {
-    const perm = await getPermissionsAsync();
+    const perm = await Notifications.getPermissionsAsync();
     const granted =
       Boolean(perm.granted) ||
-      perm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+      perm.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
     if (!granted) return 0;
   } catch {
     return 0;
@@ -509,7 +517,7 @@ export async function scheduleUpcomingSessionReminders(
     if (session.status !== 'NOT_STARTED') {
       if (existing) {
         try {
-          await cancelScheduledNotificationAsync(existing.identifier);
+          await Notifications.cancelScheduledNotificationAsync(existing.identifier);
         } catch {}
         scheduledSessionReminders.delete(session.id);
       }
@@ -532,13 +540,13 @@ export async function scheduleUpcomingSessionReminders(
 
     if (existing) {
       try {
-        await cancelScheduledNotificationAsync(existing.identifier);
+        await Notifications.cancelScheduledNotificationAsync(existing.identifier);
       } catch {}
       scheduledSessionReminders.delete(session.id);
     }
 
     try {
-      const identifier = await scheduleNotificationAsync({
+      const identifier = await Notifications.scheduleNotificationAsync({
         content: {
           title: `Pengingat Praktikum 15 Menit Lagi • Kelas ${classCode}`,
           body: `${session.courseName} akan dimulai pukul ${session.timeSlot} di ${session.room}. Pastikan Anda sudah berada di area radius laboratorium.`,
@@ -554,7 +562,7 @@ export async function scheduleUpcomingSessionReminders(
             : {}),
         },
         trigger: {
-          type: SchedulableTriggerInputTypes.DATE,
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: new Date(triggerMs),
         },
       });

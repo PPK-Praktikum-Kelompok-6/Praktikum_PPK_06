@@ -10,7 +10,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { PracticalSession, UserRole } from '@/types/attendance';
 import { Coordinates, LabLocation } from '@/types/lab';
 import { formatDateIndonesian } from '@/utils/formatTime';
-import { calculateDistanceMeters } from '@/utils/geo';
+import { calculateDistanceMeters, isRoomMatchingLab } from '@/utils/geo';
 
 export interface LabActivitySheetProps {
   selectedLab: LabLocation | null;
@@ -25,14 +25,7 @@ function isSessionMatchingLab(
   session: PracticalSession,
   lab: LabLocation
 ): boolean {
-  const roomNorm = (session.room || '').trim().toLowerCase();
-  const labNorm = (lab.name || '').trim().toLowerCase();
-  if (!roomNorm || !labNorm) return false;
-  return (
-    roomNorm === labNorm ||
-    roomNorm.includes(labNorm) ||
-    labNorm.includes(roomNorm)
-  );
+  return isRoomMatchingLab(session.room, lab, session.labId);
 }
 
 function parseStartTimeMinutes(timeSlot: string): number {

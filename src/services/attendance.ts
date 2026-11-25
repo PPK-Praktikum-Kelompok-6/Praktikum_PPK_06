@@ -141,7 +141,7 @@ export async function submitAttendanceToFirestore(
         }
 
         if (targetLab) {
-          const maxRadius = preSessionData.radiusMeters || targetLab.radiusMeters || 50;
+          const maxRadius = preSessionData.radiusMeters ?? targetLab.radiusMeters ?? 60;
           computedDistance = calculateDistanceMeters(userCoords, {
             latitude: targetLab.latitude,
             longitude: targetLab.longitude,
@@ -155,6 +155,9 @@ export async function submitAttendanceToFirestore(
           }
         }
       }
+
+      const isOfflineVerified =
+        preSessionData.deliveryMode !== 'ONLINE' && computedDistance !== null;
 
       const result = await runTransaction(db, async (transaction: Transaction) => {
         // 1. Periksa status sesi dalam transaksi
@@ -183,8 +186,8 @@ export async function submitAttendanceToFirestore(
           timestamp,
           notes: notes?.trim() || '',
           distanceMeters: computedDistance,
-          userCoords: userCoords || undefined,
-          verifiedLocation: true,
+          userCoords: userCoords ?? null,
+          verifiedLocation: isOfflineVerified,
         };
 
         transaction.set(attendanceDocRef, newRecord);
@@ -246,7 +249,7 @@ export async function submitAttendanceToFirestore(
 
     const targetLab = record.labLocation || (await getLabByRoomName(session.room));
     if (targetLab) {
-      const maxRadius = session.radiusMeters || targetLab.radiusMeters || 50;
+      const maxRadius = session.radiusMeters ?? targetLab.radiusMeters ?? 60;
       localComputedDistance = calculateDistanceMeters(userCoords, {
         latitude: targetLab.latitude,
         longitude: targetLab.longitude,
@@ -270,8 +273,9 @@ export async function submitAttendanceToFirestore(
     timestamp,
     notes: notes?.trim() || '',
     distanceMeters: localComputedDistance,
-    userCoords: userCoords || undefined,
-    verifiedLocation: true,
+    userCoords: userCoords ?? null,
+    verifiedLocation:
+      session.deliveryMode !== 'ONLINE' && localComputedDistance !== null,
   };
 
   localAttendanceStore = [newRecord, ...localAttendanceStore];

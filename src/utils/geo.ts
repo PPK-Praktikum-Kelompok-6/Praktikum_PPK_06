@@ -2,6 +2,51 @@ import { Coordinates, LabLocation, LocationValidationResult } from '@/types/lab'
 
 const EARTH_RADIUS_METERS = 6371000;
 
+const LEGACY_ROOM_TO_NEW_LAB: Record<string, string> = {
+  'lab basis data': 'Lab D',
+  'lab-basis-data': 'Lab D',
+  'lab komputer 2': 'Lab C',
+  'lab-komputer-2': 'Lab C',
+  'lab komputer 1': 'Lab B',
+  'lab-komputer-1': 'Lab B',
+  'lab komputer': 'Lab B',
+  'lab jaringan': 'Lab AP',
+  'lab-jaringan': 'Lab AP',
+  'lab riset & kecerdasan buatan': 'Lab AP',
+  'lab riset': 'Lab AP',
+  'lab-riset-ai': 'Lab AP',
+};
+
+/**
+ * Menormalkan nama ruangan praktikum lama ke 4 laboratorium resmi (Lab D, Lab C, Lab B, Lab AP).
+ */
+export function normalizeLabRoomName(room: string | undefined | null): string {
+  const trimmed = (room || '').trim();
+  if (!trimmed) return '';
+  const mapped = LEGACY_ROOM_TO_NEW_LAB[trimmed.toLowerCase()];
+  return mapped || trimmed;
+}
+
+/**
+ * Memeriksa kecocokan nama ruangan sesi dengan objek laboratorium secara presisi.
+ */
+export function isRoomMatchingLab(
+  room: string | undefined | null,
+  lab: Pick<LabLocation, 'id' | 'name'>,
+  sessionLabId?: string
+): boolean {
+  if (sessionLabId && sessionLabId.trim().toLowerCase() === lab.id.trim().toLowerCase()) {
+    return true;
+  }
+  const normalizedRoom = normalizeLabRoomName(room).toLowerCase();
+  if (!normalizedRoom) return false;
+
+  const labNameNorm = (lab.name || '').trim().toLowerCase();
+  const labIdNorm = (lab.id || '').trim().toLowerCase();
+
+  return normalizedRoom === labNameNorm || normalizedRoom === labIdNorm;
+}
+
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }

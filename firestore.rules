@@ -138,9 +138,9 @@ service cloud.firestore {
     match /labs/{labId} {
       // Semua pengguna dapat melihat daftar lokasi & radius laboratorium di halaman Maps
       allow read: if true;
-      // Asisten/Admin dapat mengatur titik koordinat & radius lab (serta auto-seed saat kosong)
+      // Pengguna terautentikasi/Asisten/Admin dapat menyinkronkan titik lab & membersihkan lab lama
       allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAssistant() || isAdmin();
     }
 
     // =========================================================================

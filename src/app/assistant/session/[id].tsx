@@ -38,6 +38,7 @@ import { canOpen, isSessionExpired } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import { LabLocation } from '@/types/lab';
 import { formatDateIndonesian } from '@/utils/formatTime';
+import { isRoomMatchingLab } from '@/utils/geo';
 
 export default function AssistantSessionDetailRoute() {
   const { currentUser } = useCurrentUser();
@@ -120,14 +121,8 @@ export default function AssistantSessionDetailRoute() {
   useEffect(() => {
     if (!session?.room) return;
     const unsubLabs = subscribeLabs((labs) => {
-      const cleaned = session.room.trim().toLowerCase();
-      const found = labs.find(
-        (l) =>
-          (session.labId && l.id.toLowerCase() === session.labId.toLowerCase()) ||
-          l.id.toLowerCase() === cleaned ||
-          l.name.trim().toLowerCase() === cleaned ||
-          cleaned.includes(l.name.trim().toLowerCase()) ||
-          l.name.trim().toLowerCase().includes(cleaned)
+      const found = labs.find((l) =>
+        isRoomMatchingLab(session.room, l, session.labId)
       );
       if (found) {
         setCurrentLab(found);
@@ -444,7 +439,7 @@ export default function AssistantSessionDetailRoute() {
             label={
               session.deliveryMode === 'ONLINE'
                 ? 'Mode Daring'
-                : `${currentLab?.radiusMeters || session.radiusMeters || 60} Meter`
+                : `${session.radiusMeters ?? currentLab?.radiusMeters ?? 60} Meter`
             }
             variant={session.deliveryMode === 'ONLINE' ? 'closed' : 'attended'}
             size="sm"
@@ -455,8 +450,8 @@ export default function AssistantSessionDetailRoute() {
           {session.deliveryMode === 'ONLINE'
             ? 'Sesi ini diadakan daring (online). Validasi radius GPS praktikan dilewati.'
             : `Praktikan wajib berada dalam radius maksimal ${
-                currentLab?.radiusMeters || session.radiusMeters || 60
-              } m dari ${currentLab?.name || session.room} untuk dapat mengisi presensi.`}
+                session.radiusMeters ?? currentLab?.radiusMeters ?? 60
+              } m dari ${currentLab?.name || session.room} untuk dapat mengisi presensi pada sesi ini.`}
         </AppText>
 
         {currentLab && session.deliveryMode !== 'ONLINE' ? (
@@ -470,21 +465,23 @@ export default function AssistantSessionDetailRoute() {
             <View style={styles.labMetaRow}>
               <Icon name="navigate-outline" size={14} color={Colors.textMuted} />
               <AppText variant="caption" color={Colors.textMuted}>
-                Koordinat: {currentLab.latitude.toFixed(5)}, {currentLab.longitude.toFixed(5)}
+                Koordinat Lab (Tetap): {currentLab.latitude.toFixed(5)}, {currentLab.longitude.toFixed(5)}
               </AppText>
             </View>
           </View>
         ) : null}
 
-        <View style={styles.labConfigBtnWrap}>
-          <CustomButton
-            title="Atur Lokasi & Radius Lab"
-            variant="outline"
-            size="sm"
-            icon={<Icon name="locate-outline" size={16} color={Colors.primary} />}
-            onPress={() => setLabModalVisible(true)}
-          />
-        </View>
+        {session.deliveryMode !== 'ONLINE' ? (
+          <View style={styles.labConfigBtnWrap}>
+            <CustomButton
+              title="Atur Radius Presensi Sesi"
+              variant="outline"
+              size="sm"
+              icon={<Icon name="locate-outline" size={16} color={Colors.primary} />}
+              onPress={() => setLabModalVisible(true)}
+            />
+          </View>
+        ) : null}
       </Card>
 
       {/* Tata Kelola Sesi: Reschedule / Hapus dengan Izin Admin */}
@@ -790,19 +787,22 @@ export default function AssistantSessionDetailRoute() {
         onPrimary={() => setFeedbackVisible(false)}
       />
 
-      {/* Modal Pengaturan Lokasi & Radius Lab (SRS-S3-03) */}
+      {/* Modal Pengaturan Radius Presensi Sesi (SRS-S3-03) */}
       <LabLocationConfigModal
         visible={labModalVisible}
         onClose={() => setLabModalVisible(false)}
         initialLab={currentLab}
         currentRoomName={session.room}
+        initialRadiusMeters={session.radiusMeters ?? currentLab?.radiusMeters ?? 60}
         sessionId={session.id}
-        onSuccess={(updatedLab) => {
-          setCurrentLab(updatedLab);
+        onSuccess={(newRadiusMeters) => {
+          setRealtimeSession((prev) =>
+            prev ? { ...prev, radiusMeters: newRadiusMeters } : prev
+          );
           setFeedbackType('success');
-          setFeedbackTitle('Lokasi Lab Diperbarui!');
+          setFeedbackTitle('Radius Sesi Diperbarui!');
           setFeedbackMessage(
-            `Koordinat dan radius ${updatedLab.name} (${updatedLab.radiusMeters} m) berhasil disimpan ke Cloud Firestore.`
+            `Batas radius presensi untuk sesi ${session.courseName} (${session.classCode}) berhasil diatur ke ${newRadiusMeters} meter.`
           );
           setFeedbackVisible(true);
         }}

@@ -391,7 +391,7 @@ export default function StudentScheduleRoute() {
                       👨‍🏫 Asprak: {asprakNames}
                     </AppText>
                     <AppText variant="caption" color={Colors.textMuted}>
-                      📍 {cls.room || 'Lab Komputer'} • Kode: {cls.studentJoinCode}
+                      📍 {cls.room || 'Lab D'} • Kode: {cls.studentJoinCode}
                     </AppText>
                   </View>
 
@@ -618,7 +618,7 @@ export default function StudentScheduleRoute() {
                   <View style={styles.previewMetaRow}>
                     <Icon name="location-outline" size={16} color={Colors.primary} />
                     <AppText variant="bodySm" color={Colors.textSecondary}>
-                      Ruangan Lab: {previewClassToJoin.room || 'Lab Komputer'}
+                      Ruangan Lab: {previewClassToJoin.room || 'Lab D'}
                     </AppText>
                   </View>
                 </View>

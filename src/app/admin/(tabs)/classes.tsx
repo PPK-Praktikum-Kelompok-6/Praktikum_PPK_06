@@ -200,7 +200,7 @@ export default function AdminClassesScreen() {
                     />
                   </View>
                   <AppText variant="caption" color={Colors.textMuted}>
-                    Ruangan: {cls.room || 'Lab Komputer'} • {cls.studentIds?.length || 0} Praktikan Terdaftar
+                    Ruangan: {cls.room || 'Lab D'} • {cls.studentIds?.length || 0} Praktikan Terdaftar
                   </AppText>
                   <AppText variant="caption" color={Colors.textSecondary}>
                     Kode Praktikan: {cls.studentJoinCode || '-'} • Invite Asprak: {cls.assistantInviteCode || '-'}

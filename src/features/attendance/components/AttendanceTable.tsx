@@ -55,6 +55,17 @@ export function AttendanceTable({ records, style }: AttendanceTableProps) {
                 <AppText variant="caption" color={Colors.textMuted}>
                   NIM: {record.studentNim}
                 </AppText>
+                {record.verifiedLocation ? (
+                  <View style={styles.verifiedRow}>
+                    <Icon name="shield-checkmark" size={12} color={Colors.success} />
+                    <AppText variant="caption" color={Colors.success} weight="semibold">
+                      Lokasi Terverifikasi
+                      {record.distanceMeters !== undefined && record.distanceMeters !== null
+                        ? ` (${record.distanceMeters} m dari lab)`
+                        : ''}
+                    </AppText>
+                  </View>
+                ) : null}
                 {record.notes ? (
                   <View style={styles.notesRow}>
                     <Icon name="chatbubble-ellipses-outline" size={12} color={Colors.textMuted} />
@@ -112,6 +123,12 @@ const styles = StyleSheet.create({
   },
   studentInfo: {
     flex: 1,
+  },
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
   },
   notesRow: {
     flexDirection: 'row',

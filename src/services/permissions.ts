@@ -1,12 +1,38 @@
+import Constants from 'expo-constants';
 import * as Location from 'expo-location';
-import {
-  getPermissionsAsync,
-  IosAuthorizationStatus,
-  requestPermissionsAsync,
-} from 'expo-notifications';
+import type * as NotificationsType from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 
 import { DevicePermissionState } from '@/types/notification';
+
+let cachedNotificationsModule: typeof NotificationsType | null | undefined;
+
+/**
+ * Memuat modul native `expo-notifications` secara aman (lazy-load).
+ * Mengembalikan `null` pada Web, Expo Go Android (SDK 53+), atau apabila klien/APK lama belum memuat
+ * modul native terkait sehingga aplikasi tidak crash dan beralih ke In-App Banner Fallback (SRS-S3-07).
+ */
+export function getExpoNotifications(): typeof NotificationsType | null {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  if (
+    Platform.OS === 'android' &&
+    Constants.executionEnvironment === 'storeClient'
+  ) {
+    return null;
+  }
+  if (cachedNotificationsModule !== undefined) {
+    return cachedNotificationsModule;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    cachedNotificationsModule = require('expo-notifications') as typeof NotificationsType;
+  } catch {
+    cachedNotificationsModule = null;
+  }
+  return cachedNotificationsModule;
+}
 
 /**
  * Meminta izin lokasi foreground + mengecek apakah layanan GPS perangkat aktif (SRS-S3-07).
@@ -107,13 +133,23 @@ export async function ensureNotificationPermission(): Promise<{
       };
     }
 
-    let perm = await getPermissionsAsync();
+    const Notifications = getExpoNotifications();
+    if (!Notifications) {
+      return {
+        granted: false,
+        canAskAgain: false,
+        message:
+          'Modul push notification native tidak tersedia pada klien ini. Sistem otomatis mengaktifkan pemberitahuan real-time melalui banner di dalam aplikasi.',
+      };
+    }
+
+    let perm = await Notifications.getPermissionsAsync();
     const isInitiallyGranted =
       perm.granted ||
-      perm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+      perm.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 
     if (!isInitiallyGranted && perm.canAskAgain !== false) {
-      perm = await requestPermissionsAsync({
+      perm = await Notifications.requestPermissionsAsync({
         ios: {
           allowAlert: true,
           allowBadge: true,
@@ -124,7 +160,7 @@ export async function ensureNotificationPermission(): Promise<{
 
     const granted =
       Boolean(perm.granted) ||
-      perm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+      perm.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
     const canAskAgain = perm.canAskAgain ?? true;
 
     if (!granted) {
@@ -187,10 +223,16 @@ export async function getDevicePermissionState(): Promise<DevicePermissionState>
           (globalThis as any).Notification.permission === 'granted';
       }
     } else {
-      const notifPerm = await getPermissionsAsync();
-      notificationGranted =
-        Boolean(notifPerm.granted) ||
-        notifPerm.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+      const Notifications = getExpoNotifications();
+      if (Notifications) {
+        const notifPerm = await Notifications.getPermissionsAsync();
+        notificationGranted =
+          Boolean(notifPerm.granted) ||
+          notifPerm.ios?.status ===
+            Notifications.IosAuthorizationStatus.PROVISIONAL;
+      } else {
+        notificationGranted = false;
+      }
     }
   } catch {
     notificationGranted = false;

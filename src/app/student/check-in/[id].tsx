@@ -16,16 +16,20 @@ import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
+import { RippleCheckIn } from '@/components/ui/RippleCheckIn';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { AttendanceSuccessCard } from '@/features/attendance/components/AttendanceSuccessCard';
 import { LocationStatusBanner } from '@/features/attendance/components/LocationStatusBanner';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
+import { subscribeAllClasses } from '@/services/admin';
 import {
   submitAttendanceToFirestore,
   subscribeToSessionAttendance,
 } from '@/services/attendance';
 import { getLabByRoomName, subscribeLabs } from '@/services/labs';
-import { subscribeSessionDoc } from '@/services/sessions';
+import { PermitRequest, subscribeStudentPermits } from '@/services/permits';
+import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
 import {
@@ -34,7 +38,7 @@ import {
   LocationValidationResult,
 } from '@/types/lab';
 import { formatTime } from '@/utils/formatTime';
-import { validateStudentLocation } from '@/utils/geo';
+import { isRoomMatchingLab, validateStudentLocation } from '@/utils/geo';
 
 export default function StudentCheckInRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -42,24 +46,30 @@ export default function StudentCheckInRoute() {
 
   const { currentUser } = useCurrentUser();
   const { getSessionById } = useSessions();
-  const { submitAttendance, isAlreadyAttended } = useAttendance();
+  const { attendanceRecords, submitAttendance, isAlreadyAttended } =
+    useAttendance();
 
-  const [realtimeSession, setRealtimeSession] = useState<PracticalSession | undefined>(
-    undefined
+  const [realtimeSession, setRealtimeSession] = useState<
+    PracticalSession | undefined
+  >(undefined);
+  const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>(
+    []
   );
-  const [realtimeRecords, setRealtimeRecords] = useState<AttendanceRecord[]>([]);
+  const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
+  const [myPermits, setMyPermits] = useState<PermitRequest[]>([]);
   const [labLocation, setLabLocation] = useState<LabLocation | null>(null);
 
   // Geolocation states
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [checkingLocation, setCheckingLocation] = useState(true);
-  const [validationResult, setValidationResult] = useState<LocationValidationResult>({
-    allowed: false,
-    status: 'CHECKING',
-    distanceMeters: null,
-    maxRadiusMeters: 60,
-    message: 'Sedang mendeteksi posisi GPS perangkat Anda...',
-  });
+  const [validationResult, setValidationResult] =
+    useState<LocationValidationResult>({
+      allowed: false,
+      status: 'CHECKING',
+      distanceMeters: null,
+      maxRadiusMeters: 60,
+      message: 'Sedang mendeteksi posisi GPS perangkat Anda...',
+    });
 
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,29 +95,34 @@ export default function StudentCheckInRoute() {
     return () => unsub();
   }, [sessionId]);
 
-  // 2. Real-time listener rekaman presensi
+  // 2. Real-time listener rekaman presensi + kelas + izin praktikan
   useEffect(() => {
     if (!sessionId) return;
-    const unsub = subscribeToSessionAttendance(sessionId, (records) => {
+    const unsubAtt = subscribeToSessionAttendance(sessionId, (records) => {
       setRealtimeRecords(records);
     });
-    return () => unsub();
-  }, [sessionId]);
+    const unsubClasses = subscribeAllClasses((cls) => {
+      setAllClasses(cls);
+    });
+    const unsubPermits = subscribeStudentPermits(currentUser.id, (permits) => {
+      setMyPermits(permits);
+    });
+    return () => {
+      unsubAtt();
+      unsubClasses();
+      unsubPermits();
+    };
+  }, [sessionId, currentUser.id]);
 
-  const session = realtimeSession || (sessionId ? getSessionById(sessionId) : undefined);
+  const session =
+    realtimeSession || (sessionId ? getSessionById(sessionId) : undefined);
 
   // 3. Sinkronisasi data Lab dari Firestore
   useEffect(() => {
     if (!session?.room) return;
     const unsubLabs = subscribeLabs((labs) => {
-      const cleaned = session.room.trim().toLowerCase();
-      const found = labs.find(
-        (l) =>
-          (session.labId && l.id.toLowerCase() === session.labId.toLowerCase()) ||
-          l.id.toLowerCase() === cleaned ||
-          l.name.trim().toLowerCase() === cleaned ||
-          cleaned.includes(l.name.trim().toLowerCase()) ||
-          l.name.trim().toLowerCase().includes(cleaned)
+      const found = labs.find((l) =>
+        isRoomMatchingLab(session.room, l, session.labId)
       );
       if (found) {
         setLabLocation(found);
@@ -115,6 +130,9 @@ export default function StudentCheckInRoute() {
     });
     return () => unsubLabs();
   }, [session?.room, session?.labId]);
+
+  const effectiveRadius =
+    session?.radiusMeters ?? labLocation?.radiusMeters ?? 60;
 
   // 4. Deteksi & Validasi Lokasi Praktikan (SRS-S3-02)
   const handleCheckLocation = async () => {
@@ -149,7 +167,7 @@ export default function StudentCheckInRoute() {
           allowed: false,
           status: 'PERMISSION_DENIED',
           distanceMeters: null,
-          maxRadiusMeters: labLocation?.radiusMeters || session.radiusMeters || 60,
+          maxRadiusMeters: effectiveRadius,
           message:
             'Izin akses lokasi perangkat ditolak. Buka pengaturan perangkat untuk mengaktifkan izin lokasi.',
         });
@@ -163,7 +181,7 @@ export default function StudentCheckInRoute() {
           allowed: false,
           status: 'GPS_DISABLED',
           distanceMeters: null,
-          maxRadiusMeters: labLocation?.radiusMeters || session.radiusMeters || 60,
+          maxRadiusMeters: effectiveRadius,
           message:
             'Layanan lokasi (GPS) pada perangkat belum aktif. Harap aktifkan GPS terlebih dahulu.',
         });
@@ -180,7 +198,6 @@ export default function StudentCheckInRoute() {
       };
       setUserCoords(coords);
 
-      // Cari data lab acuan
       let targetLab = labLocation;
       if (!targetLab) {
         targetLab = await getLabByRoomName(session.room);
@@ -190,7 +207,7 @@ export default function StudentCheckInRoute() {
       }
 
       if (targetLab) {
-        const radius = session.radiusMeters || targetLab.radiusMeters || 60;
+        const radius = session.radiusMeters ?? targetLab.radiusMeters ?? 60;
         const result = validateStudentLocation(coords, {
           latitude: targetLab.latitude,
           longitude: targetLab.longitude,
@@ -199,12 +216,11 @@ export default function StudentCheckInRoute() {
         });
         setValidationResult(result);
       } else {
-        // Fallback jika lab belum ada di database
         setValidationResult({
           allowed: true,
           status: 'INSIDE_RADIUS',
           distanceMeters: null,
-          maxRadiusMeters: 60,
+          maxRadiusMeters: effectiveRadius,
           message: `Lokasi laboratorium ${session.room} belum terdaftar. Presensi dapat dilanjutkan.`,
         });
       }
@@ -213,7 +229,7 @@ export default function StudentCheckInRoute() {
         allowed: false,
         status: 'UNAVAILABLE',
         distanceMeters: null,
-        maxRadiusMeters: labLocation?.radiusMeters || session.radiusMeters || 60,
+        maxRadiusMeters: effectiveRadius,
         message:
           err?.message ||
           'Gagal membaca posisi GPS. Pastikan Anda berada di area dengan sinyal lokasi yang memadai.',
@@ -232,15 +248,69 @@ export default function StudentCheckInRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, session?.deliveryMode, session?.room]);
 
+  // Nilai validasi efektif yang otomatis menyesuaikan perubahan radius sesi secara real-time tanpa cascading render
+  const effectiveValidationResult = React.useMemo<LocationValidationResult>(() => {
+    if (
+      !checkingLocation &&
+      session &&
+      session.deliveryMode !== 'ONLINE' &&
+      userCoords &&
+      labLocation
+    ) {
+      return validateStudentLocation(userCoords, {
+        latitude: labLocation.latitude,
+        longitude: labLocation.longitude,
+        radiusMeters: effectiveRadius,
+        name: labLocation.name,
+      });
+    }
+    return validationResult;
+  }, [
+    checkingLocation,
+    session,
+    userCoords,
+    labLocation,
+    effectiveRadius,
+    validationResult,
+  ]);
+
   // Cek apakah praktikan sudah presensi
-  const alreadyAttended = Boolean(
-    realtimeRecords.some((r) => r.studentId === currentUser.id) ||
-      (session && isAlreadyAttended(session.id, currentUser.id))
+  const realtimeAttendedRecord = realtimeRecords.find(
+    (r) => r.studentId === currentUser.id
+  );
+  const localAttended = session
+    ? isAlreadyAttended(session.id, currentUser.id)
+    : false;
+  const alreadyAttended = Boolean(realtimeAttendedRecord || localAttended);
+
+  const attendedRecord =
+    realtimeAttendedRecord ||
+    (alreadyAttended && session
+      ? attendanceRecords.find(
+          (rec) =>
+            rec.sessionId === session.id && rec.studentId === currentUser.id
+        )
+      : undefined);
+
+  const sessionPermit = session
+    ? myPermits.find(
+        (p) => p.sessionId === session.id && p.status !== 'REJECTED'
+      )
+    : undefined;
+
+  // Evaluasi kelas yang diikuti praktikan (RBAC)
+  const effectiveEnrolledCodes = Array.from(
+    new Set([
+      ...(currentUser.enrolledClasses || []).map((c) => c.toUpperCase()),
+      ...allClasses
+        .filter((cls) => (cls.studentIds || []).includes(currentUser.id))
+        .map((cls) => cls.classCode.toUpperCase()),
+    ])
   );
 
   // Submit Presensi
   const handleSubmitAttendance = async () => {
-    if (!session) return;
+    if (!session || isSubmitting || alreadyAttended) return;
 
     if (session.status !== 'OPEN') {
       setFeedbackState({
@@ -252,12 +322,12 @@ export default function StudentCheckInRoute() {
       return;
     }
 
-    if (session.deliveryMode !== 'ONLINE' && !validationResult.allowed) {
+    if (session.deliveryMode !== 'ONLINE' && !effectiveValidationResult.allowed) {
       setFeedbackState({
         visible: true,
         type: 'error',
         title: 'Presensi Ditolak',
-        message: validationResult.message,
+        message: effectiveValidationResult.message,
       });
       return;
     }
@@ -274,10 +344,8 @@ export default function StudentCheckInRoute() {
         labLocation,
       });
 
-      // Sinkronkan ke store lokal
-      submitAttendance(session.id, currentUser, notes.trim());
-
       if (res.success) {
+        submitAttendance(session.id, currentUser, notes.trim());
         const timeStr = formatTime(new Date().toISOString());
         setFeedbackState({
           visible: true,
@@ -316,6 +384,20 @@ export default function StudentCheckInRoute() {
     }
   };
 
+  if (currentUser.role !== 'STUDENT') {
+    return (
+      <Screen>
+        <EmptyState
+          title="Akses Khusus Praktikan"
+          message="Halaman check-in presensi ini hanya diperuntukkan bagi Praktikan."
+          iconName="lock-closed-outline"
+          actionLabel="Kembali"
+          onAction={() => router.replace('/assistant')}
+        />
+      </Screen>
+    );
+  }
+
   if (!session) {
     return (
       <Screen>
@@ -330,19 +412,61 @@ export default function StudentCheckInRoute() {
     );
   }
 
+  const isJoinedByClassId =
+    Boolean(session.classId) &&
+    allClasses.some(
+      (c) =>
+        c.id === session.classId &&
+        (c.studentIds || []).includes(currentUser.id)
+    );
+  const isEnrolled =
+    isJoinedByClassId ||
+    effectiveEnrolledCodes.length === 0 ||
+    effectiveEnrolledCodes.includes(session.classCode.toUpperCase());
+
+  if (!isEnrolled) {
+    return (
+      <Screen>
+        <View style={styles.topNav}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <Icon name="arrow-back" size={22} color={Colors.text} />
+          </Pressable>
+          <AppText variant="title">Halaman Presensi</AppText>
+          <View style={styles.navSpacer} />
+        </View>
+        <EmptyState
+          title="Akses Ditolak: Bukan Kelas Anda"
+          message={`Anda tidak terdaftar di kelas praktikum ${session.classCode} (${session.courseName}).`}
+          iconName="lock-closed-outline"
+          actionLabel="Kembali ke Jadwal Saya"
+          onAction={() => router.replace('/student')}
+        />
+      </Screen>
+    );
+  }
+
+  const hasApprovedPermit = sessionPermit?.status === 'APPROVED';
+
   const canSubmitAttendance =
     session.status === 'OPEN' &&
     !alreadyAttended &&
+    !hasApprovedPermit &&
     !checkingLocation &&
-    (session.deliveryMode === 'ONLINE' || validationResult.allowed);
+    (session.deliveryMode === 'ONLINE' || effectiveValidationResult.allowed);
 
   const getButtonTitle = () => {
     if (isSubmitting) return 'Mengirim Presensi...';
     if (alreadyAttended) return 'Anda Sudah Hadir';
+    if (hasApprovedPermit) return 'Izin Telah Disetujui';
     if (session.status === 'NOT_STARTED') return 'Sesi Belum Dibuka';
     if (session.status === 'CLOSED') return 'Sesi Sudah Ditutup';
     if (checkingLocation) return 'Mendeteksi Lokasi GPS...';
-    if (session.deliveryMode !== 'ONLINE' && !validationResult.allowed) {
+    if (session.deliveryMode !== 'ONLINE' && !effectiveValidationResult.allowed) {
       return 'Di Luar Radius Lab';
     }
     return 'Kirim Presensi (Check-In)';
@@ -369,7 +493,11 @@ export default function StudentCheckInRoute() {
         <Card variant="flat" padding="md" style={styles.sessionCard}>
           <View style={styles.sessionCardHeader}>
             <View style={styles.sessionTitleCol}>
-              <Badge label={`Kelas ${session.classCode}`} variant="attended" size="sm" />
+              <Badge
+                label={`Kelas ${session.classCode}`}
+                variant="attended"
+                size="sm"
+              />
               <AppText variant="h2" numberOfLines={1} style={styles.courseTitle}>
                 {session.courseName}
               </AppText>
@@ -382,12 +510,18 @@ export default function StudentCheckInRoute() {
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Icon
-                name={session.deliveryMode === 'ONLINE' ? 'videocam-outline' : 'location-outline'}
+                name={
+                  session.deliveryMode === 'ONLINE'
+                    ? 'videocam-outline'
+                    : 'location-outline'
+                }
                 size={16}
                 color={Colors.primary}
               />
               <AppText variant="bodySm" color={Colors.textSecondary}>
-                {session.deliveryMode === 'ONLINE' ? 'Daring (Online)' : session.room}
+                {session.deliveryMode === 'ONLINE'
+                  ? 'Daring (Online)'
+                  : session.room}
               </AppText>
             </View>
 
@@ -403,104 +537,140 @@ export default function StudentCheckInRoute() {
         {/* Validasi Lokasi (SRS-S3-02) */}
         <View style={styles.bannerSection}>
           <AppText variant="caption" color={Colors.textMuted} weight="bold">
-            VALIDASI LOKASI FISIK (GEOFENCING)
+            VALIDASI LOKASI FISIK (GEOFENCING • RADIUS {effectiveRadius}M)
           </AppText>
           <LocationStatusBanner
-            result={validationResult}
+            result={effectiveValidationResult}
             labName={labLocation?.name || session.room}
             loading={checkingLocation}
             onRefresh={handleCheckLocation}
           />
         </View>
 
-        {/* Formulir Presensi Check-In */}
-        <Card variant="flat" padding="lg" style={styles.formCard}>
-          <View style={styles.formHeader}>
-            <View style={styles.formIconWrap}>
-              <Icon name="clipboard-outline" size={22} color={Colors.primary} />
-            </View>
-            <View style={styles.formTitleWrap}>
-              <AppText variant="h2">Data Kehadiran</AppText>
-              <AppText variant="caption" color={Colors.textMuted}>
-                Identitas Anda diverifikasi secara otomatis dari akun aktif.
-              </AppText>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Profil Mahasiswa */}
-          <View style={styles.profileBox}>
-            <View style={styles.avatarCircle}>
-              <Icon name="person" size={20} color={Colors.primary} />
-            </View>
-            <View style={styles.profileInfo}>
-              <AppText variant="body" weight="semibold">
-                {currentUser.name}
-              </AppText>
-              <AppText variant="caption" color={Colors.textSecondary}>
-                NIM: {currentUser.identifier}
-              </AppText>
-            </View>
-            {alreadyAttended ? (
-              <Badge label="Sudah Hadir" variant="attended" size="sm" showDot />
-            ) : (
-              <Badge
-                label={session.status === 'OPEN' ? 'Siap Hadir' : 'Terkunci'}
-                variant={session.status === 'OPEN' ? 'open' : 'closed'}
-                size="sm"
-              />
-            )}
-          </View>
-
-          {/* Input Catatan (Opsional) */}
-          <View style={styles.inputGroup}>
-            <AppText variant="caption" color={Colors.textMuted} weight="bold">
-              CATATAN PRESENSI (OPSIONAL)
-            </AppText>
-            <TextInput
-              style={styles.textInput}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Tambahkan catatan singkat kehadiran jika diperlukan..."
-              placeholderTextColor={Colors.textLight}
-              multiline
-              numberOfLines={2}
-              editable={!alreadyAttended && session.status === 'OPEN'}
-            />
-          </View>
-
-          {/* Tombol Check-In */}
-          <View style={styles.submitSection}>
-            <CustomButton
-              title={getButtonTitle()}
-              variant="primary"
-              size="lg"
-              loading={isSubmitting}
-              disabled={!canSubmitAttendance}
-              icon={
+        {alreadyAttended && attendedRecord ? (
+          <AttendanceSuccessCard record={attendedRecord} session={session} />
+        ) : (
+          /* Formulir & Ripple Check-In Presensi */
+          <Card variant="flat" padding="lg" style={styles.formCard}>
+            <View style={styles.formHeader}>
+              <View style={styles.formIconWrap}>
                 <Icon
-                  name={alreadyAttended ? 'checkmark-circle' : 'finger-print'}
-                  size={20}
-                  color={Colors.textWhite}
+                  name="clipboard-outline"
+                  size={22}
+                  color={Colors.primary}
                 />
-              }
-              onPress={handleSubmitAttendance}
-            />
+              </View>
+              <View style={styles.formTitleWrap}>
+                <AppText variant="h2">Data Kehadiran</AppText>
+                <AppText variant="caption" color={Colors.textMuted}>
+                  Identitas Anda diverifikasi secara otomatis dari akun aktif.
+                </AppText>
+              </View>
+            </View>
 
-            {!canSubmitAttendance && !alreadyAttended && (
-              <AppText variant="caption" color={Colors.danger} style={styles.disabledReasonText}>
-                {session.status !== 'OPEN'
-                  ? 'Presensi dinonaktifkan karena sesi belum dibuka atau sudah ditutup oleh asisten.'
-                  : checkingLocation
-                  ? 'Menunggu pembacaan sensor GPS perangkat...'
-                  : session.deliveryMode !== 'ONLINE' && !validationResult.allowed
-                  ? 'Presensi terkunci. Anda harus berada di dalam batas radius laboratorium untuk melakukan check-in.'
-                  : ''}
+            <View style={styles.divider} />
+
+            {/* Profil Mahasiswa */}
+            <View style={styles.profileBox}>
+              <View style={styles.avatarCircle}>
+                <Icon name="person" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.profileInfo}>
+                <AppText variant="body" weight="semibold">
+                  {currentUser.name}
+                </AppText>
+                <AppText variant="caption" color={Colors.textSecondary}>
+                  NIM: {currentUser.identifier}
+                </AppText>
+              </View>
+              {alreadyAttended ? (
+                <Badge
+                  label="Sudah Hadir"
+                  variant="attended"
+                  size="sm"
+                  showDot
+                />
+              ) : (
+                <Badge
+                  label={session.status === 'OPEN' ? 'Siap Hadir' : 'Terkunci'}
+                  variant={session.status === 'OPEN' ? 'open' : 'closed'}
+                  size="sm"
+                />
+              )}
+            </View>
+
+            {/* Input Catatan (Opsional) */}
+            <View style={styles.inputGroup}>
+              <AppText variant="caption" color={Colors.textMuted} weight="bold">
+                CATATAN PRESENSI (OPSIONAL)
               </AppText>
-            )}
-          </View>
-        </Card>
+              <TextInput
+                style={styles.textInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Tambahkan catatan singkat kehadiran jika diperlukan..."
+                placeholderTextColor={Colors.textLight}
+                multiline
+                numberOfLines={2}
+                editable={!alreadyAttended && session.status === 'OPEN'}
+              />
+            </View>
+
+            {/* Ripple Check-In Visual Control */}
+            <View style={styles.rippleSection}>
+              <RippleCheckIn
+                onPress={handleSubmitAttendance}
+                checkedIn={alreadyAttended}
+                disabled={!canSubmitAttendance || isSubmitting}
+                label={isSubmitting ? 'MEMPROSES' : 'TAP PRESENSI'}
+                checkedLabel="TERPRESENSI"
+                helperText={
+                  canSubmitAttendance
+                    ? 'Ketuk lingkaran atau tombol di bawah untuk mencatat kehadiran'
+                    : undefined
+                }
+              />
+            </View>
+
+            {/* Tombol Check-In */}
+            <View style={styles.submitSection}>
+              <CustomButton
+                title={getButtonTitle()}
+                variant="primary"
+                size="lg"
+                loading={isSubmitting}
+                disabled={!canSubmitAttendance}
+                icon={
+                  <Icon
+                    name={alreadyAttended ? 'checkmark-circle' : 'finger-print'}
+                    size={20}
+                    color={Colors.textWhite}
+                  />
+                }
+                onPress={handleSubmitAttendance}
+              />
+
+              {!canSubmitAttendance && !alreadyAttended && (
+                <AppText
+                  variant="caption"
+                  color={Colors.danger}
+                  style={styles.disabledReasonText}
+                >
+                  {hasApprovedPermit
+                    ? 'Anda telah memiliki izin ketidakhadiran yang disetujui pada sesi ini.'
+                    : session.status !== 'OPEN'
+                    ? 'Presensi dinonaktifkan karena sesi belum dibuka atau sudah ditutup oleh asisten.'
+                    : checkingLocation
+                    ? 'Menunggu pembacaan sensor GPS perangkat...'
+                    : session.deliveryMode !== 'ONLINE' &&
+                      !effectiveValidationResult.allowed
+                    ? 'Presensi terkunci. Anda harus berada di dalam batas radius laboratorium untuk melakukan check-in.'
+                    : ''}
+                </AppText>
+              )}
+            </View>
+          </Card>
+        )}
       </ScrollView>
 
       {/* Modal Feedback */}
@@ -509,7 +679,9 @@ export default function StudentCheckInRoute() {
         type={feedbackState.type}
         title={feedbackState.title}
         message={feedbackState.message}
-        primaryLabel={feedbackState.type === 'success' ? 'Lihat Bukti Presensi' : 'Tutup'}
+        primaryLabel={
+          feedbackState.type === 'success' ? 'Lihat Bukti Presensi' : 'Tutup'
+        }
         onPrimary={handleFeedbackClose}
         onClose={handleFeedbackClose}
       />
@@ -634,6 +806,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  rippleSection: {
+    paddingVertical: Spacing.xs,
   },
   submitSection: {
     gap: Spacing.xs,
