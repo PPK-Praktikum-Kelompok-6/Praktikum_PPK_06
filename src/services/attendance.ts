@@ -15,7 +15,10 @@ import {
 } from 'firebase/firestore';
 
 import { AttendanceRecord, SessionStatus } from '@/types/attendance';
+import { Coordinates, LabLocation } from '@/types/lab';
+import { calculateDistanceMeters } from '@/utils/geo';
 import { db, isFirebaseConfigured } from './firebase';
+import { getLabByRoomName } from './labs';
 import { getSessionById, updateSession } from './sessions';
 
 /**
@@ -58,18 +61,24 @@ export async function setSessionStatus(
 }
 
 /**
- * 2. Submit Presensi dengan Proteksi Anti-Bocor (SRS-PRES-02)
+ * 2. Submit Presensi dengan Proteksi Anti-Bocor & Validasi Geofencing (SRS-PRES-02 & SRS-S3-02)
  *
  * Menerapkan verifikasi atomik:
  * a. Memastikan status sesi adalah 'OPEN'.
  * b. Memastikan mahasiswa belum pernah presensi pada sesi ini.
- * c. Menggunakan deterministic ID `attendance_${sessionId}_${studentId}`
+ * c. Validasi Geofencing (SRS-S3-02): Untuk sesi OFFLINE, mahasiswa wajib berada
+ *    di dalam radius laboratorium yang ditentukan.
+ * d. Menggunakan deterministic ID `attendance_${sessionId}_${studentId}`
  *    atau Firestore Transaction untuk mencegah race condition / duplikasi.
  */
 export async function submitAttendanceToFirestore(
-  record: Omit<AttendanceRecord, 'id' | 'timestamp'> & { timestamp?: string }
+  record: Omit<AttendanceRecord, 'id' | 'timestamp'> & {
+    timestamp?: string;
+    userCoords?: Coordinates | null;
+    labLocation?: LabLocation | null;
+  }
 ): Promise<{ success: boolean; message: string; record?: AttendanceRecord }> {
-  const { sessionId, studentId, studentName, studentNim, notes } = record;
+  const { sessionId, studentId, studentName, studentNim, notes, userCoords } = record;
 
   if (!sessionId || !studentId) {
     return {
@@ -87,8 +96,68 @@ export async function submitAttendanceToFirestore(
       const attendanceDocRef = doc(db, 'attendance', docId);
       const sessionDocRef = doc(db, 'sessions', sessionId);
 
+      // Ambil data sesi terlebih dahulu untuk pra-validasi geofence sebelum transaksi
+      const preSessionSnap = await getDoc(sessionDocRef);
+      if (!preSessionSnap.exists()) {
+        return {
+          success: false,
+          message: 'Sesi praktikum tidak ditemukan.',
+        };
+      }
+
+      const preSessionData = preSessionSnap.data();
+      if (preSessionData.status !== 'OPEN') {
+        return {
+          success: false,
+          message: 'Sesi praktikum belum dibuka atau sudah ditutup.',
+        };
+      }
+
+      let computedDistance: number | null = null;
+      // Validasi Lokasi (SRS-S3-02): Khusus sesi OFFLINE
+      if (preSessionData.deliveryMode !== 'ONLINE') {
+        if (!userCoords) {
+          return {
+            success: false,
+            message:
+              'Lokasi perangkat tidak dapat diperoleh. Aktifkan GPS dan izinkan akses lokasi untuk melakukan presensi praktikum offline.',
+          };
+        }
+
+        let targetLab = record.labLocation || null;
+        if (!targetLab && preSessionData.labId) {
+          try {
+            const labSnap = await getDoc(doc(db, 'labs', preSessionData.labId));
+            if (labSnap.exists()) {
+              targetLab = { id: labSnap.id, ...(labSnap.data() as Omit<LabLocation, 'id'>) };
+            }
+          } catch {
+            // Abaikan jika gagal ambil lab by id, coba via room name
+          }
+        }
+
+        if (!targetLab && preSessionData.room) {
+          targetLab = await getLabByRoomName(preSessionData.room);
+        }
+
+        if (targetLab) {
+          const maxRadius = preSessionData.radiusMeters || targetLab.radiusMeters || 50;
+          computedDistance = calculateDistanceMeters(userCoords, {
+            latitude: targetLab.latitude,
+            longitude: targetLab.longitude,
+          });
+
+          if (computedDistance > maxRadius) {
+            return {
+              success: false,
+              message: `Presensi ditolak. Anda berada di luar radius laboratorium ${targetLab.name} (Jarak Anda: ${computedDistance} m, batas maksimal: ${maxRadius} m).`,
+            };
+          }
+        }
+      }
+
       const result = await runTransaction(db, async (transaction: Transaction) => {
-        // 1. Periksa status sesi
+        // 1. Periksa status sesi dalam transaksi
         const sessionSnap = await transaction.get(sessionDocRef);
         if (!sessionSnap.exists()) {
           throw new Error('Sesi praktikum tidak ditemukan.');
@@ -113,6 +182,9 @@ export async function submitAttendanceToFirestore(
           studentNim,
           timestamp,
           notes: notes?.trim() || '',
+          distanceMeters: computedDistance,
+          userCoords: userCoords || undefined,
+          verifiedLocation: true,
         };
 
         transaction.set(attendanceDocRef, newRecord);
@@ -161,6 +233,34 @@ export async function submitAttendanceToFirestore(
     };
   }
 
+  let localComputedDistance: number | null = null;
+  // Validasi Geofencing lokal (SRS-S3-02)
+  if (session.deliveryMode !== 'ONLINE') {
+    if (!userCoords) {
+      return {
+        success: false,
+        message:
+          'Lokasi perangkat tidak dapat diperoleh. Aktifkan GPS dan izinkan akses lokasi untuk melakukan presensi praktikum offline.',
+      };
+    }
+
+    const targetLab = record.labLocation || (await getLabByRoomName(session.room));
+    if (targetLab) {
+      const maxRadius = session.radiusMeters || targetLab.radiusMeters || 50;
+      localComputedDistance = calculateDistanceMeters(userCoords, {
+        latitude: targetLab.latitude,
+        longitude: targetLab.longitude,
+      });
+
+      if (localComputedDistance > maxRadius) {
+        return {
+          success: false,
+          message: `Presensi ditolak. Anda berada di luar radius laboratorium ${targetLab.name} (Jarak Anda: ${localComputedDistance} m, batas maksimal: ${maxRadius} m).`,
+        };
+      }
+    }
+  }
+
   const newRecord: AttendanceRecord = {
     id: docId,
     sessionId,
@@ -169,6 +269,9 @@ export async function submitAttendanceToFirestore(
     studentNim,
     timestamp,
     notes: notes?.trim() || '',
+    distanceMeters: localComputedDistance,
+    userCoords: userCoords || undefined,
+    verifiedLocation: true,
   };
 
   localAttendanceStore = [newRecord, ...localAttendanceStore];

@@ -156,21 +156,21 @@ Perluas parameter `submitAttendanceToFirestore` agar menerima `userCoords?: Coor
 
 ## 5. Checklist Eksekusi Step-by-Step (Sprint 3 Zaidan)
 
-- [ ] **Langkah 1**: Buat branch `feat/zaidan/location-checkin-labs` dari `main`/`dev` terbaru.
-- [ ] **Langkah 2**: Jalankan `npx expo install expo-location` dan tambahkan konfigurasi plugin izin lokasi di `app.json`.
-- [ ] **Langkah 3**: Buat `src/types/lab.ts` dan fungsi murni Haversine di `src/utils/geo.ts`.
-- [ ] **Langkah 4**: Buat `src/services/labs.ts` untuk CRUD & *real-time listener* koleksi Firestore `labs` (lengkap dengan titik koordinat awal laboratorium Informatika).
-- [ ] **Langkah 5**: Buat modal `src/features/attendance/components/LabLocationConfigModal.tsx` dan pasang di `src/app/assistant/session/[id].tsx` agar Asisten dapat mengatur koordinat (termasuk tombol *"Gunakan Lokasi Saat Ini"*) dan radius (meter) untuk lab/sesi praktikum.
-- [ ] **Langkah 6**: Perbarui `submitAttendanceToFirestore()` di `src/services/attendance.ts` agar memvalidasi radius lokasi secara ketat sebelum menulis dokumen ke Firestore (anti-bypass & anti-double attendance).
-- [ ] **Langkah 7**: Buat komponen `src/features/attendance/components/LocationStatusBanner.tsx` yang menampilkan jarak aktual (meter), status validasi, serta tombol *"Periksa Ulang Lokasi"*.
-- [ ] **Langkah 8**: Pisahkan alur detail sesi dan halaman presensi (`SRS-S3-01`):
+- [x] **Langkah 1**: Buat branch `feat/zaidan/location-checkin-labs` dari `main`/`dev` terbaru.
+- [x] **Langkah 2**: Jalankan `npx expo install expo-location` dan tambahkan konfigurasi plugin izin lokasi di `app.json`.
+- [x] **Langkah 3**: Buat `src/types/lab.ts` dan fungsi murni Haversine di `src/utils/geo.ts`.
+- [x] **Langkah 4**: Buat `src/services/labs.ts` untuk CRUD & *real-time listener* koleksi Firestore `labs` (lengkap dengan titik koordinat awal laboratorium Informatika).
+- [x] **Langkah 5**: Buat modal `src/features/attendance/components/LabLocationConfigModal.tsx` dan pasang di `src/app/assistant/session/[id].tsx` agar Asisten dapat mengatur koordinat (termasuk tombol *"Gunakan Lokasi Saat Ini"*) dan radius (meter) untuk lab/sesi praktikum.
+- [x] **Langkah 6**: Perbarui `submitAttendanceToFirestore()` di `src/services/attendance.ts` agar memvalidasi radius lokasi secara ketat sebelum menulis dokumen ke Firestore (anti-bypass & anti-double attendance).
+- [x] **Langkah 7**: Buat komponen `src/features/attendance/components/LocationStatusBanner.tsx` yang menampilkan jarak aktual (meter), status validasi, serta tombol *"Periksa Ulang Lokasi"*.
+- [x] **Langkah 8**: Pisahkan alur detail sesi dan halaman presensi (`SRS-S3-01`):
   - Perbarui `src/app/student/attendance/[id].tsx` agar fokus sebagai **Halaman Detail Sesi** dengan tombol **"Masuk ke Halaman Presensi"** menuju `/student/check-in/${session.id}`.
   - Buat **Halaman Khusus Presensi** baru di `src/app/student/check-in/[id].tsx` yang menampilkan info sesi, status sesi, `LocationStatusBanner`, dan `AttendanceForm` / `RippleCheckIn` *(serta opsional QR Code)*.
-- [ ] **Langkah 9**: Uji skenario **Alur Demo 1**:
+- [x] **Langkah 9**: Uji skenario **Alur Demo 1**:
   1. Asisten atur lokasi/radius lab & buka sesi (`OPEN`).
   2. Praktikan di **luar radius** $\rightarrow$ presensi ditolak + jarak tampil jelas.
   3. Praktikan di **dalam radius** $\rightarrow$ presensi tercatat di Firestore + muncul real-time di rekap Asisten + presensi ke-2 ditolak (*anti-double*).
-- [ ] **Langkah 10**: Jalankan `npx tsc --noEmit` & `npx expo lint` (0 errors), lalu ajukan Pull Request.
+- [x] **Langkah 10**: Jalankan `npx tsc --noEmit` & `npx expo lint` (0 errors), lalu ajukan Pull Request.
 
 ---
 

@@ -111,6 +111,15 @@ export function AttendanceSuccessCard({
           </View>
         ) : null}
 
+        {record.verifiedLocation ? (
+          <View style={styles.verifiedLocationBox}>
+            <Icon name="shield-checkmark" size={14} color={Colors.success} />
+            <AppText variant="caption" color={Colors.success} weight="semibold">
+              Lokasi Terverifikasi Kehadiran Fisik {record.distanceMeters !== undefined && record.distanceMeters !== null ? `(${record.distanceMeters} m dari lab)` : ''}
+            </AppText>
+          </View>
+        ) : null}
+
         {record.notes ? (
           <View style={styles.notesBox}>
             <AppText variant="caption" color={Colors.textMuted}>
@@ -201,6 +210,18 @@ const styles = StyleSheet.create({
   },
   notesText: {
     fontStyle: 'italic',
+  },
+  verifiedLocationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.successBg,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
+    marginTop: Spacing.xs,
   },
 });
 
