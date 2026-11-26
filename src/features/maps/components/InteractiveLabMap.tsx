@@ -501,19 +501,19 @@ export function InteractiveLabMap({
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.pinOpen]} />
             <AppText variant="caption" color={Colors.textSecondary}>
-              Praktikum Berlangsung (OPEN)
+              Berlangsung
             </AppText>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.pinWaiting]} />
             <AppText variant="caption" color={Colors.textSecondary}>
-              Terjadwal Berikutnya
+              Berikutnya
             </AppText>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.pinUser]} />
             <AppText variant="caption" color={Colors.textSecondary}>
-              Posisi Saya (Live)
+              Posisi Saya
             </AppText>
           </View>
         </View>
@@ -551,16 +551,18 @@ export function InteractiveLabMap({
                     : styles.pinIdle,
                 ]}
               />
-              <View>
+              <View style={styles.labChipTexts}>
                 <AppText
                   variant="caption"
                   weight="bold"
+                  numberOfLines={1}
                   color={isSelected ? Colors.textWhite : Colors.text}
                 >
                   {lab.name}
                 </AppText>
                 <AppText
                   variant="caption"
+                  numberOfLines={1}
                   color={
                     isSelected ? Colors.textWhiteMuted : Colors.textSecondary
                   }
@@ -752,8 +754,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.surface,
@@ -772,7 +774,7 @@ const styles = StyleSheet.create({
   },
   labChipsRow: {
     gap: Spacing.sm,
-    paddingVertical: Spacing.xxs,
+    paddingVertical: Spacing.xs,
   },
   labChip: {
     flexDirection: 'row',
@@ -780,10 +782,14 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.sm + 2,
     borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  labChipTexts: {
+    flexShrink: 1,
+    gap: Spacing.xxs,
   },
   labChipSelected: {
     backgroundColor: Colors.primary,

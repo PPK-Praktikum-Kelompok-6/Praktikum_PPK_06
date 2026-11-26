@@ -51,22 +51,26 @@ const VARIANT_STYLES = StyleSheet.create({
     fontWeight: FontWeights.bold,
     color: Colors.text,
     letterSpacing: -0.5,
+    lineHeight: 38,
   },
   h1: {
     fontSize: Typography.xxl,
     fontWeight: FontWeights.bold,
     color: Colors.text,
     letterSpacing: -0.3,
+    lineHeight: 32,
   },
   h2: {
     fontSize: Typography.xl,
     fontWeight: FontWeights.semibold,
     color: Colors.text,
+    lineHeight: 26,
   },
   title: {
     fontSize: Typography.lg,
     fontWeight: FontWeights.semibold,
     color: Colors.text,
+    lineHeight: 23,
   },
   body: {
     fontSize: Typography.md,
@@ -78,22 +82,25 @@ const VARIANT_STYLES = StyleSheet.create({
     fontSize: Typography.sm,
     fontWeight: FontWeights.regular,
     color: Colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   caption: {
     fontSize: Typography.xs,
     fontWeight: FontWeights.medium,
     color: Colors.textMuted,
+    lineHeight: 16,
   },
   label: {
     fontSize: Typography.sm,
     fontWeight: FontWeights.medium,
     color: Colors.textSecondary,
+    lineHeight: 19,
   },
   muted: {
     fontSize: Typography.sm,
     fontWeight: FontWeights.regular,
     color: Colors.textMuted,
+    lineHeight: 19,
   },
 });
 

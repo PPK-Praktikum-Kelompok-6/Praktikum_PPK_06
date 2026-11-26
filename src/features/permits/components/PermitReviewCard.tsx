@@ -9,10 +9,10 @@ import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
-import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { BoxIcon, Icon } from '@/components/ui/Icon';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { AICategory, PermitRequest, PermitStatus } from '@/types/permit';
-import { formatTime } from '@/utils/formatTime';
+import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
 
 export interface PermitReviewCardProps {
   permit: PermitRequest;
@@ -77,7 +77,8 @@ export function PermitReviewCard({
             {permit.classCode ? ` (Kelas ${permit.classCode})` : ''}
           </AppText>
           <AppText variant="caption" color={Colors.textMuted}>
-            Waktu Pengajuan: {formatTime(permit.submittedAt)}
+            Waktu Pengajuan: {formatDateIndonesian(permit.submittedAt)} •{' '}
+            {formatTime(permit.submittedAt)}
           </AppText>
         </View>
         <Badge
@@ -172,9 +173,12 @@ export function PermitReviewCard({
               </View>
             </View>
 
-            <AppText variant="caption" color={Colors.textSecondary} style={styles.summaryText}>
-              💡 Ringkasan: {aiInfo.summary}
-            </AppText>
+            <View style={styles.summaryRow}>
+              <BoxIcon name="light-bulb" size={14} color={Colors.warning} style={styles.summaryIcon} />
+              <AppText variant="caption" color={Colors.textSecondary} style={styles.summaryText}>
+                Ringkasan: {aiInfo.summary}
+              </AppText>
+            </View>
           </View>
         ) : (
           <AppText variant="caption" color={Colors.textMuted}>
@@ -198,8 +202,20 @@ export function PermitReviewCard({
       {/* Kontrol Aksi Asisten (SRS-IZIN-02: Terima/Tolak Manual) */}
       {isPending && (
         <View style={styles.actionContainer}>
+          <CustomButton
+            title={showNoteInput ? 'Sembunyikan Catatan' : '+ Tambah Catatan'}
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+            onPress={() => setShowNoteInput(!showNoteInput)}
+            style={styles.noteToggleBtn}
+          />
+
           {showNoteInput && (
             <TextInput
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
               value={note}
               onChangeText={setNote}
               placeholder="Catatan untuk praktikan (opsional)..."
@@ -232,14 +248,6 @@ export function PermitReviewCard({
               icon={<Icon name="checkmark" size={14} color={Colors.surface} />}
               style={styles.decisionBtn}
             />
-
-            <CustomButton
-              title={showNoteInput ? 'Sembunyikan' : '+ Catatan'}
-              variant="ghost"
-              size="sm"
-              fullWidth={false}
-              onPress={() => setShowNoteInput(!showNoteInput)}
-            />
           </View>
         </View>
       )}
@@ -260,12 +268,13 @@ const styles = StyleSheet.create({
   },
   studentInfo: {
     flex: 1,
+    gap: Spacing.xxs,
   },
   reasonBox: {
     marginVertical: Spacing.xs,
   },
   reasonText: {
-    marginTop: 2,
+    marginTop: Spacing.xxs,
     fontStyle: 'italic',
   },
   aiPanel: {
@@ -273,20 +282,23 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     borderRadius: Radius.md,
     marginTop: Spacing.xs,
+    gap: Spacing.xs,
   },
   aiPanelHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    gap: Spacing.xs,
   },
   aiTitleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
+    flexShrink: 1,
   },
   aiDetails: {
-    gap: 4,
+    gap: Spacing.xs,
   },
   metaRow: {
     flexDirection: 'row',
@@ -296,13 +308,13 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     backgroundColor: Colors.primaryBg,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
     borderRadius: Radius.sm,
   },
   urgencyBadge: {
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
     borderRadius: Radius.sm,
   },
   urgencyHigh: {
@@ -314,22 +326,37 @@ const styles = StyleSheet.create({
   urgencyLow: {
     backgroundColor: Colors.successBg,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    marginTop: Spacing.xxs,
+  },
+  summaryIcon: {
+    marginTop: Spacing.xxs,
+  },
   summaryText: {
-    marginTop: 2,
+    flex: 1,
   },
   reviewedNoteBox: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primaryGhost,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
-    padding: Spacing.xs,
-    borderRadius: Radius.xs,
+    padding: Spacing.sm,
+    borderRadius: Radius.sm,
     marginTop: Spacing.sm,
+    gap: Spacing.xxs,
   },
   actionContainer: {
     marginTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  noteToggleBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.xs,
   },
   noteInput: {
     backgroundColor: Colors.background,
@@ -337,18 +364,18 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    fontSize: 13,
+    paddingVertical: Spacing.sm,
+    minHeight: 44,
+    fontSize: Typography.sm,
     color: Colors.text,
-    marginBottom: Spacing.xs,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   decisionBtn: {
-    minWidth: 90,
+    flex: 1,
   },
   attachmentBox: {
     flexDirection: 'row',

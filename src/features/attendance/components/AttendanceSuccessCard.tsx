@@ -22,13 +22,14 @@ export function AttendanceSuccessCard({
 }: AttendanceSuccessCardProps) {
   const formattedTime = formatTime(record.timestamp);
   const formattedDate = formatDateIndonesian(record.timestamp);
+  const isLate = record.attendanceStatus === 'LATE';
 
   return (
-    <Card variant="flat" padding="lg" style={[styles.card, style]}>
+    <Card variant="flat" padding="md" style={[styles.card, style]}>
       {/* Header Banner */}
       <View style={styles.header}>
         <View style={styles.iconCircle}>
-          <Icon name="checkmark-circle" size={28} color={Colors.success} />
+          <Icon name="checkmark-circle" size={26} color={Colors.success} />
         </View>
         <View style={styles.headerText}>
           <AppText variant="h2" color={Colors.success}>
@@ -38,7 +39,9 @@ export function AttendanceSuccessCard({
             Bukti presensi resmi praktikum
           </AppText>
         </View>
-        <Badge label="Hadir" variant="attended" size="sm" showDot />
+        {isLate ? (
+          <Badge label="Terlambat" variant="waiting" size="sm" showDot />
+        ) : null}
       </View>
 
       <View style={styles.divider} />
@@ -50,7 +53,7 @@ export function AttendanceSuccessCard({
             <AppText variant="caption" color={Colors.textMuted}>
               NAMA MAHASISWA
             </AppText>
-            <AppText variant="body" weight="semibold">
+            <AppText variant="body" weight="semibold" numberOfLines={2}>
               {record.studentName}
             </AppText>
           </View>
@@ -58,7 +61,7 @@ export function AttendanceSuccessCard({
             <AppText variant="caption" color={Colors.textMuted}>
               NIM
             </AppText>
-            <AppText variant="body" weight="semibold">
+            <AppText variant="bodySm" weight="semibold" numberOfLines={1}>
               {record.studentNim}
             </AppText>
           </View>
@@ -71,7 +74,7 @@ export function AttendanceSuccessCard({
             </AppText>
             <View style={styles.timeWrapper}>
               <Icon name="time-outline" size={14} color={Colors.primary} />
-              <AppText variant="bodySm" weight="semibold" color={Colors.primary} style={styles.timeText}>
+              <AppText variant="bodySm" weight="semibold" color={Colors.primary}>
                 {formattedTime}
               </AppText>
             </View>
@@ -113,9 +116,12 @@ export function AttendanceSuccessCard({
 
         {record.verifiedLocation ? (
           <View style={styles.verifiedLocationBox}>
-            <Icon name="shield-checkmark" size={14} color={Colors.success} />
-            <AppText variant="caption" color={Colors.success} weight="semibold">
-              Lokasi Terverifikasi Kehadiran Fisik {record.distanceMeters !== undefined && record.distanceMeters !== null ? `(${record.distanceMeters} m dari lab)` : ''}
+            <Icon name="shield-checkmark" size={14} color={Colors.success} style={styles.verifiedIcon} />
+            <AppText variant="caption" color={Colors.success} weight="semibold" style={styles.verifiedText}>
+              Lokasi Terverifikasi Kehadiran Fisik{' '}
+              {record.distanceMeters !== undefined && record.distanceMeters !== null
+                ? `(${record.distanceMeters} m dari lab)`
+                : ''}
             </AppText>
           </View>
         ) : null}
@@ -179,9 +185,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
-  timeText: {
-    marginLeft: Spacing.xxs,
-  },
   sessionBox: {
     backgroundColor: Colors.surfaceSecondary,
     padding: Spacing.sm,
@@ -191,16 +194,19 @@ const styles = StyleSheet.create({
   },
   sessionMeta: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.md,
+    rowGap: Spacing.xs,
     marginTop: Spacing.xxs,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xxs,
+    gap: Spacing.xs,
+    flexShrink: 1,
   },
   metaText: {
-    marginLeft: Spacing.xxs,
+    flexShrink: 1,
   },
   notesBox: {
     backgroundColor: Colors.surfaceSecondary,
@@ -213,7 +219,7 @@ const styles = StyleSheet.create({
   },
   verifiedLocationBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
     backgroundColor: Colors.successBg,
     paddingVertical: Spacing.xs,
@@ -223,5 +229,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.successBorder,
     marginTop: Spacing.xs,
   },
+  verifiedIcon: {
+    marginTop: Spacing.xxs,
+  },
+  verifiedText: {
+    flex: 1,
+  },
 });
-

@@ -4,8 +4,6 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { InteractiveLabMap } from '@/features/maps/components/InteractiveLabMap';
@@ -161,60 +159,58 @@ export default function StudentMapsScreen() {
       onRefresh={handleRefresh}
     >
       <View style={styles.content}>
-        {/* Hero Header Peta Laboratorium Praktikan */}
-        <Card variant="hero" padding="lg" style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroTag}>
-              <Icon name="compass" size={14} color={Colors.textWhite} />
-              <AppText variant="caption" weight="bold" color={Colors.textWhite}>
-                PETA LABORATORIUM INTERAKTIF
+        {/* Header Ringkas Peta Laboratorium Praktikan */}
+        <View style={styles.headerBlock}>
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerTitleCol}>
+              <AppText variant="caption" weight="bold" color={Colors.textMuted}>
+                PETA LABORATORIUM
+              </AppText>
+              <AppText variant="h1" weight="bold" numberOfLines={1}>
+                Lokasi & Aktivitas Lab
               </AppText>
             </View>
             <Badge
               label={
                 summaryCounts.openCount > 0
-                  ? `${summaryCounts.openCount} Lab Aktif`
-                  : 'Real-Time Sync'
+                  ? `${summaryCounts.openCount} Aktif`
+                  : 'Real-Time'
               }
               variant={summaryCounts.openCount > 0 ? 'open' : 'waiting'}
+              size="sm"
               showDot
             />
           </View>
 
-          <AppText variant="h1" weight="bold" color={Colors.textWhite}>
-            Lokasi & Aktivitas Lab
-          </AppText>
-          <AppText variant="caption" color={Colors.textWhiteMuted}>
-            Pantau posisi Anda secara live menuju laboratorium serta periksa praktikum yang sedang berlangsung dan jadwal berikutnya.
-          </AppText>
-
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStatPill}>
-              <AppText variant="title" weight="bold" color={Colors.textWhite}>
+          <View style={styles.statsStrip}>
+            <View style={styles.statCell}>
+              <AppText variant="title" weight="bold" color={Colors.primary}>
                 {labs.length}
               </AppText>
-              <AppText variant="caption" color={Colors.textWhiteMuted}>
+              <AppText variant="caption" color={Colors.textSecondary}>
                 Total Lab
               </AppText>
             </View>
-            <View style={styles.heroStatPill}>
-              <AppText variant="title" weight="bold" color={Colors.textWhite}>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <AppText variant="title" weight="bold" color={Colors.success}>
                 {summaryCounts.openCount}
               </AppText>
-              <AppText variant="caption" color={Colors.textWhiteMuted}>
+              <AppText variant="caption" color={Colors.textSecondary}>
                 Berlangsung
               </AppText>
             </View>
-            <View style={styles.heroStatPill}>
-              <AppText variant="title" weight="bold" color={Colors.textWhite}>
+            <View style={styles.statDivider} />
+            <View style={styles.statCell}>
+              <AppText variant="title" weight="bold" color={Colors.warning}>
                 {summaryCounts.upcomingCount}
               </AppText>
-              <AppText variant="caption" color={Colors.textWhiteMuted}>
+              <AppText variant="caption" color={Colors.textSecondary}>
                 Berikutnya
               </AppText>
             </View>
           </View>
-        </Card>
+        </View>
 
         {/* Penanganan Izin Akses & Kondisi Perangkat (SRS-S3-07) */}
         <PermissionAlertCard
@@ -256,46 +252,40 @@ export default function StudentMapsScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xl,
     gap: Spacing.md,
   },
-  heroCard: {
-    gap: Spacing.xs,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginBottom: 4,
-  },
-  heroTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.glassOverlay,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.glassHighlight,
-  },
-  heroStatsRow: {
-    flexDirection: 'row',
+  headerBlock: {
     gap: Spacing.sm,
-    marginTop: Spacing.sm,
   },
-  heroStatPill: {
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  headerTitleCol: {
     flex: 1,
-    backgroundColor: Colors.glassOverlay,
-    borderRadius: Radius.md,
+    gap: Spacing.xxs,
+  },
+  statsStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.lg,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
+  },
+  statCell: {
+    flex: 1,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.midnightBorder,
+    gap: Spacing.xxs,
+  },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginVertical: Spacing.xxs,
+    backgroundColor: Colors.borderLight,
   },
 });

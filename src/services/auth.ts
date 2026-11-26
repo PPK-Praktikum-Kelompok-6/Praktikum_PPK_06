@@ -556,8 +556,9 @@ export function subscribeAllUsers(
           list.sort((a, b) => {
             const roleOrder: Record<UserRole, number> = {
               ADMIN: 0,
-              ASSISTANT: 1,
-              STUDENT: 2,
+              ASLAB: 1,
+              ASSISTANT: 2,
+              STUDENT: 3,
             };
             const diff = (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
             if (diff !== 0) return diff;

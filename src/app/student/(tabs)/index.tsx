@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -13,21 +14,19 @@ import { Badge } from '@/components/ui/Badge';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
-import { Icon } from '@/components/ui/Icon';
+import { BoxIcon, Icon } from '@/components/ui/Icon';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
 import {
   Colors,
   HandGestureName,
   Radius,
-  Shadows,
   Spacing,
   Typography,
 } from '@/constants/theme';
 import { SessionCard } from '@/features/sessions/components/SessionCard';
 import { subscribeAllClasses } from '@/services/admin';
 import { subscribeStudentAttendance } from '@/services/attendance';
-import { signOutUser } from '@/services/auth';
 import { PermitRequest, subscribeStudentPermits } from '@/services/permits';
 import {
   confirmJoinClassAsStudent,
@@ -58,7 +57,7 @@ export default function StudentScheduleRoute() {
 
   const [activeFilter, setActiveFilter] = useState<FilterOption>('ALL');
   const [refreshing, setRefreshing] = useState(false);
-  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [classesExpanded, setClassesExpanded] = useState(false);
   const [firestoreSessions, setFirestoreSessions] = useState<PracticalSession[]>([]);
   const [studentAttendance, setStudentAttendance] = useState<AttendanceRecord[]>([]);
   const [studentPermits, setStudentPermits] = useState<PermitRequest[]>([]);
@@ -305,11 +304,9 @@ export default function StudentScheduleRoute() {
     }, 350);
   };
 
-  const handleConfirmLogout = async () => {
-    setLogoutModalVisible(false);
-    await signOutUser();
-    router.replace('/' as Href);
-  };
+  const displayedClasses = classesExpanded
+    ? myJoinedClasses
+    : myJoinedClasses.slice(0, 2);
 
   return (
     <Screen
@@ -324,21 +321,11 @@ export default function StudentScheduleRoute() {
             JADWAL PRAKTIKUM
           </AppText>
           <AppText variant="h1" numberOfLines={1} style={styles.title}>
-            Halo, {currentUser.name.split(' ')[0]} 👋
+            Halo, {currentUser.name.split(' ')[0]}
           </AppText>
           <AppText variant="caption" color={Colors.primary} weight="semibold">
             Praktikan • {currentUser.identifier}
           </AppText>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => setLogoutModalVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Keluar dari akun"
-            style={styles.logoutButton}
-          >
-            <Icon name="log-out-outline" size={20} color={Colors.danger} />
-          </Pressable>
         </View>
       </View>
 
@@ -376,7 +363,7 @@ export default function StudentScheduleRoute() {
           </AppText>
         ) : (
           <View style={styles.joinedClassList}>
-            {myJoinedClasses.map((cls) => {
+            {displayedClasses.map((cls) => {
               const asprakNames =
                 cls.assistantNames && cls.assistantNames.length > 0
                   ? cls.assistantNames.join(', ')
@@ -387,12 +374,18 @@ export default function StudentScheduleRoute() {
                     <AppText variant="bodySm" weight="bold" color={Colors.text}>
                       {cls.courseName || 'Praktikum'} • Kelas {cls.classCode}
                     </AppText>
-                    <AppText variant="caption" color={Colors.primaryDark} weight="medium">
-                      👨‍🏫 Asprak: {asprakNames}
-                    </AppText>
-                    <AppText variant="caption" color={Colors.textMuted}>
-                      📍 {cls.room || 'Lab D'} • Kode: {cls.studentJoinCode}
-                    </AppText>
+                    <View style={styles.joinedMetaRow}>
+                      <BoxIcon name="user-voice" size={14} color={Colors.primaryDark} />
+                      <AppText variant="caption" color={Colors.primaryDark} weight="medium" style={styles.joinedMetaText}>
+                        Asprak: {asprakNames}
+                      </AppText>
+                    </View>
+                    <View style={styles.joinedMetaRow}>
+                      <BoxIcon name="location" size={14} color={Colors.textMuted} />
+                      <AppText variant="caption" color={Colors.textMuted} style={styles.joinedMetaText}>
+                        {cls.room || 'Lab D'} • Kode: {cls.studentJoinCode}
+                      </AppText>
+                    </View>
                   </View>
 
                   <Pressable
@@ -406,12 +399,36 @@ export default function StudentScheduleRoute() {
                 </View>
               );
             })}
+
+            {myJoinedClasses.length > 2 ? (
+              <Pressable
+                onPress={() => setClassesExpanded((prev) => !prev)}
+                accessibilityRole="button"
+                style={styles.toggleClassesBtn}
+              >
+                <AppText variant="caption" weight="semibold" color={Colors.primary}>
+                  {classesExpanded
+                    ? 'Tampilkan Lebih Sedikit'
+                    : `Lihat Semua (${myJoinedClasses.length} Kelas)`}
+                </AppText>
+                <Icon
+                  name={classesExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={Colors.primary}
+                />
+              </Pressable>
+            ) : null}
           </View>
         )}
       </View>
 
       {/* Filter Chips */}
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}
+      >
         {(
           [
             { key: 'ALL', label: 'Semua' },
@@ -437,7 +454,7 @@ export default function StudentScheduleRoute() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {filteredSessions.length === 0 ? (
         <EmptyState
@@ -544,7 +561,7 @@ export default function StudentScheduleRoute() {
           {!previewClassToJoin ? (
             <>
               <AppText variant="caption" color={Colors.textMuted} style={styles.modalSubText}>
-                Mintalah Kode Kelas Praktikan (contoh: PPK-C1-103, SDA-B2-102, BDL-A1-101) kepada asisten praktikum Anda.
+                Mintalah Kode Kelas Praktikan (contoh: PPK-C1-103, SD-B2-102, BD-A1-101) kepada asisten praktikum Anda.
               </AppText>
 
               <View style={styles.modalFieldGroup}>
@@ -673,18 +690,6 @@ export default function StudentScheduleRoute() {
         onPrimary={() => setFeedback((prev) => ({ ...prev, visible: false }))}
         onClose={() => setFeedback((prev) => ({ ...prev, visible: false }))}
       />
-
-      <FeedbackModal
-        visible={logoutModalVisible}
-        type="warning"
-        title="Keluar dari Akun?"
-        message={`Apakah Anda yakin ingin keluar dari sesi ${currentUser.name}?`}
-        primaryLabel="Ya, Keluar"
-        secondaryLabel="Batal"
-        onPrimary={handleConfirmLogout}
-        onSecondary={() => setLogoutModalVisible(false)}
-        onClose={() => setLogoutModalVisible(false)}
-      />
     </Screen>
   );
 }
@@ -699,27 +704,10 @@ const styles = StyleSheet.create({
   },
   headerInfo: {
     flex: 1,
-    marginRight: Spacing.sm,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs + 2,
   },
   title: {
     marginTop: 2,
     marginBottom: 2,
-  },
-  logoutButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.dangerBg,
-    borderWidth: 1.2,
-    borderColor: Colors.dangerBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.sm,
   },
   myClassesCard: {
     backgroundColor: Colors.surface,
@@ -768,6 +756,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  joinedMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  joinedMetaText: {
+    flex: 1,
+  },
   leaveBtn: {
     width: 32,
     height: 32,
@@ -776,10 +772,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  toggleClassesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs + 2,
+    marginTop: Spacing.xxs,
+  },
+  filterScroll: {
+    marginBottom: Spacing.lg,
+  },
   filterRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
-    marginBottom: Spacing.lg,
   },
   filterChip: {
     paddingHorizontal: Spacing.md,

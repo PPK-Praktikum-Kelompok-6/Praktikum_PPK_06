@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -172,45 +172,48 @@ export default function StudentPermitScreen() {
       withBottomNavPadding
       refreshing={refreshing}
       onRefresh={handleRefresh}
-      style={styles.screen}
     >
-      <View style={styles.content}>
-        {/* Header Layar */}
-        <View style={styles.header}>
-          <AppText variant="h2" weight="bold">
-            Pengajuan Izin
-          </AppText>
-          <AppText variant="bodySm" color={Colors.textSecondary}>
-            Ajukan permohonan ketidakhadiran praktikum dan pantau status persetujuannya secara real-time
-          </AppText>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.content}>
+          {/* Header Layar */}
+          <View style={styles.header}>
+            <AppText variant="h1" weight="bold">
+              Pengajuan Izin
+            </AppText>
+            <AppText variant="bodySm" color={Colors.textSecondary}>
+              Ajukan permohonan ketidakhadiran praktikum dan pantau status persetujuannya secara real-time
+            </AppText>
+          </View>
+
+          {/* Form Pengajuan Izin */}
+          <PermitForm
+            sessions={studentAvailableSessions}
+            onSubmit={handleSubmitPermit}
+            isLoading={loading}
+          />
+
+          {/* Riwayat & Status Pengajuan Izin */}
+          <View style={styles.historySection}>
+            <AppText variant="title" weight="bold">
+              Status Permohonan Saya ({permits.length})
+            </AppText>
+
+            {permits.length === 0 ? (
+              <EmptyState
+                title="Belum Ada Permohonan Izin"
+                message="Riwayat permohonan izin praktikum yang Anda ajukan akan langsung tampil dan tersinkronisasi di sini."
+                iconName="document-text-outline"
+              />
+            ) : (
+              permits.map((item) => (
+                <PermitStatusCard key={item.id} permit={item} />
+              ))
+            )}
+          </View>
         </View>
-
-        {/* Form Pengajuan Izin */}
-        <PermitForm
-          sessions={studentAvailableSessions}
-          onSubmit={handleSubmitPermit}
-          isLoading={loading}
-        />
-
-        {/* Riwayat & Status Pengajuan Izin */}
-        <View style={styles.historySection}>
-          <AppText variant="title" weight="bold" style={styles.sectionTitle}>
-            Status Permohonan Saya ({permits.length})
-          </AppText>
-
-          {permits.length === 0 ? (
-            <EmptyState
-              title="Belum Ada Permohonan Izin"
-              message="Riwayat permohonan izin praktikum yang Anda ajukan akan langsung tampil dan tersinkronisasi di sini."
-              iconName="document-text-outline"
-            />
-          ) : (
-            permits.map((item) => (
-              <PermitStatusCard key={item.id} permit={item} />
-            ))
-          )}
-        </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Feedback Modal (SRS-UI-01) */}
       <FeedbackModal
@@ -225,19 +228,15 @@ export default function StudentPermitScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
   content: {
-    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   header: {
+    gap: Spacing.xs,
     marginBottom: Spacing.md,
   },
   historySection: {
     marginTop: Spacing.sm,
-  },
-  sectionTitle: {
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
 });

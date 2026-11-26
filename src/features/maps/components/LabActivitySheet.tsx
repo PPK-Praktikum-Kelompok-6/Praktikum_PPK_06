@@ -123,39 +123,34 @@ export function LabActivitySheet({
   return (
     <View style={styles.container}>
       {/* Header Kartu Laboratorium Terpilih */}
-      <Card variant="default" padding="lg" style={styles.labHeaderCard}>
+      <Card variant="default" padding="md" style={styles.labHeaderCard}>
         <View style={styles.labTitleRow}>
           <View style={styles.labIconCircle}>
-            <Icon name="business" size={22} color={Colors.primary} />
+            <Icon name="business" size={20} color={Colors.primary} />
           </View>
           <View style={styles.labTitleCol}>
-            <View style={styles.badgeLine}>
-              <AppText variant="label" color={Colors.primary} weight="bold">
-                INFORMASI AKTIVITAS LABORATORIUM
-              </AppText>
-              {ongoingSessions.length > 0 ? (
-                <Badge label="AKTIF BERLANGSUNG" variant="open" showDot />
-              ) : upcomingSessions.length > 0 ? (
-                <Badge label="TERJADWAL" variant="waiting" showDot />
-              ) : (
-                <Badge label="TIDAK ADA SESI AKTIF" variant="closed" />
-              )}
-            </View>
-            <AppText variant="h2" weight="bold">
+            <AppText variant="h2" weight="bold" numberOfLines={1}>
               {selectedLab.name}
             </AppText>
-            <AppText variant="caption" color={Colors.textSecondary}>
+            <AppText variant="caption" color={Colors.textSecondary} numberOfLines={1}>
               {selectedLab.building}
             </AppText>
           </View>
+          {ongoingSessions.length > 0 ? (
+            <Badge label="Aktif" variant="open" size="sm" showDot />
+          ) : upcomingSessions.length > 0 ? (
+            <Badge label="Terjadwal" variant="waiting" size="sm" showDot />
+          ) : (
+            <Badge label="Kosong" variant="closed" size="sm" />
+          )}
         </View>
 
         {/* Baris Koordinat, Radius & Jarak Pengguna */}
         <View style={styles.metaGrid}>
           <View style={styles.metaPill}>
             <Icon name="radio-button-on" size={14} color={Colors.primary} />
-            <AppText variant="caption" color={Colors.textSecondary}>
-              Radius Presensi:{' '}
+            <AppText variant="caption" color={Colors.textSecondary} style={styles.pillText}>
+              Radius:{' '}
               <AppText variant="caption" weight="bold" color={Colors.text}>
                 {selectedLab.radiusMeters} m
               </AppText>
@@ -164,7 +159,7 @@ export function LabActivitySheet({
 
           <View style={styles.metaPill}>
             <Icon name="compass-outline" size={14} color={Colors.textMuted} />
-            <AppText variant="caption" color={Colors.textSecondary}>
+            <AppText variant="caption" color={Colors.textSecondary} style={styles.pillText}>
               {selectedLab.latitude.toFixed(5)}, {selectedLab.longitude.toFixed(5)}
             </AppText>
           </View>
@@ -191,6 +186,7 @@ export function LabActivitySheet({
                 variant="caption"
                 weight="bold"
                 color={distanceInfo.inside ? Colors.success : Colors.warning}
+                style={styles.pillText}
               >
                 Jarak Anda: {distanceInfo.meters} m (
                 {distanceInfo.inside ? 'Dalam Radius Lab' : 'Di Luar Radius'})
@@ -199,7 +195,7 @@ export function LabActivitySheet({
           ) : (
             <View style={styles.metaPill}>
               <Icon name="locate-outline" size={14} color={Colors.textMuted} />
-              <AppText variant="caption" color={Colors.textMuted}>
+              <AppText variant="caption" color={Colors.textMuted} style={styles.pillText}>
                 Menunggu posisi GPS perangkat...
               </AppText>
             </View>
@@ -219,6 +215,7 @@ export function LabActivitySheet({
           <Badge
             label={`${ongoingSessions.length} Sesi`}
             variant={ongoingSessions.length > 0 ? 'open' : 'closed'}
+            size="sm"
           />
         </View>
 
@@ -227,15 +224,15 @@ export function LabActivitySheet({
             <View style={styles.emptySectionRow}>
               <Icon
                 name="pause-circle-outline"
-                size={22}
+                size={20}
                 color={Colors.textMuted}
               />
               <View style={styles.emptySectionTextCol}>
-                <AppText variant="body" weight="semibold" color={Colors.textSecondary}>
-                  Tidak Ada Praktikum yang Sedang Berlangsung
+                <AppText variant="bodySm" weight="semibold" color={Colors.textSecondary}>
+                  Tidak Ada Praktikum Berlangsung
                 </AppText>
                 <AppText variant="caption" color={Colors.textMuted}>
-                  Saat ini belum ada sesi berstatus DIBUKA (OPEN) di {selectedLab.name}. Begitu asisten membuka sesi, informasi akan langsung tampil di sini secara real-time.
+                  Belum ada sesi yang dibuka di {selectedLab.name}.
                 </AppText>
               </View>
             </View>
@@ -278,7 +275,7 @@ export function LabActivitySheet({
                       </View>
                     )}
                   </View>
-                  <Badge label="SEDANG BERLANGSUNG" variant="open" showDot />
+                  <Badge label="BERLANGSUNG" variant="open" size="sm" showDot />
                 </View>
 
                 <AppText variant="title" weight="bold" style={styles.courseTitle}>
@@ -288,9 +285,13 @@ export function LabActivitySheet({
                 <View style={styles.detailList}>
                   <View style={styles.detailRow}>
                     <Icon name="time-outline" size={16} color={Colors.success} />
-                    <AppText variant="caption" color={Colors.text} weight="semibold">
-                      Waktu Pelaksanaan: {formatDateIndonesian(session.date)} •{' '}
-                      {session.timeSlot}
+                    <AppText
+                      variant="caption"
+                      color={Colors.text}
+                      weight="semibold"
+                      style={styles.detailText}
+                    >
+                      {formatDateIndonesian(session.date)} • {session.timeSlot}
                     </AppText>
                   </View>
                   <View style={styles.detailRow}>
@@ -299,8 +300,12 @@ export function LabActivitySheet({
                       size={16}
                       color={Colors.textSecondary}
                     />
-                    <AppText variant="caption" color={Colors.textSecondary}>
-                      Ruangan: {session.room} ({session.deliveryMode || 'OFFLINE'})
+                    <AppText
+                      variant="caption"
+                      color={Colors.textSecondary}
+                      style={styles.detailText}
+                    >
+                      {session.room} ({session.deliveryMode || 'OFFLINE'})
                     </AppText>
                   </View>
                   <View style={styles.detailRow}>
@@ -309,7 +314,11 @@ export function LabActivitySheet({
                       size={16}
                       color={Colors.textSecondary}
                     />
-                    <AppText variant="caption" color={Colors.textSecondary}>
+                    <AppText
+                      variant="caption"
+                      color={Colors.textSecondary}
+                      style={styles.detailText}
+                    >
                       Asisten: {session.assistantName}
                     </AppText>
                   </View>
@@ -354,6 +363,7 @@ export function LabActivitySheet({
           <Badge
             label={`${upcomingSessions.length} Terjadwal`}
             variant="waiting"
+            size="sm"
           />
         </View>
 
@@ -362,18 +372,16 @@ export function LabActivitySheet({
             <View style={styles.emptySectionRow}>
               <Icon
                 name="calendar-clear-outline"
-                size={22}
+                size={20}
                 color={Colors.textMuted}
               />
               <View style={styles.emptySectionTextCol}>
-                <AppText variant="body" weight="semibold" color={Colors.textSecondary}>
-                  Belum Ada Jadwal Praktikum Berikutnya
+                <AppText variant="bodySm" weight="semibold" color={Colors.textSecondary}>
+                  Belum Ada Jadwal Berikutnya
                 </AppText>
                 <AppText variant="caption" color={Colors.textMuted}>
-                  Tidak ada sesi berstatus BELUM DIMULAI di {selectedLab.name}.
-                  {closedCount > 0
-                    ? ` Terdapat ${closedCount} sesi yang telah selesai dilaksanakan.`
-                    : ''}
+                  Belum ada sesi terjadwal di {selectedLab.name}
+                  {closedCount > 0 ? ` (${closedCount} sesi selesai).` : '.'}
                 </AppText>
               </View>
             </View>
@@ -420,7 +428,7 @@ export function LabActivitySheet({
                             weight="bold"
                             color={Colors.primaryDark}
                           >
-                            SESI BERIKUTNYA
+                            BERIKUTNYA
                           </AppText>
                         </View>
                       )}
@@ -436,7 +444,7 @@ export function LabActivitySheet({
                         </View>
                       )}
                     </View>
-                    <Badge label="BELUM DIMULAI" variant="waiting" showDot />
+                    <Badge label="BELUM MULAI" variant="waiting" size="sm" showDot />
                   </View>
 
                   <AppText variant="title" weight="bold" style={styles.courseTitle}>
@@ -450,9 +458,13 @@ export function LabActivitySheet({
                         size={16}
                         color={Colors.warning}
                       />
-                      <AppText variant="caption" color={Colors.text} weight="semibold">
-                        Waktu Pelaksanaan: {formatDateIndonesian(session.date)} •{' '}
-                        {session.timeSlot}
+                      <AppText
+                        variant="caption"
+                        color={Colors.text}
+                        weight="semibold"
+                        style={styles.detailText}
+                      >
+                        {formatDateIndonesian(session.date)} • {session.timeSlot}
                       </AppText>
                     </View>
                     <View style={styles.detailRow}>
@@ -461,7 +473,11 @@ export function LabActivitySheet({
                         size={16}
                         color={Colors.textSecondary}
                       />
-                      <AppText variant="caption" color={Colors.textSecondary}>
+                      <AppText
+                        variant="caption"
+                        color={Colors.textSecondary}
+                        style={styles.detailText}
+                      >
                         Asisten: {session.assistantName}
                       </AppText>
                     </View>
@@ -518,12 +534,12 @@ const styles = StyleSheet.create({
   },
   labTitleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: Spacing.sm,
   },
   labIconCircle: {
-    width: 46,
-    height: 46,
+    width: 44,
+    height: 44,
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryBg,
     borderWidth: 1,
@@ -533,15 +549,7 @@ const styles = StyleSheet.create({
   },
   labTitleCol: {
     flex: 1,
-    gap: 2,
-  },
-  badgeLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginBottom: 2,
+    gap: Spacing.xxs,
   },
   metaGrid: {
     flexDirection: 'row',
@@ -558,6 +566,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  pillText: {
+    flexShrink: 1,
   },
   distanceInsidePill: {
     backgroundColor: Colors.successBg,
@@ -675,8 +686,11 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  detailText: {
+    flex: 1,
   },
   cardActionWrap: {
     marginTop: Spacing.xxs,

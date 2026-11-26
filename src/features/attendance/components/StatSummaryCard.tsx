@@ -32,7 +32,9 @@ export function StatSummaryCard({
           <View style={styles.iconBadge}>
             <Icon name="people" size={18} color={Colors.primary} />
           </View>
-          <AppText variant="title">Rekapitulasi Kehadiran</AppText>
+          <AppText variant="title" style={styles.headerTitle}>
+            Rekapitulasi Kehadiran
+          </AppText>
         </View>
         <AppText variant="title" color={Colors.primary} weight="bold">
           {percentage}%
@@ -47,7 +49,7 @@ export function StatSummaryCard({
       {/* Stats Breakdown */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <AppText variant="caption" color={Colors.textMuted}>
+          <AppText variant="caption" align="center" color={Colors.textMuted}>
             Hadir
           </AppText>
           <AppText variant="h2" color={Colors.success} weight="bold">
@@ -58,7 +60,7 @@ export function StatSummaryCard({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <AppText variant="caption" color={Colors.textMuted}>
+          <AppText variant="caption" align="center" color={Colors.textMuted}>
             Belum Hadir
           </AppText>
           <AppText variant="h2" color={Colors.textSecondary} weight="bold">
@@ -69,7 +71,7 @@ export function StatSummaryCard({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <AppText variant="caption" color={Colors.textMuted}>
+          <AppText variant="caption" align="center" color={Colors.textMuted}>
             Total Peserta
           </AppText>
           <AppText variant="h2" color={Colors.text} weight="bold">
@@ -89,12 +91,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
   titleRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  headerTitle: {
+    flexShrink: 1,
   },
   iconBadge: {
     width: 32,
@@ -116,10 +123,12 @@ const styles = StyleSheet.create({
   statItem: {
     alignItems: 'center',
     flex: 1,
+    paddingHorizontal: Spacing.xs,
   },
   divider: {
     width: 1,
-    height: 32,
+    alignSelf: 'stretch',
+    marginVertical: Spacing.xs,
     backgroundColor: Colors.border,
   },
 });

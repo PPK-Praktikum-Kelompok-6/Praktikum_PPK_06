@@ -31,10 +31,11 @@ import { getExpoNotifications } from '@/services/permissions';
 import { subscribeAllSessions } from '@/services/sessions';
 import { AppProvider } from '@/store/AppProvider';
 import { useCurrentUser } from '@/store/hooks';
+import { NotificationInboxContext } from '@/store/notificationInbox';
 import { AppNotification } from '@/types/notification';
 import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
 
-function GlobalNotificationCoordinator() {
+function GlobalNotificationProvider({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const { currentUser } = useCurrentUser();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
@@ -189,9 +190,7 @@ function GlobalNotificationCoordinator() {
     };
   }, [activeUserId]);
 
-  if (!activeUserId || activeRole !== 'STUDENT') {
-    return null;
-  }
+  const isStudentActive = Boolean(activeUserId && activeRole === 'STUDENT');
 
   const handleOpenNotificationItem = (notif: AppNotification) => {
     setInboxVisible(false);
@@ -216,34 +215,21 @@ function GlobalNotificationCoordinator() {
     void markAllNotificationsRead(unreadIds, activeUserId);
   };
 
-  const bottomOffset = Math.max(insets.bottom, Spacing.md) + 6;
+  const inboxContextValue = React.useMemo(
+    () => ({
+      unreadCount: isStudentActive ? unreadCount : 0,
+      openInbox: () => {
+        if (isStudentActive) setInboxVisible(true);
+      },
+    }),
+    [isStudentActive, unreadCount]
+  );
 
   return (
-    <>
-      {/* Tombol Lonceng Inbox Notifikasi Mengambang di Sisi Kiri Navigasi Bawah */}
-      <Pressable
-        onPress={() => setInboxVisible(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Buka riwayat notifikasi praktikum"
-        style={({ pressed }) => [
-          styles.floatingBellBtn,
-          { bottom: bottomOffset },
-          pressed && styles.floatingBellPressed,
-        ]}
-      >
-        <Icon
-          name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
-          size={20}
-          color={unreadCount > 0 ? Colors.primary : Colors.textSecondary}
-        />
-        {unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <AppText variant="caption" weight="bold" color={Colors.textWhite}>
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </AppText>
-          </View>
-        )}
-      </Pressable>
+    <NotificationInboxContext.Provider value={inboxContextValue}>
+      {children}
+      {isStudentActive ? (
+        <>
 
       {/* Banner In-App Real-Time di Bagian Atas Layar */}
       {activeBanner && (
@@ -489,7 +475,9 @@ function GlobalNotificationCoordinator() {
           </View>
         </View>
       </Modal>
-    </>
+        </>
+      ) : null}
+    </NotificationInboxContext.Provider>
   );
 }
 
@@ -499,10 +487,11 @@ function GlobalNotificationCoordinator() {
 export default function RootLayout() {
   return (
     <AppProvider>
-      <View style={styles.root}>
-        <Stack screenOptions={{ headerShown: false }} />
-        <GlobalNotificationCoordinator />
-      </View>
+      <GlobalNotificationProvider>
+        <View style={styles.root}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </View>
+      </GlobalNotificationProvider>
     </AppProvider>
   );
 }
@@ -510,38 +499,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  floatingBellBtn: {
-    position: 'absolute',
-    left: Spacing.lg,
-    width: 48,
-    height: 48,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    borderWidth: 1.2,
-    borderColor: Colors.primaryBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9900,
-    ...Shadows.floatingNav,
-  },
-  floatingBellPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.94 }],
-  },
-  unreadBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 20,
-    height: 20,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.danger,
-    paddingHorizontal: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
   },
   bannerWrapper: {
     position: 'absolute',

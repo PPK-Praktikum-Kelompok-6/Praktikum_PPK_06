@@ -63,7 +63,7 @@ export function PermissionAlertCard({
                 Gangguan Koneksi Jaringan
               </AppText>
               <AppText variant="caption" color={Colors.textSecondary}>
-                Menampilkan titik laboratorium dari cache terakhir. Sinkronisasi aktivitas praktikum akan otomatis pulih saat perangkat kembali terhubung.
+                Menampilkan data laboratorium dari cache sampai koneksi pulih.
               </AppText>
             </View>
           </View>
@@ -90,27 +90,26 @@ export function PermissionAlertCard({
             <View style={styles.textCol}>
               <AppText variant="body" weight="bold" color={Colors.danger}>
                 {!locationGranted
-                  ? 'Izin Akses Lokasi Belum Diberikan'
+                  ? 'Izin Lokasi Diperlukan'
                   : !locationServicesEnabled
-                  ? 'Layanan Lokasi (GPS) Perangkat Mati'
-                  : 'Lokasi Perangkat Belum Diperoleh'}
+                  ? 'Layanan GPS Perangkat Mati'
+                  : 'Lokasi Belum Diperoleh'}
               </AppText>
               <AppText variant="caption" color={Colors.textSecondary}>
                 {locationError ||
                   (!locationGranted
-                    ? 'Izinkan akses lokasi agar aplikasi dapat menampilkan marker posisi perangkat Anda secara real-time di peta laboratorium.'
-                    : 'Aktifkan layanan GPS pada perangkat Anda untuk melacak perpindahan posisi Anda menuju laboratorium.')}
+                    ? 'Izinkan lokasi agar posisi Anda muncul secara real-time di peta.'
+                    : 'Aktifkan GPS untuk melacak jarak menuju laboratorium.')}
               </AppText>
             </View>
           </View>
 
           <View style={styles.actionRow}>
             <CustomButton
-              title={
-                !locationGranted ? 'Berikan Izin Lokasi' : 'Periksa Ulang GPS'
-              }
+              title={!locationGranted ? 'Izinkan Lokasi' : 'Cek GPS'}
               variant="primary"
               size="sm"
+              fullWidth={false}
               loading={isChecking}
               onPress={onRetryLocation}
               icon={
@@ -120,9 +119,10 @@ export function PermissionAlertCard({
             />
             {Platform.OS !== 'web' && (
               <CustomButton
-                title="Buka Pengaturan"
+                title="Pengaturan"
                 variant="outline"
                 size="sm"
+                fullWidth={false}
                 onPress={onOpenSettings}
                 icon={
                   <Icon
@@ -151,18 +151,19 @@ export function PermissionAlertCard({
             </View>
             <View style={styles.textCol}>
               <AppText variant="caption" weight="bold" color={Colors.info}>
-                Notifikasi Perangkat Nonaktif • Mode Banner Dalam Aplikasi Aktif
+                Notifikasi Perangkat Nonaktif
               </AppText>
               <AppText variant="caption" color={Colors.textSecondary}>
-                Anda tetap menerima pemberitahuan saat sesi dibuka, jadwal berubah, atau izin direview melalui banner real-time di dalam aplikasi.
+                Banner notifikasi di dalam aplikasi tetap aktif secara real-time.
               </AppText>
             </View>
           </View>
           <View style={styles.notifActionRow}>
             <CustomButton
-              title="Aktifkan Push Notification"
+              title="Aktifkan Notifikasi"
               variant="secondary"
               size="sm"
+              fullWidth={false}
               onPress={onRequestNotification}
               icon={
                 <Icon
@@ -177,6 +178,7 @@ export function PermissionAlertCard({
                 title="Pengaturan"
                 variant="ghost"
                 size="sm"
+                fullWidth={false}
                 onPress={onOpenSettings}
               />
             )}
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
   },
   textCol: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   actionRow: {
     flexDirection: 'row',
@@ -256,10 +258,12 @@ const styles = StyleSheet.create({
   },
   notifActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   flexBtn: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: 132,
   },
 });

@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { updateSession } from '@/services/sessions';
 import { LabLocation } from '@/types/lab';
 
@@ -37,6 +40,7 @@ export function LabLocationConfigModal({
   sessionId,
   onSuccess,
 }: LabLocationConfigModalProps) {
+  const insets = useSafeAreaInsets();
   const [draftRadius, setDraftRadius] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -98,176 +102,202 @@ export function LabLocationConfigModal({
       onRequestClose={handleCloseModal}
     >
       <View style={styles.backdrop}>
-        <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.iconCircle}>
-                <Icon name="locate-outline" size={22} color={Colors.primary} />
-              </View>
-              <View style={styles.headerTextCol}>
-                <AppText variant="h2">Atur Radius Presensi</AppText>
-                <AppText variant="caption" color={Colors.textMuted}>
-                  Berlaku khusus untuk sesi praktikum ini saja
-                </AppText>
-              </View>
-            </View>
-            <Pressable
-              onPress={handleCloseModal}
-              style={styles.closeButton}
-              accessibilityRole="button"
-              accessibilityLabel="Tutup"
-            >
-              <Icon name="close" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseModal} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoid}
+        >
+          <View
+            style={[
+              styles.modalContainer,
+              { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+            ]}
           >
-            {errorMsg ? (
-              <View style={styles.errorBox}>
-                <Icon name="alert-circle" size={18} color={Colors.danger} />
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <View style={styles.iconCircle}>
+                  <Icon name="locate-outline" size={22} color={Colors.primary} />
+                </View>
+                <View style={styles.headerTextCol}>
+                  <AppText variant="h2">Atur Radius Presensi</AppText>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    Berlaku khusus untuk sesi praktikum ini saja
+                  </AppText>
+                </View>
+              </View>
+              <Pressable
+                onPress={handleCloseModal}
+                hitSlop={8}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Tutup"
+              >
+                <Icon name="close" size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.scrollArea}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {errorMsg ? (
+                <View style={styles.errorBox}>
+                  <Icon name="alert-circle" size={18} color={Colors.danger} />
+                  <AppText
+                    variant="caption"
+                    color={Colors.danger}
+                    style={styles.errorText}
+                  >
+                    {errorMsg}
+                  </AppText>
+                </View>
+              ) : null}
+
+              {/* Info Lokasi Lab Terkunci (Read-Only Master Data) */}
+              <View style={styles.lockedInfoCard}>
+                <View style={styles.lockedHeaderRow}>
+                  <AppText
+                    variant="caption"
+                    color={Colors.textMuted}
+                    weight="bold"
+                    style={styles.flexLabel}
+                  >
+                    INFORMASI LABORATORIUM (TETAP)
+                  </AppText>
+                  <View style={styles.lockedTag}>
+                    <Icon name="lock-closed" size={12} color={Colors.textMuted} />
+                    <AppText variant="caption" color={Colors.textMuted}>
+                      Terkunci
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.lockedRow}>
+                  <Icon name="desktop-outline" size={16} color={Colors.primary} />
+                  <View style={styles.lockedCol}>
+                    <AppText variant="caption" color={Colors.textMuted}>
+                      Nama Ruangan / Lab
+                    </AppText>
+                    <AppText variant="bodySm" weight="semibold">
+                      {displayLabName}
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.lockedRow}>
+                  <Icon name="business-outline" size={16} color={Colors.primary} />
+                  <View style={styles.lockedCol}>
+                    <AppText variant="caption" color={Colors.textMuted}>
+                      Gedung
+                    </AppText>
+                    <AppText variant="bodySm" color={Colors.textSecondary}>
+                      {displayBuilding}
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.lockedRow}>
+                  <Icon name="navigate-outline" size={16} color={Colors.primary} />
+                  <View style={styles.lockedCol}>
+                    <AppText variant="caption" color={Colors.textMuted}>
+                      Titik Koordinat Pusat (Lat, Long)
+                    </AppText>
+                    <AppText variant="bodySm" color={Colors.textSecondary}>
+                      {displayCoords}
+                    </AppText>
+                  </View>
+                </View>
+              </View>
+
+              {/* Batas Radius Presensi (Editable untuk sesi ini) */}
+              <View style={styles.formGroup}>
+                <View style={styles.radiusHeaderRow}>
+                  <AppText
+                    variant="caption"
+                    color={Colors.textMuted}
+                    weight="bold"
+                    style={styles.flexLabel}
+                  >
+                    RADIUS PRESENSI SESI (METER)
+                  </AppText>
+                  <Badge
+                    label={`${radiusMeters || '0'} meter`}
+                    variant="attended"
+                    size="sm"
+                  />
+                </View>
+
+                {/* Preset Chips */}
+                <View style={styles.presetsRow}>
+                  {RADIUS_PRESETS.map((preset) => {
+                    const isSelected = String(preset) === radiusMeters;
+                    return (
+                      <Pressable
+                        key={preset}
+                        onPress={() => setDraftRadius(String(preset))}
+                        style={[
+                          styles.presetChip,
+                          isSelected && styles.presetChipSelected,
+                        ]}
+                      >
+                        <AppText
+                          variant="caption"
+                          weight={isSelected ? 'bold' : 'regular'}
+                          color={
+                            isSelected ? Colors.textWhite : Colors.textSecondary
+                          }
+                        >
+                          {preset} m
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <TextInput
+                  style={styles.textInput}
+                  value={radiusMeters}
+                  onChangeText={setDraftRadius}
+                  placeholder="60"
+                  keyboardType="number-pad"
+                  placeholderTextColor={Colors.textLight}
+                />
                 <AppText
                   variant="caption"
-                  color={Colors.danger}
-                  style={styles.errorText}
+                  color={Colors.textMuted}
+                  style={styles.helperText}
                 >
-                  {errorMsg}
+                  Perubahan radius ini hanya berlaku pada sesi praktikum ini dan tidak mengubah data utama laboratorium maupun sesi lainnya.
                 </AppText>
               </View>
-            ) : null}
+            </ScrollView>
 
-            {/* Info Lokasi Lab Terkunci (Read-Only Master Data) */}
-            <View style={styles.lockedInfoCard}>
-              <View style={styles.lockedHeaderRow}>
-                <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                  INFORMASI LABORATORIUM (TETAP)
-                </AppText>
-                <View style={styles.lockedTag}>
-                  <Icon name="lock-closed" size={12} color={Colors.textMuted} />
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    Terkunci
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.lockedRow}>
-                <Icon name="desktop-outline" size={16} color={Colors.primary} />
-                <View style={styles.lockedCol}>
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    Nama Ruangan / Lab
-                  </AppText>
-                  <AppText variant="bodySm" weight="semibold">
-                    {displayLabName}
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.lockedRow}>
-                <Icon name="business-outline" size={16} color={Colors.primary} />
-                <View style={styles.lockedCol}>
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    Gedung
-                  </AppText>
-                  <AppText variant="bodySm" color={Colors.textSecondary}>
-                    {displayBuilding}
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.lockedRow}>
-                <Icon name="navigate-outline" size={16} color={Colors.primary} />
-                <View style={styles.lockedCol}>
-                  <AppText variant="caption" color={Colors.textMuted}>
-                    Titik Koordinat Pusat (Lat, Long)
-                  </AppText>
-                  <AppText variant="bodySm" color={Colors.textSecondary}>
-                    {displayCoords}
-                  </AppText>
-                </View>
-              </View>
-            </View>
-
-            {/* Batas Radius Presensi (Editable untuk sesi ini) */}
-            <View style={styles.formGroup}>
-              <View style={styles.radiusHeaderRow}>
-                <AppText variant="caption" color={Colors.textMuted} weight="bold">
-                  BATAS RADIUS PRESENSI SESI INI (METER)
-                </AppText>
-                <Badge
-                  label={`${radiusMeters || '0'} meter`}
-                  variant="attended"
-                  size="sm"
-                />
-              </View>
-
-              {/* Preset Chips */}
-              <View style={styles.presetsRow}>
-                {RADIUS_PRESETS.map((preset) => {
-                  const isSelected = String(preset) === radiusMeters;
-                  return (
-                    <Pressable
-                      key={preset}
-                      onPress={() => setDraftRadius(String(preset))}
-                      style={[
-                        styles.presetChip,
-                        isSelected && styles.presetChipSelected,
-                      ]}
-                    >
-                      <AppText
-                        variant="caption"
-                        weight={isSelected ? 'bold' : 'regular'}
-                        color={
-                          isSelected ? Colors.textWhite : Colors.textSecondary
-                        }
-                      >
-                        {preset} m
-                      </AppText>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <TextInput
-                style={styles.textInput}
-                value={radiusMeters}
-                onChangeText={setDraftRadius}
-                placeholder="60"
-                keyboardType="number-pad"
-                placeholderTextColor={Colors.textLight}
+            {/* Footer Actions */}
+            <View style={styles.footer}>
+              <CustomButton
+                title="Batal"
+                variant="outline"
+                size="md"
+                fullWidth={false}
+                onPress={handleCloseModal}
+                disabled={saving}
+                style={styles.cancelBtn}
               />
-              <AppText
-                variant="caption"
-                color={Colors.textMuted}
-                style={styles.helperText}
-              >
-                Perubahan radius ini hanya berlaku pada sesi praktikum ini dan tidak mengubah data utama laboratorium maupun sesi lainnya.
-              </AppText>
+              <CustomButton
+                title={saving ? 'Menyimpan...' : 'Simpan Radius'}
+                variant="primary"
+                size="md"
+                fullWidth={false}
+                loading={saving}
+                onPress={handleSave}
+                style={styles.saveBtn}
+              />
             </View>
-          </ScrollView>
-
-          {/* Footer Actions */}
-          <View style={styles.footer}>
-            <CustomButton
-              title="Batal"
-              variant="outline"
-              size="md"
-              onPress={handleCloseModal}
-              disabled={saving}
-              style={styles.cancelBtn}
-            />
-            <CustomButton
-              title={saving ? 'Menyimpan...' : 'Simpan Radius Sesi'}
-              variant="primary"
-              size="md"
-              loading={saving}
-              onPress={handleSave}
-              style={styles.saveBtn}
-            />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -279,12 +309,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoid: {
+    width: '100%',
+  },
   modalContainer: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     maxHeight: '90%',
-    paddingBottom: Spacing.xl,
   },
   header: {
     flexDirection: 'row',
@@ -354,17 +386,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.xs,
     paddingBottom: Spacing.xxs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
+  flexLabel: {
+    flex: 1,
+  },
   lockedTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
+    paddingVertical: Spacing.xxs,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -389,23 +425,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     color: Colors.text,
-    fontSize: 14,
+    fontSize: Typography.sm,
   },
   radiusHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.sm,
     marginBottom: Spacing.xxs,
   },
   presetsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   presetChip: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: 56,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
     backgroundColor: Colors.surfaceSecondary,
@@ -432,6 +473,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   saveBtn: {
-    flex: 2,
+    flex: 1.6,
   },
 });

@@ -14,12 +14,30 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 
-import { AttendanceRecord, SessionStatus } from '@/types/attendance';
+import {
+  AttendanceRecord,
+  PracticalSession,
+  SessionStatus,
+} from '@/types/attendance';
+import { FineRecord } from '@/types/fine';
 import { Coordinates, LabLocation } from '@/types/lab';
 import { calculateDistanceMeters } from '@/utils/geo';
+import {
+  DEFAULT_FINE_AMOUNT,
+  DEFAULT_GRACE_PERIOD_MINUTES,
+  evaluateLateness,
+  formatRupiah,
+  resolveSessionStartIso,
+} from '@/utils/lateness';
+import { buildFineId, createLateFineIfNotExists } from './fines';
 import { db, isFirebaseConfigured } from './firebase';
 import { getLabByRoomName } from './labs';
 import { getSessionById, updateSession } from './sessions';
+
+type LabWithPolicy = LabLocation & {
+  gracePeriodMinutes?: number;
+  fineAmount?: number;
+};
 
 /**
  * Service Presensi, Sinkronisasi Real-Time, dan Anti-Bocor (Sprint 2 - Bahir).
@@ -56,20 +74,30 @@ export async function setSessionStatus(
     throw new Error('ID sesi tidak valid.');
   }
 
-  // Delegasikan pembaruan status ke service sessions
+  // Delegasikan pembaruan status ke service sessions; catat openedAt saat sesi dibuka
+  if (status === 'OPEN') {
+    await updateSession(sessionId, {
+      status,
+      openedAt: new Date().toISOString(),
+    });
+    return;
+  }
   await updateSession(sessionId, { status });
 }
 
 /**
- * 2. Submit Presensi dengan Proteksi Anti-Bocor & Validasi Geofencing (SRS-PRES-02 & SRS-S3-02)
+ * 2. Submit Presensi dengan Proteksi Anti-Bocor, Validasi Geofencing, & Evaluasi Keterlambatan
+ * (SRS-PRES-02, SRS-S3-02, SRS-S4-04)
  *
  * Menerapkan verifikasi atomik:
  * a. Memastikan status sesi adalah 'OPEN'.
- * b. Memastikan mahasiswa belum pernah presensi pada sesi ini.
+ * b. Memastikan mahasiswa belum pernah presensi / belum berstatus EXCUSED_ABSENCE pada sesi ini.
  * c. Validasi Geofencing (SRS-S3-02): Untuk sesi OFFLINE, mahasiswa wajib berada
  *    di dalam radius laboratorium yang ditentukan.
- * d. Menggunakan deterministic ID `attendance_${sessionId}_${studentId}`
- *    atau Firestore Transaction untuk mencegah race condition / duplikasi.
+ * d. Evaluasi Grace Period (SRS-S4-04): Menentukan ON_TIME vs LATE dan menerbitkan
+ *    tepat 1 tagihan denda nominal tetap (idempotent) bila terlambat.
+ * e. Menggunakan deterministic ID `attendance_${sessionId}_${studentId}`
+ *    dengan Firestore Transaction untuk mencegah race condition / duplikasi.
  */
 export async function submitAttendanceToFirestore(
   record: Omit<AttendanceRecord, 'id' | 'timestamp'> & {
@@ -77,7 +105,12 @@ export async function submitAttendanceToFirestore(
     userCoords?: Coordinates | null;
     labLocation?: LabLocation | null;
   }
-): Promise<{ success: boolean; message: string; record?: AttendanceRecord }> {
+): Promise<{
+  success: boolean;
+  message: string;
+  record?: AttendanceRecord;
+  fine?: FineRecord | null;
+}> {
   const { sessionId, studentId, studentName, studentNim, notes, userCoords } = record;
 
   if (!sessionId || !studentId) {
@@ -96,7 +129,7 @@ export async function submitAttendanceToFirestore(
       const attendanceDocRef = doc(db, 'attendance', docId);
       const sessionDocRef = doc(db, 'sessions', sessionId);
 
-      // Ambil data sesi terlebih dahulu untuk pra-validasi geofence sebelum transaksi
+      // Ambil data sesi terlebih dahulu untuk pra-validasi geofence & kebijakan keterlambatan
       const preSessionSnap = await getDoc(sessionDocRef);
       if (!preSessionSnap.exists()) {
         return {
@@ -105,12 +138,32 @@ export async function submitAttendanceToFirestore(
         };
       }
 
-      const preSessionData = preSessionSnap.data();
+      const preSessionData = preSessionSnap.data() as Omit<PracticalSession, 'id'>;
       if (preSessionData.status !== 'OPEN') {
         return {
           success: false,
           message: 'Sesi praktikum belum dibuka atau sudah ditutup.',
         };
+      }
+
+      let targetLab: LabWithPolicy | null =
+        (record.labLocation as LabWithPolicy | null) || null;
+      if (!targetLab && preSessionData.labId) {
+        try {
+          const labSnap = await getDoc(doc(db, 'labs', preSessionData.labId));
+          if (labSnap.exists()) {
+            targetLab = {
+              id: labSnap.id,
+              ...(labSnap.data() as Omit<LabWithPolicy, 'id'>),
+            };
+          }
+        } catch {
+          // Abaikan jika gagal ambil lab by id, coba via room name
+        }
+      }
+
+      if (!targetLab && preSessionData.room) {
+        targetLab = (await getLabByRoomName(preSessionData.room)) as LabWithPolicy | null;
       }
 
       let computedDistance: number | null = null;
@@ -122,22 +175,6 @@ export async function submitAttendanceToFirestore(
             message:
               'Lokasi perangkat tidak dapat diperoleh. Aktifkan GPS dan izinkan akses lokasi untuk melakukan presensi praktikum offline.',
           };
-        }
-
-        let targetLab = record.labLocation || null;
-        if (!targetLab && preSessionData.labId) {
-          try {
-            const labSnap = await getDoc(doc(db, 'labs', preSessionData.labId));
-            if (labSnap.exists()) {
-              targetLab = { id: labSnap.id, ...(labSnap.data() as Omit<LabLocation, 'id'>) };
-            }
-          } catch {
-            // Abaikan jika gagal ambil lab by id, coba via room name
-          }
-        }
-
-        if (!targetLab && preSessionData.room) {
-          targetLab = await getLabByRoomName(preSessionData.room);
         }
 
         if (targetLab) {
@@ -159,6 +196,25 @@ export async function submitAttendanceToFirestore(
       const isOfflineVerified =
         preSessionData.deliveryMode !== 'ONLINE' && computedDistance !== null;
 
+      // Evaluasi Keterlambatan berbasis Grace Period (SRS-S4-04)
+      const gracePeriodMinutes =
+        preSessionData.gracePeriodMinutes ??
+        targetLab?.gracePeriodMinutes ??
+        DEFAULT_GRACE_PERIOD_MINUTES;
+      const fineAmount =
+        preSessionData.fineAmount ??
+        targetLab?.fineAmount ??
+        DEFAULT_FINE_AMOUNT;
+      const sessionStartIso = resolveSessionStartIso(preSessionData);
+      const lateness = evaluateLateness(
+        timestamp,
+        sessionStartIso,
+        gracePeriodMinutes
+      );
+      const expectedFineId = lateness.isLate
+        ? buildFineId(sessionId, studentId)
+        : null;
+
       const result = await runTransaction(db, async (transaction: Transaction) => {
         // 1. Periksa status sesi dalam transaksi
         const sessionSnap = await transaction.get(sessionDocRef);
@@ -171,9 +227,15 @@ export async function submitAttendanceToFirestore(
           throw new Error('Sesi praktikum belum dibuka atau sudah ditutup.');
         }
 
-        // 2. Proteksi Anti-Bocor: Periksa apakah sudah ada presensi
+        // 2. Proteksi Anti-Bocor: Periksa apakah sudah ada presensi atau izin disetujui
         const attendanceSnap = await transaction.get(attendanceDocRef);
         if (attendanceSnap.exists()) {
+          const existingStatus = attendanceSnap.data()?.attendanceStatus;
+          if (existingStatus === 'EXCUSED_ABSENCE') {
+            throw new Error(
+              'Anda sudah tercatat Izin Disetujui (Bebas Denda) pada sesi ini sehingga tidak perlu melakukan presensi.'
+            );
+          }
           throw new Error('Anda sudah melakukan presensi pada sesi ini.');
         }
 
@@ -188,17 +250,42 @@ export async function submitAttendanceToFirestore(
           distanceMeters: computedDistance,
           userCoords: userCoords ?? null,
           verifiedLocation: isOfflineVerified,
+          attendanceStatus: lateness.status,
+          lateMinutes: lateness.lateMinutes,
+          fineId: expectedFineId,
         };
 
         transaction.set(attendanceDocRef, newRecord);
         return newRecord;
       });
 
+      // Jika terlambat, buat tepat 1 tagihan denda nominal tetap (idempotent)
+      let createdFine: FineRecord | null = null;
+      if (lateness.isLate) {
+        createdFine = await createLateFineIfNotExists({
+          studentId,
+          studentName,
+          studentNim,
+          sessionId,
+          sessionName: preSessionData.courseName || 'Sesi Praktikum',
+          classCode: preSessionData.classCode || '-',
+          labId: preSessionData.labId || targetLab?.id,
+          attendanceId: result.id,
+          lateMinutes: lateness.lateMinutes,
+          amount: fineAmount,
+        });
+      }
+
       notifyAttendanceListeners();
       return {
         success: true,
-        message: 'Presensi berhasil dicatat!',
+        message: lateness.isLate
+          ? `Presensi tercatat (Terlambat ${lateness.lateMinutes} menit). Tagihan denda sebesar ${formatRupiah(
+              createdFine?.amount ?? fineAmount
+            )} telah dibuat.`
+          : 'Presensi berhasil dicatat tepat waktu!',
         record: result,
+        fine: createdFine,
       };
     } catch (err: any) {
       return {
@@ -225,16 +312,26 @@ export async function submitAttendanceToFirestore(
   }
 
   // Proteksi Anti-Bocor lokal
-  const isDuplicate = localAttendanceStore.some(
+  const existingLocal = localAttendanceStore.find(
     (item) => item.sessionId === sessionId && item.studentId === studentId
   );
 
-  if (isDuplicate) {
+  if (existingLocal) {
+    if (existingLocal.attendanceStatus === 'EXCUSED_ABSENCE') {
+      return {
+        success: false,
+        message:
+          'Anda sudah tercatat Izin Disetujui (Bebas Denda) pada sesi ini sehingga tidak perlu melakukan presensi.',
+      };
+    }
     return {
       success: false,
       message: 'Anda sudah melakukan presensi pada sesi ini.',
     };
   }
+
+  const targetLab = ((record.labLocation ||
+    (await getLabByRoomName(session.room))) as LabWithPolicy | null);
 
   let localComputedDistance: number | null = null;
   // Validasi Geofencing lokal (SRS-S3-02)
@@ -247,7 +344,6 @@ export async function submitAttendanceToFirestore(
       };
     }
 
-    const targetLab = record.labLocation || (await getLabByRoomName(session.room));
     if (targetLab) {
       const maxRadius = session.radiusMeters ?? targetLab.radiusMeters ?? 60;
       localComputedDistance = calculateDistanceMeters(userCoords, {
@@ -264,6 +360,22 @@ export async function submitAttendanceToFirestore(
     }
   }
 
+  const gracePeriodMinutes =
+    session.gracePeriodMinutes ??
+    targetLab?.gracePeriodMinutes ??
+    DEFAULT_GRACE_PERIOD_MINUTES;
+  const fineAmount =
+    session.fineAmount ?? targetLab?.fineAmount ?? DEFAULT_FINE_AMOUNT;
+  const sessionStartIso = resolveSessionStartIso(session);
+  const lateness = evaluateLateness(
+    timestamp,
+    sessionStartIso,
+    gracePeriodMinutes
+  );
+  const expectedFineId = lateness.isLate
+    ? buildFineId(sessionId, studentId)
+    : null;
+
   const newRecord: AttendanceRecord = {
     id: docId,
     sessionId,
@@ -276,15 +388,40 @@ export async function submitAttendanceToFirestore(
     userCoords: userCoords ?? null,
     verifiedLocation:
       session.deliveryMode !== 'ONLINE' && localComputedDistance !== null,
+    attendanceStatus: lateness.status,
+    lateMinutes: lateness.lateMinutes,
+    fineId: expectedFineId,
   };
 
   localAttendanceStore = [newRecord, ...localAttendanceStore];
+
+  let localFine: FineRecord | null = null;
+  if (lateness.isLate) {
+    localFine = await createLateFineIfNotExists({
+      studentId,
+      studentName,
+      studentNim,
+      sessionId,
+      sessionName: session.courseName,
+      classCode: session.classCode,
+      labId: session.labId || targetLab?.id,
+      attendanceId: newRecord.id,
+      lateMinutes: lateness.lateMinutes,
+      amount: fineAmount,
+    });
+  }
+
   notifyAttendanceListeners();
 
   return {
     success: true,
-    message: 'Presensi berhasil dicatat!',
+    message: lateness.isLate
+      ? `Presensi tercatat (Terlambat ${lateness.lateMinutes} menit). Tagihan denda sebesar ${formatRupiah(
+          localFine?.amount ?? fineAmount
+        )} telah dibuat.`
+      : 'Presensi berhasil dicatat tepat waktu!',
     record: newRecord,
+    fine: localFine,
   };
 }
 
@@ -523,6 +660,9 @@ export async function recordManualAttendanceByAssistant(params: {
     notes:
       customNote?.trim() ||
       `Dicatat hadir manual oleh Asprak ${assistantName}`,
+    attendanceStatus: 'ON_TIME',
+    lateMinutes: 0,
+    fineId: null,
   };
 
   if (isFirebaseConfigured) {
@@ -544,4 +684,52 @@ export async function recordManualAttendanceByAssistant(params: {
     message: `Kehadiran ${studentName} (${studentNim}) berhasil dicatat oleh asisten.`,
     record: newRecord,
   };
+}
+
+/**
+ * 8. Mencatat status Tidak Hadir dengan Izin (`EXCUSED_ABSENCE`) saat izin disetujui Asprak (SRS-S4-04).
+ * TIDAK mengubah status menjadi hadir (`ON_TIME` / `LATE`) dan bebas dari denda keterlambatan.
+ */
+export async function recordExcusedAbsenceRecord(params: {
+  sessionId: string;
+  studentId: string;
+  studentName: string;
+  studentNim: string;
+  reason?: string;
+}): Promise<AttendanceRecord> {
+  const { sessionId, studentId, studentName, studentNim, reason } = params;
+  const timestamp = new Date().toISOString();
+  const docId = `attendance_${sessionId}_${studentId}`;
+
+  const excusedRecord: AttendanceRecord = {
+    id: docId,
+    sessionId,
+    studentId,
+    studentName,
+    studentNim,
+    timestamp,
+    notes: reason?.trim() || 'Tidak hadir dengan izin yang disetujui Asprak.',
+    distanceMeters: null,
+    userCoords: null,
+    verifiedLocation: false,
+    attendanceStatus: 'EXCUSED_ABSENCE',
+    lateMinutes: 0,
+    fineId: null,
+  };
+
+  if (isFirebaseConfigured) {
+    try {
+      await setDoc(doc(db, 'attendance', docId), excusedRecord, { merge: true });
+    } catch (err) {
+      console.warn('Gagal mencatat EXCUSED_ABSENCE ke Firestore:', err);
+    }
+  }
+
+  localAttendanceStore = [
+    excusedRecord,
+    ...localAttendanceStore.filter((item) => item.id !== docId),
+  ];
+  notifyAttendanceListeners();
+
+  return excusedRecord;
 }

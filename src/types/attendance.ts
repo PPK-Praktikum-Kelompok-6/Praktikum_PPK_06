@@ -1,7 +1,8 @@
 import { Coordinates } from './lab';
 
 export type SessionStatus = 'NOT_STARTED' | 'OPEN' | 'CLOSED';
-export type UserRole = 'ADMIN' | 'ASSISTANT' | 'STUDENT';
+export type UserRole = 'ADMIN' | 'ASLAB' | 'ASSISTANT' | 'STUDENT';
+export type AttendancePunctuality = 'ON_TIME' | 'LATE' | 'EXCUSED_ABSENCE';
 export type ApprovalStatus =
   | 'PENDING_ADMIN'
   | 'PENDING_ASSISTANT'
@@ -30,6 +31,9 @@ export interface AttendanceRecord {
   distanceMeters?: number | null;
   userCoords?: Coordinates | null;
   verifiedLocation?: boolean;
+  attendanceStatus?: AttendancePunctuality;
+  lateMinutes?: number;
+  fineId?: string | null;
 }
 
 export interface PracticalSession {
@@ -46,11 +50,14 @@ export interface PracticalSession {
   totalStudents: number;
   description?: string;
   createdAt?: string;
+  openedAt?: string;
   deliveryMode?: 'OFFLINE' | 'ONLINE';
   meetingLink?: string;
   pendingChangeRequest?: 'DELETE' | 'RESCHEDULE';
   labId?: string;
   radiusMeters?: number;
+  gracePeriodMinutes?: number;
+  fineAmount?: number;
 }
 
 export interface CreateSessionInput {

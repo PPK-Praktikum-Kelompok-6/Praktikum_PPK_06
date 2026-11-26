@@ -30,62 +30,91 @@ export function AttendanceTable({ records, style }: AttendanceTableProps) {
   return (
     <View style={[styles.container, style]}>
       <View style={styles.headerRow}>
-        <AppText variant="title">Daftar Hadir Praktikan</AppText>
+        <AppText variant="title" style={styles.headerTitle}>
+          Daftar Hadir Praktikan
+        </AppText>
         <AppText variant="caption" color={Colors.primary} weight="semibold">
           {records.length} Peserta
         </AppText>
       </View>
 
       <View style={styles.list}>
-        {records.map((record, index) => (
-          <Card key={record.id} variant="default" padding="sm" style={styles.itemCard}>
-            <View style={styles.row}>
-              {/* Number / Index Badge */}
-              <View style={styles.indexBadge}>
-                <AppText variant="caption" color={Colors.textSecondary} weight="bold">
-                  {index + 1}
-                </AppText>
-              </View>
+        {records.map((record, index) => {
+          const isLate = record.attendanceStatus === 'LATE';
+          return (
+            <Card key={record.id} variant="default" padding="sm" style={styles.itemCard}>
+              <View style={styles.row}>
+                {/* Number / Index Badge */}
+                <View style={styles.indexBadge}>
+                  <AppText variant="caption" color={Colors.textSecondary} weight="bold">
+                    {index + 1}
+                  </AppText>
+                </View>
 
-              {/* Student Info */}
-              <View style={styles.studentInfo}>
-                <AppText variant="bodySm" weight="semibold">
-                  {record.studentName}
-                </AppText>
-                <AppText variant="caption" color={Colors.textMuted}>
-                  NIM: {record.studentNim}
-                </AppText>
-                {record.verifiedLocation ? (
-                  <View style={styles.verifiedRow}>
-                    <Icon name="shield-checkmark" size={12} color={Colors.success} />
-                    <AppText variant="caption" color={Colors.success} weight="semibold">
-                      Lokasi Terverifikasi
-                      {record.distanceMeters !== undefined && record.distanceMeters !== null
-                        ? ` (${record.distanceMeters} m dari lab)`
-                        : ''}
-                    </AppText>
-                  </View>
-                ) : null}
-                {record.notes ? (
-                  <View style={styles.notesRow}>
-                    <Icon name="chatbubble-ellipses-outline" size={12} color={Colors.textMuted} />
-                    <AppText variant="caption" color={Colors.textMuted}>
-                      {record.notes}
-                    </AppText>
-                  </View>
-                ) : null}
-              </View>
+                {/* Student Info */}
+                <View style={styles.studentInfo}>
+                  <AppText variant="bodySm" weight="semibold" numberOfLines={1}>
+                    {record.studentName}
+                  </AppText>
+                  <AppText variant="caption" color={Colors.textMuted} numberOfLines={1}>
+                    NIM: {record.studentNim}
+                  </AppText>
+                  {record.verifiedLocation ? (
+                    <View style={styles.verifiedRow}>
+                      <Icon
+                        name="shield-checkmark"
+                        size={12}
+                        color={Colors.success}
+                        style={styles.inlineIcon}
+                      />
+                      <AppText
+                        variant="caption"
+                        color={Colors.success}
+                        weight="semibold"
+                        style={styles.inlineText}
+                      >
+                        Lokasi Terverifikasi
+                        {record.distanceMeters !== undefined && record.distanceMeters !== null
+                          ? ` (${record.distanceMeters} m dari lab)`
+                          : ''}
+                      </AppText>
+                    </View>
+                  ) : null}
+                  {record.notes ? (
+                    <View style={styles.notesRow}>
+                      <Icon
+                        name="chatbubble-ellipses-outline"
+                        size={12}
+                        color={Colors.textMuted}
+                        style={styles.inlineIcon}
+                      />
+                      <AppText
+                        variant="caption"
+                        color={Colors.textMuted}
+                        style={styles.inlineText}
+                      >
+                        {record.notes}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
 
-              {/* Timestamp & Status Badge */}
-              <View style={styles.timeSection}>
-                <Badge label="Hadir" variant="attended" size="sm" showDot />
-                <AppText variant="caption" color={Colors.textMuted} style={styles.timeText}>
-                  {formatTime(record.timestamp)}
-                </AppText>
+                {/* Timestamp & Status Badge */}
+                <View style={styles.timeSection}>
+                  <Badge
+                    label={isLate ? 'Terlambat' : 'Tepat Waktu'}
+                    variant={isLate ? 'waiting' : 'attended'}
+                    size="sm"
+                    showDot
+                  />
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    {formatTime(record.timestamp)}
+                  </AppText>
+                </View>
               </View>
-            </View>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </View>
     </View>
   );
@@ -93,13 +122,17 @@ export function AttendanceTable({ records, style }: AttendanceTableProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
+  },
+  headerTitle: {
+    flexShrink: 1,
   },
   list: {
     gap: Spacing.sm,
@@ -110,7 +143,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
   },
   indexBadge: {
@@ -126,21 +159,25 @@ const styles = StyleSheet.create({
   },
   verifiedRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    marginTop: Spacing.xxs,
   },
   notesRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    marginTop: Spacing.xxs,
+  },
+  inlineIcon: {
+    marginTop: Spacing.xxs,
+  },
+  inlineText: {
+    flex: 1,
   },
   timeSection: {
     alignItems: 'flex-end',
-    gap: 4,
-  },
-  timeText: {
-    fontSize: 11,
+    gap: Spacing.xs,
+    flexShrink: 0,
   },
 });

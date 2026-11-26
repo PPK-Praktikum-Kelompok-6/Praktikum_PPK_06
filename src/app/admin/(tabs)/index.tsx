@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -7,9 +16,10 @@ import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
+import { BoxIcon } from '@/components/ui/Icon';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import {
   reviewSessionRequest,
   subscribeSessionRequests,
@@ -91,7 +101,7 @@ export default function AdminSessionRequestsScreen() {
   };
 
   return (
-    <Screen scroll withBottomNavPadding style={styles.screen}>
+    <Screen scroll withBottomNavPadding>
       <View style={styles.header}>
         <AppText variant="caption" color={Colors.primary} weight="bold">
           PORTAL ADMINISTRATOR LAB
@@ -108,7 +118,12 @@ export default function AdminSessionRequestsScreen() {
       <LiveClock variant="light" />
 
       {/* Filter Tabs */}
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}
+      >
         {(
           [
             { key: 'PENDING', label: 'Menunggu' },
@@ -134,7 +149,7 @@ export default function AdminSessionRequestsScreen() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {filteredRequests.length === 0 ? (
         <EmptyState
@@ -155,14 +170,14 @@ export default function AdminSessionRequestsScreen() {
             <Card key={req.id} variant="default" padding="md" style={styles.requestCard}>
               <View style={styles.cardHeader}>
                 <Badge
-                  label={isDelete ? 'Permintaan Hapus Sesi' : 'Permintaan Reschedule'}
+                  label={isDelete ? 'Hapus Sesi' : 'Reschedule'}
                   variant={isDelete ? 'danger' : 'waiting'}
                   size="sm"
                 />
                 <Badge
                   label={
                     req.status === 'PENDING'
-                      ? 'Menunggu Admin'
+                      ? 'Menunggu'
                       : req.status === 'APPROVED'
                       ? 'Disetujui'
                       : 'Ditolak'
@@ -201,21 +216,33 @@ export default function AdminSessionRequestsScreen() {
                   <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
                     Rincian Perubahan yang Diajukan:
                   </AppText>
-                  {req.newTimeSlot ? (
-                    <AppText variant="caption" color={Colors.textSecondary}>
-                      ⏰ Jam Baru: {req.newTimeSlot}
-                    </AppText>
-                  ) : null}
-                  {req.newRoom ? (
-                    <AppText variant="caption" color={Colors.textSecondary}>
-                      📍 Ruangan Baru: {req.newRoom}
-                    </AppText>
-                  ) : null}
-                  {req.newDate ? (
-                    <AppText variant="caption" color={Colors.textSecondary}>
-                      📅 Tanggal Baru: {new Date(req.newDate).toLocaleDateString('id-ID')}
-                    </AppText>
-                  ) : null}
+                  {[
+                    req.newTimeSlot
+                      ? { icon: 'clock' as const, text: `Jam Baru: ${req.newTimeSlot}` }
+                      : null,
+                    req.newRoom
+                      ? { icon: 'location' as const, text: `Ruangan Baru: ${req.newRoom}` }
+                      : null,
+                    req.newDate
+                      ? {
+                          icon: 'calendar' as const,
+                          text: `Tanggal Baru: ${new Date(req.newDate).toLocaleDateString('id-ID')}`,
+                        }
+                      : null,
+                  ].map((item) =>
+                    item ? (
+                      <View key={item.icon} style={styles.rescheduleDetailRow}>
+                        <BoxIcon name={item.icon} size={14} color={Colors.primaryDark} />
+                        <AppText
+                          variant="caption"
+                          color={Colors.textSecondary}
+                          style={styles.rescheduleDetailText}
+                        >
+                          {item.text}
+                        </AppText>
+                      </View>
+                    ) : null
+                  )}
                 </View>
               ) : null}
 
@@ -225,6 +252,7 @@ export default function AdminSessionRequestsScreen() {
                     title="Tolak"
                     variant="outline"
                     size="sm"
+                    fullWidth={false}
                     style={styles.actionButton}
                     onPress={() => handleOpenDecision(req, 'REJECTED')}
                   />
@@ -232,6 +260,7 @@ export default function AdminSessionRequestsScreen() {
                     title="Setujui"
                     variant="primary"
                     size="sm"
+                    fullWidth={false}
                     style={styles.actionButton}
                     onPress={() => handleOpenDecision(req, 'APPROVED')}
                   />
@@ -250,47 +279,67 @@ export default function AdminSessionRequestsScreen() {
       )}
 
       {/* Decision Modal */}
-      {selectedReq && decisionAction ? (
-        <Card variant="flat" padding="lg" style={styles.decisionModalCard}>
-          <AppText variant="title" weight="bold">
-            {decisionAction === 'APPROVED' ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan'}
-          </AppText>
-          <AppText variant="bodySm" color={Colors.textSecondary} style={styles.decisionSub}>
-            Anda akan {decisionAction === 'APPROVED' ? 'menyetujui' : 'menolak'} permintaan{' '}
-            {selectedReq.type === 'DELETE' ? 'penghapusan' : 'reschedule'} sesi praktikum{' '}
-            <AppText variant="bodySm" weight="bold">{selectedReq.courseName}</AppText>.
-          </AppText>
+      <Modal
+        visible={Boolean(selectedReq && decisionAction)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedReq(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSelectedReq(null)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboardAvoid}
+          >
+            <View style={styles.decisionModalCard}>
+              <AppText variant="title" weight="bold">
+                {decisionAction === 'APPROVED'
+                  ? 'Konfirmasi Persetujuan'
+                  : 'Konfirmasi Penolakan'}
+              </AppText>
+              <AppText variant="bodySm" color={Colors.textSecondary} style={styles.decisionSub}>
+                Anda akan {decisionAction === 'APPROVED' ? 'menyetujui' : 'menolak'} permintaan{' '}
+                {selectedReq?.type === 'DELETE' ? 'penghapusan' : 'reschedule'} sesi praktikum{' '}
+                <AppText variant="bodySm" weight="bold">{selectedReq?.courseName}</AppText>.
+              </AppText>
 
-          <View style={styles.inputGroup}>
-            <AppText variant="label">Catatan Admin (Opsional):</AppText>
-            <TextInput
-              value={adminNote}
-              onChangeText={setAdminNote}
-              placeholder="Berikan catatan untuk asisten..."
-              placeholderTextColor={Colors.textLight}
-              style={styles.noteInput}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <AppText variant="label">Catatan Admin (Opsional):</AppText>
+                <TextInput
+                  value={adminNote}
+                  onChangeText={setAdminNote}
+                  placeholder="Berikan catatan untuk asisten..."
+                  placeholderTextColor={Colors.textLight}
+                  style={styles.noteInput}
+                />
+              </View>
 
-          <View style={styles.actionRow}>
-            <CustomButton
-              title="Batal"
-              variant="outline"
-              size="md"
-              style={styles.actionButton}
-              onPress={() => setSelectedReq(null)}
-            />
-            <CustomButton
-              title={decisionAction === 'APPROVED' ? 'Ya, Setujui' : 'Ya, Tolak'}
-              variant={decisionAction === 'APPROVED' ? 'primary' : 'danger'}
-              size="md"
-              loading={submitting}
-              style={styles.actionButton}
-              onPress={handleConfirmDecision}
-            />
-          </View>
-        </Card>
-      ) : null}
+              <View style={styles.actionRow}>
+                <CustomButton
+                  title="Batal"
+                  variant="outline"
+                  size="md"
+                  fullWidth={false}
+                  style={styles.modalCancelBtn}
+                  onPress={() => setSelectedReq(null)}
+                />
+                <CustomButton
+                  title={decisionAction === 'APPROVED' ? 'Ya, Setujui' : 'Ya, Tolak'}
+                  variant={decisionAction === 'APPROVED' ? 'primary' : 'danger'}
+                  size="md"
+                  fullWidth={false}
+                  loading={submitting}
+                  style={styles.modalConfirmBtn}
+                  onPress={handleConfirmDecision}
+                />
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       <FeedbackModal
         visible={feedback.visible}
@@ -304,20 +353,20 @@ export default function AdminSessionRequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    padding: Spacing.md,
-  },
   header: {
     marginBottom: Spacing.md,
+    paddingTop: Spacing.xs,
   },
   title: {
-    marginTop: 2,
-    marginBottom: 4,
+    marginTop: Spacing.xxs,
+    marginBottom: Spacing.xs,
+  },
+  filterScroll: {
+    marginBottom: Spacing.md,
   },
   filterRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
-    marginBottom: Spacing.md,
   },
   filterChip: {
     paddingHorizontal: Spacing.sm + 2,
@@ -336,8 +385,10 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   courseTitle: {
@@ -359,6 +410,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
+    gap: Spacing.xxs,
+  },
+  rescheduleDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+  },
+  rescheduleDetailText: {
+    flex: 1,
   },
   actionRow: {
     flexDirection: 'row',
@@ -374,16 +434,22 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
     marginTop: Spacing.xs,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  modalKeyboardAvoid: {
+    width: '100%',
+  },
   decisionModalCard: {
-    position: 'absolute',
-    top: 100,
-    left: Spacing.md,
-    right: Spacing.md,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: Colors.border,
-    zIndex: 9999,
+    padding: Spacing.lg,
+    ...Shadows.lg,
   },
   decisionSub: {
     marginTop: Spacing.xs,
@@ -399,7 +465,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.sm,
     marginTop: Spacing.xs,
-    fontSize: 14,
+    fontSize: Typography.sm,
     color: Colors.text,
+  },
+  modalCancelBtn: {
+    flex: 1,
+  },
+  modalConfirmBtn: {
+    flex: 1.3,
   },
 });

@@ -1,19 +1,26 @@
 import * as DocumentPicker from 'expo-document-picker';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
-import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { BoxIcon, Icon } from '@/components/ui/Icon';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { PracticalSession } from '@/types/attendance';
 import { PermitAttachment } from '@/types/permit';
+import { formatDateIndonesian } from '@/utils/formatTime';
 
 export interface PermitFormProps {
   sessions: PracticalSession[];
@@ -29,7 +36,11 @@ export interface PermitFormProps {
 }
 
 export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitFormProps) {
+  const insets = useSafeAreaInsets();
   const [userSelectedSessionId, setUserSelectedSessionId] = useState<string>('');
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [courseFilter, setCourseFilter] = useState<string>('ALL');
   const [reason, setReason] = useState('');
   const [attachment, setAttachment] = useState<PermitAttachment | null>(null);
   const [pickingFile, setPickingFile] = useState(false);
@@ -41,6 +52,32 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
       : sessions[0]?.id || '';
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
+
+  const courseOptions = useMemo(
+    () => Array.from(new Set(sessions.map((s) => s.courseName).filter(Boolean))),
+    [sessions]
+  );
+
+  const filteredSessions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return sessions.filter((s) => {
+      if (courseFilter !== 'ALL' && s.courseName !== courseFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const haystack = [
+        s.courseName,
+        s.classCode,
+        s.date,
+        formatDateIndonesian(s.date),
+        s.timeSlot,
+        s.deliveryMode === 'ONLINE' ? 'daring online' : s.room,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [sessions, courseFilter, searchQuery]);
 
   const handlePickDocument = async () => {
     setErrorMessage(null);
@@ -117,60 +154,74 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
 
   return (
     <Card variant="flat" padding="md" style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.iconCircle}>
-          <Icon name="document-text-outline" size={20} color={Colors.primary} />
-        </View>
-        <View style={styles.headerTexts}>
-          <AppText variant="title" weight="bold">
-            Formulir Izin Praktikum
-          </AppText>
-          <AppText variant="caption" color={Colors.textSecondary}>
-            Sertakan alasan yang jelas & bukti lampiran untuk ditinjau asisten
-          </AppText>
-        </View>
-      </View>
-
-      {/* Sesi Praktikum Selector */}
+      {/* Sesi Praktikum Searchable Picker */}
       <View style={styles.field}>
-        <AppText variant="label" weight="semibold" style={styles.label}>
-          Pilih Sesi Praktikum
-        </AppText>
-        {sessions.length === 0 ? (
+        <View style={styles.fieldHeaderRow}>
+          <AppText variant="label" weight="semibold" style={styles.label}>
+            Pilih Sesi Praktikum
+          </AppText>
+          {sessions.length > 0 ? (
+            <AppText variant="caption" color={Colors.textMuted}>
+              {sessions.length} Sesi
+            </AppText>
+          ) : null}
+        </View>
+
+        {sessions.length === 0 || !selectedSession ? (
           <View style={styles.emptySessionNotice}>
             <AppText variant="caption" color={Colors.textMuted}>
               Tidak ada jadwal praktikum yang tersedia saat ini.
             </AppText>
           </View>
         ) : (
-          <View style={styles.sessionChipsWrap}>
-            {sessions.map((session) => {
-              const isSelected = session.id === selectedSessionId;
-              return (
-                <CustomButton
-                  key={session.id}
-                  title={`${session.courseName} (${session.classCode})`}
-                  variant={isSelected ? 'primary' : 'outline'}
-                  size="sm"
-                  fullWidth={false}
-                  onPress={() => setUserSelectedSessionId(session.id)}
-                  style={styles.sessionChip}
+          <Pressable
+            onPress={() => setPickerVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Pilih sesi praktikum"
+            style={({ pressed }) => [
+              styles.sessionSelector,
+              pressed && styles.selectorPressed,
+            ]}
+          >
+            <View style={styles.selectorTopRow}>
+              <AppText
+                variant="bodySm"
+                weight="bold"
+                color={Colors.text}
+                numberOfLines={1}
+                style={styles.selectorCourse}
+              >
+                {selectedSession.courseName}
+              </AppText>
+              <View style={styles.selectorRight}>
+                <View style={styles.classPill}>
+                  <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+                    Kelas {selectedSession.classCode}
+                  </AppText>
+                </View>
+                <Icon name="chevron-down" size={18} color={Colors.primary} />
+              </View>
+            </View>
+
+            <View style={styles.selectorMetaRow}>
+              <Icon name="calendar-outline" size={14} color={Colors.primary} />
+              <AppText variant="caption" color={Colors.primaryDark}>
+                {formatDateIndonesian(selectedSession.date)} • {selectedSession.timeSlot}
+              </AppText>
+              <View style={styles.sessionVenueGroup}>
+                <BoxIcon
+                  name={selectedSession.deliveryMode === 'ONLINE' ? 'globe' : 'buildings'}
+                  size={13}
+                  color={Colors.primaryDark}
                 />
-              );
-            })}
-          </View>
+                <AppText variant="caption" color={Colors.primaryDark} style={styles.sessionInfoText}>
+                  {selectedSession.deliveryMode === 'ONLINE' ? 'Daring' : selectedSession.room}
+                </AppText>
+              </View>
+            </View>
+          </Pressable>
         )}
       </View>
-
-      {/* Detail singkat sesi yang dipilih */}
-      {selectedSession && (
-        <View style={styles.sessionInfoBox}>
-          <Icon name="time-outline" size={14} color={Colors.primary} />
-          <AppText variant="caption" color={Colors.primaryDark} style={styles.sessionInfoText}>
-            {selectedSession.date} • {selectedSession.timeSlot} • {selectedSession.deliveryMode === 'ONLINE' ? '🌐 Daring' : '🏢 ' + selectedSession.room}
-          </AppText>
-        </View>
-      )}
 
       {/* Input Alasan */}
       <View style={styles.field}>
@@ -178,7 +229,10 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
           <AppText variant="label" weight="semibold" style={styles.label}>
             Alasan Ketidakhadiran *
           </AppText>
-          <AppText variant="caption" color={reason.trim().length >= 10 ? Colors.success : Colors.textMuted}>
+          <AppText
+            variant="caption"
+            color={reason.trim().length >= 10 ? Colors.success : Colors.textMuted}
+          >
             {reason.trim().length}/10 karakter
           </AppText>
         </View>
@@ -200,14 +254,9 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
 
       {/* Kolom Lampiran Dokumen Bukti (Maks. 3 MB) */}
       <View style={styles.field}>
-        <View style={styles.attachmentHeader}>
-          <AppText variant="label" weight="semibold" style={styles.label}>
-            LAMPIRAN BUKTI (OPSIONAL)
-          </AppText>
-          <AppText variant="caption" color={Colors.textMuted}>
-            PDF, JPG, PNG (Maks. 3 MB)
-          </AppText>
-        </View>
+        <AppText variant="label" weight="semibold" style={styles.label}>
+          Lampiran Bukti (Opsional)
+        </AppText>
 
         {attachment ? (
           <View style={styles.attachedCard}>
@@ -229,6 +278,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
               </View>
             </View>
             <Pressable
+              hitSlop={8}
               onPress={handleRemoveAttachment}
               style={styles.removeAttachButton}
               accessibilityRole="button"
@@ -251,7 +301,7 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
                 {pickingFile ? 'Membuka File Picker...' : 'Unggah Surat Dokter / Bukti Izin'}
               </AppText>
               <AppText variant="caption" color={Colors.textMuted}>
-                Format: PDF, JPG, JPEG, PNG (Maks. 3 MB)
+                Format: PDF, JPG, JPEG, PNG • Maks. 3 MB
               </AppText>
             </View>
           </Pressable>
@@ -278,6 +328,210 @@ export function PermitForm({ sessions, onSubmit, isLoading = false }: PermitForm
         icon={<Icon name="paper-plane" size={16} color={Colors.surface} />}
         style={styles.submitBtn}
       />
+
+      {/* Searchable Modal Picker untuk Memilih Sesi Praktikum */}
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPickerVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.pickerKeyboardWrap}
+          >
+            <View
+              style={[
+                styles.pickerSheet,
+                { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+              ]}
+            >
+              <View style={styles.pickerHeader}>
+                <View style={styles.pickerHeaderText}>
+                  <AppText variant="title" weight="bold">
+                    Pilih Sesi Praktikum
+                  </AppText>
+                  <AppText variant="caption" color={Colors.textMuted}>
+                    {sessions.length} jadwal tersedia dari kelas Anda
+                  </AppText>
+                </View>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => setPickerVisible(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup daftar sesi"
+                  style={styles.pickerCloseBtn}
+                >
+                  <Icon name="close" size={20} color={Colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.searchBox}>
+                <Icon name="search-outline" size={18} color={Colors.textMuted} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Cari matkul, kelas, tanggal, atau ruang..."
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.searchInput}
+                />
+                {searchQuery.length > 0 ? (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => setSearchQuery('')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Hapus pencarian"
+                  >
+                    <Icon name="close-circle" size={18} color={Colors.textMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {courseOptions.length > 1 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.courseFilterScroll}
+                  contentContainerStyle={styles.courseFilterRow}
+                >
+                  {['ALL', ...courseOptions].map((opt) => {
+                    const active = courseFilter === opt;
+                    return (
+                      <Pressable
+                        key={opt}
+                        onPress={() => setCourseFilter(opt)}
+                        style={[
+                          styles.courseFilterChip,
+                          active && styles.courseFilterChipActive,
+                        ]}
+                      >
+                        <AppText
+                          variant="caption"
+                          weight={active ? 'semibold' : 'medium'}
+                          color={active ? Colors.textWhite : Colors.textSecondary}
+                          numberOfLines={1}
+                        >
+                          {opt === 'ALL' ? 'Semua' : opt}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
+              <FlatList
+                data={filteredSessions}
+                keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                style={styles.pickerList}
+                contentContainerStyle={styles.pickerListContent}
+                ListEmptyComponent={
+                  <View style={styles.emptySearchWrap}>
+                    <Icon name="search-outline" size={28} color={Colors.textMuted} />
+                    <AppText variant="bodySm" weight="semibold" color={Colors.textSecondary}>
+                      Sesi Tidak Ditemukan
+                    </AppText>
+                    <AppText variant="caption" color={Colors.textMuted} align="center">
+                      Ubah kata kunci pencarian atau pilih filter mata kuliah lain.
+                    </AppText>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const isSelected = item.id === selectedSessionId;
+                  const statusLabel =
+                    item.status === 'OPEN'
+                      ? 'Dibuka'
+                      : item.status === 'NOT_STARTED'
+                      ? 'Belum Mulai'
+                      : 'Ditutup';
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        setUserSelectedSessionId(item.id);
+                        setPickerVisible(false);
+                        setSearchQuery('');
+                      }}
+                      style={[
+                        styles.sessionOptionCard,
+                        isSelected && styles.sessionOptionSelected,
+                      ]}
+                    >
+                      <View style={styles.optionTopRow}>
+                        <AppText
+                          variant="bodySm"
+                          weight="bold"
+                          color={isSelected ? Colors.primaryDark : Colors.text}
+                          numberOfLines={2}
+                          style={styles.optionTitle}
+                        >
+                          {item.courseName}
+                        </AppText>
+                        <View style={styles.optionRightChips}>
+                          <View style={styles.optionClassPill}>
+                            <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+                              Kelas {item.classCode}
+                            </AppText>
+                          </View>
+                          {isSelected ? (
+                            <Icon name="checkmark-circle" size={18} color={Colors.primary} />
+                          ) : null}
+                        </View>
+                      </View>
+
+                      <View style={styles.optionMetaRow}>
+                        <Icon name="time-outline" size={13} color={Colors.textMuted} />
+                        <AppText
+                          variant="caption"
+                          color={Colors.textSecondary}
+                          style={styles.optionMetaText}
+                        >
+                          {formatDateIndonesian(item.date)} • {item.timeSlot}
+                        </AppText>
+                      </View>
+
+                      <View style={styles.optionBottomRow}>
+                        <View style={styles.sessionVenueGroup}>
+                          <BoxIcon
+                            name={item.deliveryMode === 'ONLINE' ? 'globe' : 'buildings'}
+                            size={13}
+                            color={Colors.textMuted}
+                          />
+                          <AppText
+                            variant="caption"
+                            color={Colors.textMuted}
+                            style={styles.optionMetaText}
+                          >
+                            {item.deliveryMode === 'ONLINE' ? 'Daring (Online)' : item.room}
+                          </AppText>
+                        </View>
+                        <AppText
+                          variant="caption"
+                          weight="semibold"
+                          color={
+                            item.status === 'OPEN'
+                              ? Colors.success
+                              : item.status === 'NOT_STARTED'
+                              ? Colors.warning
+                              : Colors.textMuted
+                          }
+                        >
+                          {statusLabel}
+                        </AppText>
+                      </View>
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </Card>
   );
 }
@@ -286,76 +540,91 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: Spacing.md,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+  field: {
     marginBottom: Spacing.md,
   },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.primaryBg,
+  fieldHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTexts: {
-    flex: 1,
-  },
-  field: {
-    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   label: {
-    marginBottom: Spacing.xs,
     color: Colors.text,
-  },
-  sessionChipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-  },
-  sessionChip: {
-    marginBottom: Spacing.xs,
+    flexShrink: 1,
   },
   emptySessionNotice: {
     padding: Spacing.sm,
     backgroundColor: Colors.surfaceSecondary,
     borderRadius: Radius.md,
   },
-  sessionInfoBox: {
+  sessionSelector: {
+    backgroundColor: Colors.primaryBg,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    gap: Spacing.xs + 2,
+  },
+  selectorPressed: {
+    opacity: 0.85,
+  },
+  selectorTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryBg,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  selectorCourse: {
+    flex: 1,
+  },
+  selectorRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: Spacing.md,
+    flexShrink: 0,
+  },
+  classPill: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.full,
+  },
+  selectorMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  sessionVenueGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flexShrink: 1,
   },
   sessionInfoText: {
-    flex: 1,
+    flexShrink: 1,
   },
   reasonHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   textArea: {
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: Radius.md,
-    padding: Spacing.sm,
-    fontSize: 14,
+    padding: Spacing.sm + 2,
+    fontSize: Typography.sm,
     color: Colors.text,
     minHeight: 88,
-  },
-  attachmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
   },
   pickFileBox: {
     flexDirection: 'row',
@@ -368,6 +637,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
     borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   pickIconCircle: {
     width: 32,
@@ -390,6 +660,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   attachedLeft: {
     flexDirection: 'row',
@@ -416,7 +687,7 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: Colors.dangerBg,
     padding: Spacing.sm,
     borderRadius: Radius.sm,
@@ -428,5 +699,147 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     marginTop: Spacing.xs,
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+  },
+  pickerKeyboardWrap: {
+    width: '100%',
+    maxHeight: '84%',
+  },
+  pickerSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    maxHeight: '100%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    flexShrink: 0,
+    marginBottom: Spacing.sm,
+  },
+  pickerHeaderText: {
+    flex: 1,
+  },
+  pickerCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm + 2,
+    minHeight: 44,
+    flexShrink: 0,
+    marginBottom: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Typography.sm,
+    color: Colors.text,
+    paddingVertical: 0,
+  },
+  courseFilterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: Spacing.sm,
+  },
+  courseFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  courseFilterChip: {
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  courseFilterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  pickerList: {
+    flexShrink: 1,
+  },
+  pickerListContent: {
+    gap: Spacing.xs + 2,
+    paddingBottom: Spacing.sm,
+  },
+  emptySearchWrap: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  sessionOptionCard: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Spacing.sm + 2,
+    gap: Spacing.xs,
+  },
+  sessionOptionSelected: {
+    backgroundColor: Colors.primaryBg,
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+  },
+  optionTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
+  },
+  optionTitle: {
+    flex: 1,
+  },
+  optionRightChips: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flexShrink: 0,
+  },
+  optionClassPill: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+    paddingHorizontal: Spacing.xs + 2,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.full,
+  },
+  optionMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  optionMetaText: {
+    flexShrink: 1,
+  },
+  optionBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
   },
 });

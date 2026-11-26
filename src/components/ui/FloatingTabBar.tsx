@@ -8,17 +8,22 @@ import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 
 export type FloatingTabBarProps = Parameters<
   NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>
->[0];
+>[0] & {
+  leftAccessory?: React.ReactNode;
+  rightAccessory?: React.ReactNode;
+};
 
 /**
- * Compact Frosted-Glass Floating Pill Navbar (auto-width hugging the number of menu items).
- * Uses native BlurView + specular glass border so content scrolling underneath blurs smoothly.
+ * Compact Frosted-Glass Floating Pill Navbar with optional coordinated side accessories.
+ * Renders accessories and the tab capsule inside one flex row so they never overlap on narrow screens.
  */
 export function FloatingTabBar({
   state,
   descriptors,
   emitter,
   navigateToTab,
+  leftAccessory,
+  rightAccessory,
 }: FloatingTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomOffset = Math.max(insets.bottom, Spacing.md);
@@ -28,56 +33,63 @@ export function FloatingTabBar({
       pointerEvents="box-none"
       style={[styles.wrapper, { bottom: bottomOffset }]}
     >
-      <View style={styles.shadowContainer}>
-        <BlurView intensity={70} tint="light" style={styles.blurCapsule}>
-          <View style={styles.pillInner}>
-            {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
-              const focused = state.index === index;
+      <View pointerEvents="box-none" style={styles.barRow}>
+        {leftAccessory ? <View style={styles.sideSlot}>{leftAccessory}</View> : null}
 
-              const onPress = () => {
-                const event = emitter.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
+        <View style={styles.shadowContainer}>
+          <BlurView intensity={70} tint="light" style={styles.blurCapsule}>
+            <View style={styles.pillInner}>
+              {state.routes.map((route, index) => {
+                const { options } = descriptors[route.key];
+                const focused = state.index === index;
 
-                if (!focused && !event.defaultPrevented) {
-                  navigateToTab(route.key);
-                }
-              };
+                const onPress = () => {
+                  const event = emitter.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
 
-              const iconColor = focused
-                ? Colors.tabBarActiveTint
-                : Colors.tabBarInactiveTint;
-
-              return (
-                <Pressable
-                  key={route.key}
-                  accessibilityRole="button"
-                  accessibilityState={focused ? { selected: true } : {}}
-                  accessibilityLabel={
-                    options.tabBarAccessibilityLabel ??
-                    options.title ??
-                    route.name
+                  if (!focused && !event.defaultPrevented) {
+                    navigateToTab(route.key);
                   }
-                  onPress={onPress}
-                  style={({ pressed }) => [
-                    styles.circle,
-                    focused ? styles.circleActive : styles.circleInactive,
-                    pressed && styles.circlePressed,
-                  ]}
-                >
-                  {options.tabBarIcon?.({
-                    focused,
-                    color: iconColor,
-                    size: 22,
-                  })}
-                </Pressable>
-              );
-            })}
-          </View>
-        </BlurView>
+                };
+
+                const iconColor = focused
+                  ? Colors.tabBarActiveTint
+                  : Colors.tabBarInactiveTint;
+
+                return (
+                  <Pressable
+                    key={route.key}
+                    hitSlop={4}
+                    accessibilityRole="button"
+                    accessibilityState={focused ? { selected: true } : {}}
+                    accessibilityLabel={
+                      options.tabBarAccessibilityLabel ??
+                      options.title ??
+                      route.name
+                    }
+                    onPress={onPress}
+                    style={({ pressed }) => [
+                      styles.circle,
+                      focused ? styles.circleActive : styles.circleInactive,
+                      pressed && styles.circlePressed,
+                    ]}
+                  >
+                    {options.tabBarIcon?.({
+                      focused,
+                      color: iconColor,
+                      size: 21,
+                    })}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </BlurView>
+        </View>
+
+        {rightAccessory ? <View style={styles.sideSlot}>{rightAccessory}</View> : null}
       </View>
     </View>
   );
@@ -88,6 +100,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm + 4,
+  },
+  sideSlot: {
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -104,15 +127,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.tabBarBg,
     borderRadius: Radius.full,
-    padding: 6,
-    gap: Spacing.sm,
+    padding: 5,
+    gap: 6,
     borderWidth: 1.2,
     borderColor: Colors.tabBarBorder,
   },
   circle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

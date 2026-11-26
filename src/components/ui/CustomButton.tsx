@@ -129,7 +129,8 @@ export function CustomButton({
             variant={sizeStyle.textVariant}
             weight="semibold"
             color={getTextColor()}
-            style={textStyle}
+            numberOfLines={1}
+            style={[styles.labelText, textStyle]}
           >
             {title}
           </AppText>
@@ -185,6 +186,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 1,
+  },
+  labelText: {
+    flexShrink: 1,
   },
   iconLeft: {
     marginRight: Spacing.sm,

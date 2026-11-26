@@ -1,6 +1,8 @@
 import { Href, router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -8,7 +10,6 @@ import {
 } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
@@ -16,7 +17,6 @@ import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { signInUser, signUpUser } from '@/services/auth';
-import { isFirebaseConfigured } from '@/services/firebase';
 import { useCurrentUser } from '@/store/hooks';
 import { UserRole } from '@/types/attendance';
 
@@ -136,256 +136,252 @@ export default function AuthAndRoleRoute() {
   };
 
   return (
-    <Screen style={styles.container}>
-      {/* Brand Header */}
-      <View style={styles.header}>
-        <View style={styles.logoBadge}>
-          <Icon name="school" size={32} color={Colors.primary} />
+    <Screen contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Brand Header */}
+        <View style={styles.header}>
+          <View style={styles.logoBadge}>
+            <Icon name="school" size={32} color={Colors.primary} />
+          </View>
+          <AppText variant="h1" align="center" style={styles.title}>
+            Presensi Praktikum
+          </AppText>
+          <AppText variant="bodySm" align="center" color={Colors.textMuted}>
+            Sistem Presensi Praktikum Terpadu & Realtime
+          </AppText>
         </View>
-        <AppText variant="h1" align="center" style={styles.title}>
-          Presensi Praktikum
-        </AppText>
-        <AppText variant="bodySm" align="center" color={Colors.textMuted}>
-          Sistem Presensi Praktikum Terpadu & Realtime
-        </AppText>
-        <View style={styles.connectionBadgeWrap}>
-          <Badge
-            label={
-              isFirebaseConfigured
-                ? 'Firebase Cloud Aktif'
-                : 'Mode Autentikasi Hybrid'
-            }
-            variant={isFirebaseConfigured ? 'open' : 'primary'}
-            size="sm"
-            showDot
-          />
-        </View>
-      </View>
 
-      {/* Kartu Utama: Form Login & Registrasi Firebase (SRS-AUTH-01 & SRS-AUTH-02) */}
-      <Card variant="default" padding="lg" style={styles.authCard}>
-        {/* Mode Switcher: Masuk vs Daftar */}
-        <View style={styles.modeTabRow}>
-          <Pressable
-            style={[
-              styles.modeTab,
-              mode === 'LOGIN' && styles.modeTabActive,
-            ]}
-            onPress={() => setMode('LOGIN')}
-            accessibilityRole="tab"
-          >
-            <AppText
-              variant="bodySm"
-              weight="semibold"
-              color={mode === 'LOGIN' ? Colors.textWhite : Colors.textSecondary}
+        {/* Kartu Utama: Form Login & Registrasi Firebase (SRS-AUTH-01 & SRS-AUTH-02) */}
+        <Card variant="default" padding="lg" style={styles.authCard}>
+          {/* Mode Switcher: Masuk vs Daftar */}
+          <View style={styles.modeTabRow}>
+            <Pressable
+              style={[
+                styles.modeTab,
+                mode === 'LOGIN' && styles.modeTabActive,
+              ]}
+              onPress={() => setMode('LOGIN')}
+              accessibilityRole="tab"
             >
-              Masuk
-            </AppText>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.modeTab,
-              mode === 'REGISTER' && styles.modeTabActive,
-            ]}
-            onPress={() => setMode('REGISTER')}
-            accessibilityRole="tab"
-          >
-            <AppText
-              variant="bodySm"
-              weight="semibold"
-              color={
-                mode === 'REGISTER' ? Colors.textWhite : Colors.textSecondary
-              }
+              <AppText
+                variant="bodySm"
+                weight="semibold"
+                color={mode === 'LOGIN' ? Colors.textWhite : Colors.textSecondary}
+              >
+                Masuk
+              </AppText>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.modeTab,
+                mode === 'REGISTER' && styles.modeTabActive,
+              ]}
+              onPress={() => setMode('REGISTER')}
+              accessibilityRole="tab"
             >
-              Daftar Akun
-            </AppText>
-          </Pressable>
-        </View>
-
-        {mode === 'REGISTER' ? (
-          <>
-            {/* Pilihan Peran (Praktikan vs Asisten) */}
-            <View style={styles.fieldGroup}>
-              <AppText variant="label" style={styles.fieldLabel}>
-                PERAN PENGGUNA
+              <AppText
+                variant="bodySm"
+                weight="semibold"
+                color={
+                  mode === 'REGISTER' ? Colors.textWhite : Colors.textSecondary
+                }
+              >
+                Daftar Akun
               </AppText>
-              <View style={styles.roleChoiceRow}>
-                <Pressable
-                  style={[
-                    styles.roleChoiceBtn,
-                    registerRole === 'STUDENT' && styles.roleChoiceBtnActive,
-                  ]}
-                  onPress={() => setRegisterRole('STUDENT')}
-                >
-                  <Icon
-                    name="person-outline"
-                    size={16}
-                    color={
-                      registerRole === 'STUDENT'
-                        ? Colors.primary
-                        : Colors.textMuted
-                    }
-                  />
-                  <AppText
-                    variant="bodySm"
-                    weight="semibold"
-                    color={
-                      registerRole === 'STUDENT'
-                        ? Colors.primary
-                        : Colors.textSecondary
-                    }
-                  >
-                    Praktikan
-                  </AppText>
-                </Pressable>
+            </Pressable>
+          </View>
 
-                <Pressable
-                  style={[
-                    styles.roleChoiceBtn,
-                    registerRole === 'ASSISTANT' && styles.roleChoiceBtnActive,
-                  ]}
-                  onPress={() => setRegisterRole('ASSISTANT')}
-                >
-                  <Icon
-                    name="school-outline"
-                    size={16}
-                    color={
-                      registerRole === 'ASSISTANT'
-                        ? Colors.primary
-                        : Colors.textMuted
-                    }
-                  />
-                  <AppText
-                    variant="bodySm"
-                    weight="semibold"
-                    color={
-                      registerRole === 'ASSISTANT'
-                        ? Colors.primary
-                        : Colors.textSecondary
-                    }
-                  >
-                    Asisten
-                  </AppText>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Input Nama Lengkap */}
-            <View style={styles.fieldGroup}>
-              <AppText variant="label" style={styles.fieldLabel}>
-                NAMA LENGKAP
-              </AppText>
-              <View style={styles.inputBox}>
-                <Icon
-                  name="person-outline"
-                  size={18}
-                  color={Colors.textMuted}
-                />
-                <TextInput
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder="Contoh: Budi Santoso"
-                  placeholderTextColor={Colors.textLight}
-                  style={styles.textInput}
-                />
-              </View>
-            </View>
-
-            {/* Input NIM Praktikan */}
-            {registerRole === 'STUDENT' ? (
+          {mode === 'REGISTER' ? (
+            <>
+              {/* Pilihan Peran (Praktikan vs Asisten) */}
               <View style={styles.fieldGroup}>
                 <AppText variant="label" style={styles.fieldLabel}>
-                  NIM PRAKTIKAN
+                  PERAN PENGGUNA
+                </AppText>
+                <View style={styles.roleChoiceRow}>
+                  <Pressable
+                    style={[
+                      styles.roleChoiceBtn,
+                      registerRole === 'STUDENT' && styles.roleChoiceBtnActive,
+                    ]}
+                    onPress={() => setRegisterRole('STUDENT')}
+                  >
+                    <Icon
+                      name="person-outline"
+                      size={16}
+                      color={
+                        registerRole === 'STUDENT'
+                          ? Colors.primary
+                          : Colors.textMuted
+                      }
+                    />
+                    <AppText
+                      variant="bodySm"
+                      weight="semibold"
+                      color={
+                        registerRole === 'STUDENT'
+                          ? Colors.primary
+                          : Colors.textSecondary
+                      }
+                    >
+                      Praktikan
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.roleChoiceBtn,
+                      registerRole === 'ASSISTANT' && styles.roleChoiceBtnActive,
+                    ]}
+                    onPress={() => setRegisterRole('ASSISTANT')}
+                  >
+                    <Icon
+                      name="school-outline"
+                      size={16}
+                      color={
+                        registerRole === 'ASSISTANT'
+                          ? Colors.primary
+                          : Colors.textMuted
+                      }
+                    />
+                    <AppText
+                      variant="bodySm"
+                      weight="semibold"
+                      color={
+                        registerRole === 'ASSISTANT'
+                          ? Colors.primary
+                          : Colors.textSecondary
+                      }
+                    >
+                      Asisten
+                    </AppText>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Input Nama Lengkap */}
+              <View style={styles.fieldGroup}>
+                <AppText variant="label" style={styles.fieldLabel}>
+                  NAMA LENGKAP
                 </AppText>
                 <View style={styles.inputBox}>
                   <Icon
-                    name="card-outline"
+                    name="person-outline"
                     size={18}
                     color={Colors.textMuted}
                   />
                   <TextInput
-                    value={identifier}
-                    onChangeText={setIdentifier}
-                    placeholder="Contoh: 24060124140130"
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="Contoh: Budi Santoso"
                     placeholderTextColor={Colors.textLight}
                     style={styles.textInput}
-                    keyboardType="numeric"
                   />
                 </View>
               </View>
-            ) : null}
-          </>
-        ) : null}
 
-        {/* Input Email */}
-        <View style={styles.fieldGroup}>
-          <AppText variant="label" style={styles.fieldLabel}>
-            ALAMAT EMAIL
-          </AppText>
-          <View style={styles.inputBox}>
-            <Icon name="mail-outline" size={18} color={Colors.textMuted} />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="nama@praktikum.ac.id"
-              placeholderTextColor={Colors.textLight}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.textInput}
-            />
+              {/* Input NIM Praktikan */}
+              {registerRole === 'STUDENT' ? (
+                <View style={styles.fieldGroup}>
+                  <AppText variant="label" style={styles.fieldLabel}>
+                    NIM PRAKTIKAN
+                  </AppText>
+                  <View style={styles.inputBox}>
+                    <Icon
+                      name="card-outline"
+                      size={18}
+                      color={Colors.textMuted}
+                    />
+                    <TextInput
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                      placeholder="Contoh: 24060124140130"
+                      placeholderTextColor={Colors.textLight}
+                      style={styles.textInput}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              ) : null}
+            </>
+          ) : null}
+
+          {/* Input Email */}
+          <View style={styles.fieldGroup}>
+            <AppText variant="label" style={styles.fieldLabel}>
+              ALAMAT EMAIL
+            </AppText>
+            <View style={styles.inputBox}>
+              <Icon name="mail-outline" size={18} color={Colors.textMuted} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="nama@praktikum.ac.id"
+                placeholderTextColor={Colors.textLight}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.textInput}
+              />
+            </View>
           </View>
-        </View>
 
-        {/* Input Kata Sandi */}
-        <View style={styles.fieldGroup}>
-          <AppText variant="label" style={styles.fieldLabel}>
-            KATA SANDI
-          </AppText>
-          <View style={styles.inputBox}>
-            <Icon
-              name="lock-closed-outline"
-              size={18}
-              color={Colors.textMuted}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Minimal 6 karakter"
-              placeholderTextColor={Colors.textLight}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              style={styles.textInput}
-            />
-            <Pressable
-              onPress={() => setShowPassword((prev) => !prev)}
-              hitSlop={8}
-            >
+          {/* Input Kata Sandi */}
+          <View style={styles.fieldGroup}>
+            <AppText variant="label" style={styles.fieldLabel}>
+              KATA SANDI
+            </AppText>
+            <View style={styles.inputBox}>
               <Icon
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                name="lock-closed-outline"
                 size={18}
                 color={Colors.textMuted}
               />
-            </Pressable>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Minimal 6 karakter"
+                placeholderTextColor={Colors.textLight}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                style={styles.textInput}
+              />
+              <Pressable
+                onPress={() => setShowPassword((prev) => !prev)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'
+                }
+              >
+                <Icon
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={Colors.textMuted}
+                />
+              </Pressable>
+            </View>
           </View>
-        </View>
 
-        {/* Tombol Submit Utama */}
-        <CustomButton
-          title={mode === 'LOGIN' ? 'Masuk' : 'Daftar dan Masuk'}
-          onPress={mode === 'LOGIN' ? handleLogin : handleRegister}
-          loading={submitting}
-          variant="primary"
-          size="md"
-          icon={
-            <Icon
-              name={mode === 'LOGIN' ? 'log-in-outline' : 'person-add-outline'}
-              size={18}
-              color={Colors.textWhite}
-            />
-          }
-        />
-      </Card>
+          {/* Tombol Submit Utama */}
+          <CustomButton
+            title={mode === 'LOGIN' ? 'Masuk' : 'Daftar dan Masuk'}
+            onPress={mode === 'LOGIN' ? handleLogin : handleRegister}
+            loading={submitting}
+            variant="primary"
+            size="md"
+            icon={
+              <Icon
+                name={mode === 'LOGIN' ? 'log-in-outline' : 'person-add-outline'}
+                size={18}
+                color={Colors.textWhite}
+              />
+            }
+          />
+        </Card>
+      </KeyboardAvoidingView>
 
       {/* Feedback Modal (FR-07 / SRS-UI-01) */}
       <FeedbackModal
@@ -402,13 +398,13 @@ export default function AuthAndRoleRoute() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: Spacing.lg,
+  scrollContent: {
+    paddingHorizontal: Spacing.md,
   },
   header: {
     alignItems: 'center',
-    marginBottom: Spacing.md,
-    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
   },
   logoBadge: {
     width: 60,
@@ -422,9 +418,6 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: Spacing.xxs,
   },
-  connectionBadgeWrap: {
-    marginTop: Spacing.xs,
-  },
   authCard: {
     marginBottom: Spacing.xl,
   },
@@ -432,11 +425,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.surfaceSecondary,
     borderRadius: Radius.md,
-    padding: Spacing.xxs + 2,
+    padding: Spacing.xs,
     marginBottom: Spacing.md,
   },
   modeTab: {
     flex: 1,
+    minHeight: 42,
     paddingVertical: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -457,6 +451,7 @@ const styles = StyleSheet.create({
   },
   roleChoiceBtn: {
     flex: 1,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -479,13 +474,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
-    height: 48,
+    minHeight: 48,
     gap: Spacing.sm,
   },
   textInput: {
     flex: 1,
     fontSize: Typography.md,
     color: Colors.text,
-    paddingVertical: Spacing.xs,
+    paddingVertical: 0,
   },
 });

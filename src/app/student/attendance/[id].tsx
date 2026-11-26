@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { AttendanceSuccessCard } from '@/features/attendance/components/AttendanceSuccessCard';
 import { StatusBadge } from '@/features/sessions/components/StatusBadge';
 import { subscribeAllClasses } from '@/services/admin';
@@ -117,14 +117,20 @@ export default function StudentAttendanceDetailRoute() {
       <Screen>
         <View style={styles.navHeader}>
           <Pressable
+            hitSlop={8}
             onPress={() => router.back()}
-            style={styles.backButton}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Kembali"
           >
             <Icon name="arrow-back" size={22} color={Colors.text} />
           </Pressable>
-          <AppText variant="title">Detail Sesi</AppText>
+          <AppText variant="title" align="center" numberOfLines={1} style={styles.headerTitle}>
+            Detail Sesi
+          </AppText>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -156,14 +162,20 @@ export default function StudentAttendanceDetailRoute() {
       <Screen>
         <View style={styles.navHeader}>
           <Pressable
+            hitSlop={8}
             onPress={() => router.back()}
-            style={styles.backButton}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Kembali"
           >
             <Icon name="arrow-back" size={22} color={Colors.text} />
           </Pressable>
-          <AppText variant="title">Detail Sesi</AppText>
+          <AppText variant="title" align="center" numberOfLines={1} style={styles.headerTitle}>
+            Detail Sesi
+          </AppText>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -184,27 +196,31 @@ export default function StudentAttendanceDetailRoute() {
       {/* Navigation Header */}
       <View style={styles.navHeader}>
         <Pressable
+          hitSlop={8}
           onPress={() => router.back()}
-          style={styles.backButton}
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.backButtonPressed,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Kembali"
         >
           <Icon name="arrow-back" size={22} color={Colors.text} />
         </Pressable>
-        <AppText variant="title" style={styles.headerTitle}>
+        <AppText variant="title" align="center" numberOfLines={1} style={styles.headerTitle}>
           Presensi Praktikum
         </AppText>
         <View style={styles.headerSpacer} />
       </View>
 
       {/* Detail Kartu Sesi */}
-      <Card variant="flat" padding="lg" style={styles.sessionHeaderCard}>
+      <Card variant="flat" padding="md" style={styles.sessionHeaderCard}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.courseTitleWrapper}>
             <AppText variant="caption" color={Colors.primary} weight="bold">
               KELAS {session.classCode}
             </AppText>
-            <AppText variant="h2" style={styles.courseName}>
+            <AppText variant="title" weight="bold">
               {session.courseName}
             </AppText>
           </View>
@@ -221,7 +237,7 @@ export default function StudentAttendanceDetailRoute() {
                 size={16}
                 color={Colors.primary}
               />
-              <View>
+              <View style={styles.metaTextCol}>
                 <AppText variant="caption" color={Colors.textMuted}>
                   {session.deliveryMode === 'ONLINE' ? 'METODE' : 'RUANGAN'}
                 </AppText>
@@ -233,7 +249,7 @@ export default function StudentAttendanceDetailRoute() {
 
             <View style={styles.metaItem}>
               <Icon name="time-outline" size={16} color={Colors.primary} />
-              <View>
+              <View style={styles.metaTextCol}>
                 <AppText variant="caption" color={Colors.textMuted}>
                   WAKTU
                 </AppText>
@@ -247,7 +263,7 @@ export default function StudentAttendanceDetailRoute() {
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Icon name="calendar-outline" size={16} color={Colors.primary} />
-              <View>
+              <View style={styles.metaTextCol}>
                 <AppText variant="caption" color={Colors.textMuted}>
                   TANGGAL
                 </AppText>
@@ -259,7 +275,7 @@ export default function StudentAttendanceDetailRoute() {
 
             <View style={styles.metaItem}>
               <Icon name="person-outline" size={16} color={Colors.primary} />
-              <View>
+              <View style={styles.metaTextCol}>
                 <AppText variant="caption" color={Colors.textMuted}>
                   ASISTEN
                 </AppText>
@@ -304,16 +320,15 @@ export default function StudentAttendanceDetailRoute() {
         </View>
       </Card>
 
-      {/* Bagian Bukti Kehadiran, Bukti Izin Disetujui, atau Form Presensi */}
+      {/* Bagian Bukti Kehadiran, Bukti Izin Disetujui, atau Status Check-In */}
       <View style={styles.contentSection}>
         {attended && attendedRecord ? (
           <AttendanceSuccessCard
             record={attendedRecord}
-            session={session}
             style={styles.successCard}
           />
         ) : sessionPermit?.status === 'APPROVED' ? (
-          <Card variant="default" padding="lg" style={styles.permitApprovedCard}>
+          <Card variant="default" padding="md" style={styles.permitApprovedCard}>
             <View style={styles.permitApprovedHeader}>
               <View style={styles.permitIconWrap}>
                 <Icon name="checkmark-done-circle" size={26} color={Colors.primary} />
@@ -340,13 +355,15 @@ export default function StudentAttendanceDetailRoute() {
             ) : null}
           </Card>
         ) : (
-          <Card variant="flat" padding="lg" style={styles.actionCard}>
+          <Card variant="flat" padding="md" style={styles.actionCard}>
             <View style={styles.actionCardHeader}>
               <View style={styles.actionCardIconWrap}>
                 <Icon name="finger-print" size={24} color={Colors.primary} />
               </View>
               <View style={styles.actionCardTitleWrap}>
-                <AppText variant="h2">Presensi Praktikum</AppText>
+                <AppText variant="title" weight="bold">
+                  Status Check-In
+                </AppText>
                 <AppText variant="caption" color={Colors.textMuted}>
                   {session.status === 'OPEN'
                     ? 'Sesi sedang dibuka. Silakan lakukan check-in kehadiran.'
@@ -405,11 +422,17 @@ export default function StudentAttendanceDetailRoute() {
 
               {session.status !== 'CLOSED' && (
                 <Pressable
+                  hitSlop={4}
                   style={styles.permitLinkBtn}
                   onPress={() => router.push('/student/permit')}
                 >
                   <Icon name="document-text-outline" size={16} color={Colors.primary} />
-                  <AppText variant="caption" weight="semibold" color={Colors.primary}>
+                  <AppText
+                    variant="caption"
+                    weight="semibold"
+                    color={Colors.primary}
+                    style={styles.permitLinkText}
+                  >
                     Berhalangan hadir? Ajukan Izin Ketidakhadiran
                   </AppText>
                 </Pressable>
@@ -438,6 +461,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.sm,
     paddingVertical: Spacing.sm,
     marginBottom: Spacing.sm,
   },
@@ -451,8 +475,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  backButtonPressed: {
+    opacity: 0.75,
+  },
   headerTitle: {
-    fontSize: Typography.xl,
+    flex: 1,
   },
   headerSpacer: {
     width: 40,
@@ -470,9 +497,6 @@ const styles = StyleSheet.create({
   courseTitleWrapper: {
     flex: 1,
     gap: Spacing.xxs,
-  },
-  courseName: {
-    fontSize: Typography.lg,
   },
   divider: {
     height: 1,
@@ -492,6 +516,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  metaTextCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.xxs,
   },
   meetingLinkBox: {
     flexDirection: 'row',
@@ -519,10 +548,10 @@ const styles = StyleSheet.create({
   },
   descriptionContent: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   contentSection: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   successCard: {
     marginTop: Spacing.xs,
@@ -552,10 +581,10 @@ const styles = StyleSheet.create({
   permitHeaderTitleCol: {
     flex: 1,
     alignItems: 'flex-start',
-    gap: 4,
+    gap: Spacing.xs,
   },
   permitApprovedTitle: {
-    marginTop: 2,
+    marginTop: Spacing.xxs,
   },
   permitDecisionNote: {
     backgroundColor: Colors.surface,
@@ -563,7 +592,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   actionCard: {
     borderWidth: 1,
@@ -584,7 +613,7 @@ const styles = StyleSheet.create({
   },
   actionCardTitleWrap: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   actionCardBody: {
     gap: Spacing.md,
@@ -601,14 +630,17 @@ const styles = StyleSheet.create({
   },
   locationNoticeText: {
     flex: 1,
-    lineHeight: 18,
   },
   permitLinkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
     gap: Spacing.xs,
     paddingVertical: Spacing.xs,
+  },
+  permitLinkText: {
+    flexShrink: 1,
   },
 });
 

@@ -1,12 +1,11 @@
 import { Href, Redirect, router, Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { FloatingTabBar } from '@/components/ui/FloatingTabBar';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadows } from '@/constants/theme';
 import {
   AuthUser,
   getCurrentUser as getAuthUser,
@@ -19,7 +18,6 @@ import { useCurrentUser } from '@/store/hooks';
 
 export default function AssistantTabsLayout() {
   const { currentUser } = useCurrentUser();
-  const insets = useSafeAreaInsets();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
     getAuthUser()
   );
@@ -57,18 +55,33 @@ export default function AssistantTabsLayout() {
     return <Redirect href={'/admin' as any} />;
   }
 
-  const bottomOffset = Math.max(insets.bottom, Spacing.md) + 6;
-
   const handleConfirmLogout = async () => {
     setLogoutModalVisible(false);
     await signOutUser();
     router.replace('/' as Href);
   };
 
+  const logoutButton = (
+    <Pressable
+      hitSlop={4}
+      onPress={() => setLogoutModalVisible(true)}
+      accessibilityRole="button"
+      accessibilityLabel="Keluar dari akun asisten"
+      style={({ pressed }) => [
+        styles.sideBtn,
+        pressed && styles.sideBtnPressed,
+      ]}
+    >
+      <Icon name="log-out-outline" size={20} color={Colors.danger} />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
+        tabBar={(props) => (
+          <FloatingTabBar {...props} rightAccessory={logoutButton} />
+        )}
         screenOptions={{
           headerShown: false,
         }}
@@ -127,20 +140,6 @@ export default function AssistantTabsLayout() {
         />
       </Tabs>
 
-      {/* Tombol Logout Mengambang di Samping Navigasi Bawah */}
-      <Pressable
-        onPress={() => setLogoutModalVisible(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Keluar dari akun asisten"
-        style={({ pressed }) => [
-          styles.floatingLogoutBtn,
-          { bottom: bottomOffset },
-          pressed && styles.floatingLogoutPressed,
-        ]}
-      >
-        <Icon name="log-out-outline" size={20} color={Colors.danger} />
-      </Pressable>
-
       <FeedbackModal
         visible={logoutModalVisible}
         type="warning"
@@ -160,11 +159,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  floatingLogoutBtn: {
-    position: 'absolute',
-    right: Spacing.lg,
-    width: 48,
-    height: 48,
+  sideBtn: {
+    width: 44,
+    height: 44,
     borderRadius: Radius.full,
     backgroundColor: Colors.dangerBg,
     borderWidth: 1.2,
@@ -173,7 +170,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...Shadows.floatingNav,
   },
-  floatingLogoutPressed: {
+  sideBtnPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.94 }],
   },

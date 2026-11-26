@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     left: -55,
     width: 290,
     height: 290,
-    opacity: 0.62,
+    opacity: 0.26,
   },
   heroCornerBlob: {
     position: 'absolute',
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     right: -45,
     width: 240,
     height: 240,
-    opacity: 0.58,
+    opacity: 0.22,
   },
   pressed: {
     opacity: 0.92,

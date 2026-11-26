@@ -5,7 +5,7 @@ import { AppText } from '@/components/ui/AppText';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { PermitReviewCard } from '@/features/permits/components/PermitReviewCard';
 import {
   getIncomingPermitsSync,
@@ -102,62 +102,62 @@ export default function AssistantPermitsScreen() {
       withBottomNavPadding
       refreshing={refreshing}
       onRefresh={handleRefresh}
-      style={styles.screen}
     >
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <AppText variant="h2" weight="bold">
-            Verifikasi Izin Praktikan
-          </AppText>
-          <AppText variant="bodySm" color={Colors.textSecondary}>
-            Tinjau alasan ketidakhadiran praktikan dengan bantuan analisis klasifikasi AI
-          </AppText>
+      {/* Header */}
+      <View style={styles.header}>
+        <AppText variant="caption" color={Colors.textMuted} weight="semibold">
+          PENINJAUAN IZIN
+        </AppText>
+        <AppText variant="h1" weight="bold">
+          Verifikasi Izin Praktikan
+        </AppText>
+        <AppText variant="bodySm" color={Colors.textSecondary}>
+          Tinjau alasan ketidakhadiran praktikan dengan bantuan analisis klasifikasi AI
+        </AppText>
 
-          {/* Quick Counter */}
-          <View style={styles.counterRow}>
-            <View style={styles.counterBox}>
-              <AppText variant="caption" color={Colors.textSecondary}>
-                Menunggu Review:
-              </AppText>
-              <AppText
-                variant="title"
-                weight="bold"
-                color={pendingCount > 0 ? Colors.warning : Colors.text}
-              >
-                {pendingCount}
-              </AppText>
-            </View>
-            <View style={styles.counterBox}>
-              <AppText variant="caption" color={Colors.textSecondary}>
-                Total Izin Masuk:
-              </AppText>
-              <AppText variant="title" weight="bold">
-                {permits.length}
-              </AppText>
-            </View>
+        {/* Quick Counter */}
+        <View style={styles.counterRow}>
+          <View style={styles.counterBox}>
+            <AppText variant="caption" color={Colors.textSecondary}>
+              Menunggu Review:
+            </AppText>
+            <AppText
+              variant="title"
+              weight="bold"
+              color={pendingCount > 0 ? Colors.warning : Colors.text}
+            >
+              {pendingCount}
+            </AppText>
+          </View>
+          <View style={styles.counterBox}>
+            <AppText variant="caption" color={Colors.textSecondary}>
+              Total Izin Masuk:
+            </AppText>
+            <AppText variant="title" weight="bold">
+              {permits.length}
+            </AppText>
           </View>
         </View>
+      </View>
 
-        {/* Daftar Kartu Izin */}
-        <View style={styles.listSection}>
-          {permits.length === 0 ? (
-            <EmptyState
-              title="Tidak Ada Izin Masuk"
-              message="Belum ada praktikan yang mengajukan permohonan izin praktikum."
-              iconName="file-tray-outline"
+      {/* Daftar Kartu Izin */}
+      <View style={styles.listSection}>
+        {permits.length === 0 ? (
+          <EmptyState
+            title="Tidak Ada Izin Masuk"
+            message="Belum ada praktikan yang mengajukan permohonan izin praktikum."
+            iconName="file-tray-outline"
+          />
+        ) : (
+          permits.map((item) => (
+            <PermitReviewCard
+              key={item.id}
+              permit={item}
+              onReview={handleReview}
+              isLoading={loadingId === item.id}
             />
-          ) : (
-            permits.map((item) => (
-              <PermitReviewCard
-                key={item.id}
-                permit={item}
-                onReview={handleReview}
-                isLoading={loadingId === item.id}
-              />
-            ))
-          )}
-        </View>
+          ))
+        )}
       </View>
 
       {/* Feedback Modal (SRS-UI-01) */}
@@ -173,27 +173,26 @@ export default function AssistantPermitsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    padding: Spacing.md,
-  },
   header: {
     marginBottom: Spacing.md,
+    paddingTop: Spacing.xs,
+    gap: Spacing.xs,
   },
   counterRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   counterBox: {
     flex: 1,
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     padding: Spacing.sm,
-    borderRadius: 8,
+    borderRadius: Radius.md,
+    gap: Spacing.xxs,
   },
   listSection: {
-    marginTop: Spacing.xs,
+    gap: Spacing.sm,
   },
 });

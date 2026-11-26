@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -19,6 +20,7 @@ import { getDemoAccounts } from '@/services/auth';
 import { PracticalClass } from '@/services/sessions';
 
 export default function AdminClassesScreen() {
+  const insets = useSafeAreaInsets();
   const [classes, setClasses] = useState<PracticalClass[]>([]);
   const [selectedClass, setSelectedClass] = useState<PracticalClass | null>(null);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
@@ -107,7 +109,7 @@ export default function AdminClassesScreen() {
   };
 
   return (
-    <Screen scroll withBottomNavPadding style={styles.screen}>
+    <Screen scroll withBottomNavPadding>
       <View style={styles.header}>
         <AppText variant="caption" color={Colors.primary} weight="bold">
           MANAJEMEN KELAS & ASISTEN
@@ -124,7 +126,7 @@ export default function AdminClassesScreen() {
       <Card variant="accent" padding="md" style={styles.summaryCard}>
         <View style={styles.summaryHeader}>
           <Icon name="shield-checkmark" size={20} color={Colors.primary} />
-          <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
+          <AppText variant="caption" weight="bold" color={Colors.primaryDark} style={styles.flexText}>
             REKAP PENUGASAN ASISTEN SAAT INI
           </AppText>
         </View>
@@ -164,7 +166,9 @@ export default function AdminClassesScreen() {
 
       {/* Class List */}
       <View style={styles.sectionTitleRow}>
-        <AppText variant="title">Daftar Kelas Laboratorium</AppText>
+        <AppText variant="title" style={styles.flexShrinkText}>
+          Daftar Kelas Laboratorium
+        </AppText>
         <AppText variant="caption" color={Colors.textMuted}>
           {classes.length} Kelas Terdaftar
         </AppText>
@@ -189,8 +193,8 @@ export default function AdminClassesScreen() {
 
                 <View style={styles.classDetails}>
                   <View style={styles.classTitleRow}>
-                    <AppText variant="title" weight="bold">
-                      {cls.courseName ? `${cls.courseName} (${cls.classCode})` : `Kelas ${cls.classCode}`}
+                    <AppText variant="title" weight="bold" style={styles.classTitle}>
+                      {cls.courseName || `Kelas ${cls.classCode}`}
                     </AppText>
                     <Badge
                       label={cls.isOpen !== false ? 'Terbuka' : 'Ditutup'}
@@ -207,7 +211,12 @@ export default function AdminClassesScreen() {
                   </AppText>
                   <View style={styles.assistantBadgeRow}>
                     <Icon name="people" size={13} color={Colors.primary} />
-                    <AppText variant="caption" weight="semibold" color={Colors.primary}>
+                    <AppText
+                      variant="caption"
+                      weight="semibold"
+                      color={Colors.primary}
+                      style={styles.assistantBadgeText}
+                    >
                       Asprak: {(cls.assistantNames && cls.assistantNames.length > 0 ? cls.assistantNames.join(', ') : cls.assistantName) || 'Belum Ditugaskan'}
                     </AppText>
                   </View>
@@ -215,23 +224,23 @@ export default function AdminClassesScreen() {
               </View>
 
               <View style={styles.classActionRow}>
-                <View style={styles.actionBtnCol}>
-                  <CustomButton
-                    title={cls.isOpen !== false ? 'Tutup Pendaftaran' : 'Buka Pendaftaran'}
-                    variant={cls.isOpen !== false ? 'outline' : 'primary'}
-                    size="sm"
-                    onPress={() => handleToggleActive(cls)}
-                  />
-                </View>
-                <View style={styles.actionBtnCol}>
-                  <CustomButton
-                    title="Tugaskan Asisten"
-                    variant="outline"
-                    size="sm"
-                    icon={<Icon name="swap-horizontal" size={16} color={Colors.primary} />}
-                    onPress={() => handleOpenAssign(cls)}
-                  />
-                </View>
+                <CustomButton
+                  title={cls.isOpen !== false ? 'Tutup Kelas' : 'Buka Kelas'}
+                  variant={cls.isOpen !== false ? 'outline' : 'primary'}
+                  size="sm"
+                  fullWidth={false}
+                  style={styles.actionBtn}
+                  onPress={() => handleToggleActive(cls)}
+                />
+                <CustomButton
+                  title="Atur Asprak"
+                  variant="outline"
+                  size="sm"
+                  fullWidth={false}
+                  style={styles.actionBtn}
+                  icon={<Icon name="swap-horizontal" size={16} color={Colors.primary} />}
+                  onPress={() => handleOpenAssign(cls)}
+                />
               </View>
             </Card>
           );
@@ -245,61 +254,71 @@ export default function AdminClassesScreen() {
         animationType="slide"
         onRequestClose={() => setAssignModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setAssignModalVisible(false)}
-        />
-        <View style={styles.modalSheet}>
-          <AppText variant="title" weight="bold">
-            Pilih Asisten Penanggung Jawab
-          </AppText>
-          <AppText variant="caption" color={Colors.textSecondary} style={styles.modalSub}>
-            Tentukan asisten yang bertanggung jawab untuk mengampu{' '}
-            <AppText variant="caption" weight="bold">
-              Kelas {selectedClass?.classCode} ({selectedClass?.courseName})
-            </AppText>
-          </AppText>
-
-          <View style={styles.assistantListWrap}>
-            {availableAssistants.map((ast) => {
-              const isCurrent =
-                selectedClass?.assistantId === ast.uid ||
-                selectedClass?.assistantName === ast.name;
-              return (
-                <Pressable
-                  key={ast.uid}
-                  style={[styles.assistantChoiceRow, isCurrent && styles.assistantChoiceRowActive]}
-                  onPress={() => handleSelectAssistant(ast)}
-                  disabled={submitting}
-                >
-                  <View style={styles.astAvatar}>
-                    <Icon name="school" size={18} color={Colors.primary} />
-                  </View>
-                  <View style={styles.astChoiceTextCol}>
-                    <AppText variant="bodySm" weight="bold">
-                      {ast.name}
-                    </AppText>
-                    <AppText variant="caption" color={Colors.textMuted}>
-                      Kode Asisten: {ast.identifier} • {ast.email}
-                    </AppText>
-                  </View>
-                  {isCurrent ? (
-                    <Badge label="PJ Saat Ini" variant="open" size="sm" />
-                  ) : (
-                    <Icon name="chevron-forward" size={18} color={Colors.textMuted} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <CustomButton
-            title="Tutup"
-            variant="outline"
-            size="md"
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
             onPress={() => setAssignModalVisible(false)}
-            style={styles.closeModalBtn}
           />
+          <View
+            style={[
+              styles.modalSheet,
+              { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+            ]}
+          >
+            <AppText variant="title" weight="bold">
+              Pilih Asisten Penanggung Jawab
+            </AppText>
+            <AppText variant="caption" color={Colors.textSecondary} style={styles.modalSub}>
+              Tentukan asisten yang bertanggung jawab untuk mengampu{' '}
+              <AppText variant="caption" weight="bold">
+                Kelas {selectedClass?.classCode} ({selectedClass?.courseName})
+              </AppText>
+            </AppText>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.assistantListWrap}
+            >
+              {availableAssistants.map((ast) => {
+                const isCurrent =
+                  selectedClass?.assistantId === ast.uid ||
+                  selectedClass?.assistantName === ast.name;
+                return (
+                  <Pressable
+                    key={ast.uid}
+                    style={[styles.assistantChoiceRow, isCurrent && styles.assistantChoiceRowActive]}
+                    onPress={() => handleSelectAssistant(ast)}
+                    disabled={submitting}
+                  >
+                    <View style={styles.astAvatar}>
+                      <Icon name="school" size={18} color={Colors.primary} />
+                    </View>
+                    <View style={styles.astChoiceTextCol}>
+                      <AppText variant="bodySm" weight="bold">
+                        {ast.name}
+                      </AppText>
+                      <AppText variant="caption" color={Colors.textMuted}>
+                        Kode Asisten: {ast.identifier} • {ast.email}
+                      </AppText>
+                    </View>
+                    {isCurrent ? (
+                      <Badge label="PJ Saat Ini" variant="open" size="sm" />
+                    ) : (
+                      <Icon name="chevron-forward" size={18} color={Colors.textMuted} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <CustomButton
+              title="Tutup"
+              variant="outline"
+              size="md"
+              onPress={() => setAssignModalVisible(false)}
+              style={styles.closeModalBtn}
+            />
+          </View>
         </View>
       </Modal>
 
@@ -315,15 +334,19 @@ export default function AdminClassesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    padding: Spacing.md,
-  },
   header: {
     marginBottom: Spacing.md,
+    paddingTop: Spacing.xs,
   },
   title: {
-    marginTop: 2,
-    marginBottom: 4,
+    marginTop: Spacing.xxs,
+    marginBottom: Spacing.xs,
+  },
+  flexText: {
+    flex: 1,
+  },
+  flexShrinkText: {
+    flexShrink: 1,
   },
   summaryCard: {
     marginBottom: Spacing.lg,
@@ -341,6 +364,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
@@ -352,6 +376,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
   classCard: {
@@ -360,7 +385,7 @@ const styles = StyleSheet.create({
   classCardTop: {
     flexDirection: 'row',
     gap: Spacing.md,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: Spacing.sm,
   },
   classBadge: {
@@ -375,19 +400,25 @@ const styles = StyleSheet.create({
   },
   classDetails: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   classTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  classTitle: {
+    flex: 1,
   },
   assistantBadgeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
-    marginTop: 2,
+    marginTop: Spacing.xxs,
+  },
+  assistantBadgeText: {
+    flex: 1,
   },
   classActionRow: {
     flexDirection: 'row',
@@ -396,27 +427,29 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
     paddingTop: Spacing.sm,
   },
-  actionBtnCol: {
+  actionBtn: {
     flex: 1,
   },
-  modalBackdrop: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
   },
   modalSheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
     maxHeight: '80%',
   },
   modalSub: {
-    marginTop: 4,
+    marginTop: Spacing.xs,
     marginBottom: Spacing.md,
   },
   assistantListWrap: {
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   assistantChoiceRow: {
     flexDirection: 'row',
@@ -444,7 +477,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeModalBtn: {
-    marginTop: Spacing.xs,
+    marginTop: Spacing.md,
   },
 });
 

@@ -9,8 +9,11 @@ import {
   where,
 } from 'firebase/firestore';
 
+import { normalizeCourseName } from '@/constants/courses';
 import { PermitAttachment, PermitRequest } from '@/types/permit';
 import { classifyPermitReason } from './ai';
+import { recordExcusedAbsenceRecord } from './attendance';
+import { waiveFineForExcusedAbsence } from './fines';
 import { db, isFirebaseConfigured } from './firebase';
 import { notifyPermitReviewed } from './notifications';
 
@@ -54,6 +57,26 @@ export function subscribePermits(listener: PermitListener): () => void {
 // Store bersih tanpa dummy data sampah; otomatis terisi dari Firestore
 let permitStore: PermitRequest[] = [];
 
+const migratedPermitIds = new Set<string>();
+
+function normalizePermitRecord(permit: PermitRequest): PermitRequest {
+  const normalizedCourseName = permit.courseName
+    ? normalizeCourseName(permit.courseName)
+    : permit.courseName;
+  if (permit.courseName && normalizedCourseName !== permit.courseName) {
+    if (isFirebaseConfigured && permit.id && !migratedPermitIds.has(permit.id)) {
+      migratedPermitIds.add(permit.id);
+      setDoc(
+        doc(db, 'permits', permit.id),
+        { courseName: normalizedCourseName },
+        { merge: true }
+      ).catch(() => {});
+    }
+    return { ...permit, courseName: normalizedCourseName };
+  }
+  return permit;
+}
+
 function mergeRemotePermitsIntoLocal(remoteList: PermitRequest[]) {
   const byId = new Map<string, PermitRequest>();
   permitStore.forEach((loc) => byId.set(loc.id, loc));
@@ -91,10 +114,12 @@ export function subscribeStudentPermits(
       const unsubFirestore = onSnapshot(
         q,
         (snap) => {
-          const allRemote: PermitRequest[] = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<PermitRequest, 'id'>),
-          }));
+          const allRemote: PermitRequest[] = snap.docs.map((d) =>
+            normalizePermitRecord({
+              id: d.id,
+              ...(d.data() as Omit<PermitRequest, 'id'>),
+            })
+          );
           mergeRemotePermitsIntoLocal(allRemote);
           onUpdate(permitStore.filter((p) => p.studentId === studentId));
         },
@@ -135,10 +160,12 @@ export function subscribeIncomingPermits(
       const unsubFirestore = onSnapshot(
         q,
         (snap) => {
-          const list: PermitRequest[] = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<PermitRequest, 'id'>),
-          }));
+          const list: PermitRequest[] = snap.docs.map((d) =>
+            normalizePermitRecord({
+              id: d.id,
+              ...(d.data() as Omit<PermitRequest, 'id'>),
+            })
+          );
           mergeRemotePermitsIntoLocal(list);
           onUpdate([...permitStore]);
         },
@@ -215,7 +242,7 @@ export async function submitPermit(
     sessionId: permitData.sessionId,
     classId: permitData.classId,
     classCode: permitData.classCode,
-    courseName: permitData.courseName,
+    courseName: normalizeCourseName(permitData.courseName),
     studentId: permitData.studentId,
     studentName: permitData.studentName,
     studentNim: permitData.studentNim,
@@ -282,10 +309,12 @@ export async function getStudentPermits(
         where('studentId', '==', studentId)
       );
       const snap = await getDocs(q);
-      const remoteList: PermitRequest[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<PermitRequest, 'id'>),
-      }));
+      const remoteList: PermitRequest[] = snap.docs.map((d) =>
+        normalizePermitRecord({
+          id: d.id,
+          ...(d.data() as Omit<PermitRequest, 'id'>),
+        })
+      );
       mergeRemotePermitsIntoLocal(remoteList);
     } catch {
       // Fallback ke store lokal
@@ -301,10 +330,12 @@ export async function getIncomingPermits(): Promise<PermitRequest[]> {
   if (isFirebaseConfigured) {
     try {
       const snap = await getDocs(collection(db, 'permits'));
-      const remoteList: PermitRequest[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<PermitRequest, 'id'>),
-      }));
+      const remoteList: PermitRequest[] = snap.docs.map((d) =>
+        normalizePermitRecord({
+          id: d.id,
+          ...(d.data() as Omit<PermitRequest, 'id'>),
+        })
+      );
       mergeRemotePermitsIntoLocal(remoteList);
     } catch {
       // Fallback ke store lokal
@@ -331,10 +362,10 @@ export async function reviewPermit(
     try {
       const docSnap = await getDoc(doc(db, 'permits', permitId));
       if (docSnap.exists()) {
-        targetPermit = {
+        targetPermit = normalizePermitRecord({
           id: docSnap.id,
           ...(docSnap.data() as Omit<PermitRequest, 'id'>),
-        };
+        });
       }
     } catch {
       // Fallback
@@ -378,6 +409,22 @@ export async function reviewPermit(
 
   notifyListeners();
 
+  // Aturan Sprint 4 (SRS-S4-04): Izin yang disetujui dicatat sebagai EXCUSED_ABSENCE
+  // (tidak hadir dengan izin, BUKAN hadir) dan membebaskan praktikan dari denda keterlambatan.
+  if (decision === 'APPROVED') {
+    await recordExcusedAbsenceRecord({
+      sessionId: updatedPermit.sessionId,
+      studentId: updatedPermit.studentId,
+      studentName: updatedPermit.studentName,
+      studentNim: updatedPermit.studentNim,
+      reason: `Izin disetujui oleh ${assistantName}: ${updatedPermit.reason}`,
+    });
+    await waiveFineForExcusedAbsence(
+      updatedPermit.sessionId,
+      updatedPermit.studentId
+    );
+  }
+
   // Kirim push notification terarah hanya kepada praktikan pemilik izin (SRS-S3-06)
   void notifyPermitReviewed(updatedPermit, decision, decisionNote);
 
@@ -385,7 +432,10 @@ export async function reviewPermit(
 
   return {
     success: true,
-    message: `Permohonan izin berhasil ${actionText}.`,
+    message:
+      decision === 'APPROVED'
+        ? 'Permohonan izin berhasil disetujui. Status tercatat sebagai Tidak Hadir dengan Izin (Bebas Denda).'
+        : `Permohonan izin berhasil ${actionText}.`,
   };
 }
 
@@ -430,7 +480,7 @@ export async function recordManualPermitByAssistant(params: {
     sessionId: params.sessionId,
     classId: params.classId,
     classCode: params.classCode,
-    courseName: params.courseName,
+    courseName: normalizeCourseName(params.courseName),
     studentId: params.studentId,
     studentName: params.studentName,
     studentNim: params.studentNim,
@@ -461,6 +511,16 @@ export async function recordManualPermitByAssistant(params: {
   ];
   notifyListeners();
 
+  // Aturan Sprint 4 (SRS-S4-04): Izin fisik disetujui -> EXCUSED_ABSENCE & bebas denda
+  await recordExcusedAbsenceRecord({
+    sessionId: params.sessionId,
+    studentId: params.studentId,
+    studentName: params.studentName,
+    studentNim: params.studentNim,
+    reason: `Izin fisik disetujui oleh Asprak ${params.assistantName}: ${finalReason}`,
+  });
+  await waiveFineForExcusedAbsence(params.sessionId, params.studentId);
+
   // Beri tahu praktikan terkait bahwa surat izin fisiknya telah diverifikasi asisten
   void notifyPermitReviewed(
     manualPermit,
@@ -470,7 +530,7 @@ export async function recordManualPermitByAssistant(params: {
 
   return {
     success: true,
-    message: `Status izin/sakit untuk ${params.studentName} (${params.studentNim}) berhasil dicatat dan disetujui.`,
+    message: `Status izin/sakit untuk ${params.studentName} (${params.studentNim}) berhasil dicatat sebagai Tidak Hadir dengan Izin (Bebas Denda).`,
     data: manualPermit,
   };
 }

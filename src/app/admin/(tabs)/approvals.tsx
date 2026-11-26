@@ -87,7 +87,7 @@ export default function AdminApprovalsScreen() {
   };
 
   return (
-    <Screen scroll withBottomNavPadding style={styles.screen}>
+    <Screen scroll withBottomNavPadding>
       <View style={styles.header}>
         <AppText variant="caption" color={Colors.primary} weight="bold">
           VERIFIKASI & PERIZINAN AKUN
@@ -101,7 +101,9 @@ export default function AdminApprovalsScreen() {
       </View>
 
       <View style={styles.countRow}>
-        <AppText variant="title">Permohonan Menunggu</AppText>
+        <AppText variant="title" style={styles.countTitle}>
+          Permohonan Menunggu
+        </AppText>
         <Badge
           label={`${pendingAssistants.length} Akun`}
           variant={pendingAssistants.length > 0 ? 'waiting' : 'closed'}
@@ -127,15 +129,20 @@ export default function AdminApprovalsScreen() {
                   <Icon name="person" size={24} color={Colors.primary} />
                 </View>
                 <View style={styles.userInfoCol}>
-                  <AppText variant="body" weight="bold">
+                  <AppText variant="body" weight="bold" numberOfLines={1}>
                     {user.name}
                   </AppText>
-                  <AppText variant="caption" color={Colors.textMuted}>
+                  <AppText variant="caption" color={Colors.textMuted} numberOfLines={1}>
                     {user.email}
                   </AppText>
                   <View style={styles.codeBadge}>
                     <Icon name="school" size={12} color={Colors.primaryDark} />
-                    <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
+                    <AppText
+                      variant="caption"
+                      weight="semibold"
+                      color={Colors.primaryDark}
+                      style={styles.codeBadgeText}
+                    >
                       Alokasi Kode: {user.identifier}
                     </AppText>
                   </View>
@@ -144,17 +151,19 @@ export default function AdminApprovalsScreen() {
 
               <View style={styles.userActionRow}>
                 <CustomButton
-                  title="Tolak Pendaftaran"
+                  title="Tolak"
                   variant="outline"
                   size="sm"
+                  fullWidth={false}
                   disabled={isLoading}
                   style={styles.actionBtn}
                   onPress={() => handleReject(user)}
                 />
                 <CustomButton
-                  title="Setujui Akun"
+                  title="Setujui"
                   variant="primary"
                   size="sm"
+                  fullWidth={false}
                   loading={isLoading}
                   style={styles.actionBtn}
                   onPress={() => handleApprove(user)}
@@ -177,21 +186,23 @@ export default function AdminApprovalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    padding: Spacing.md,
-  },
   header: {
     marginBottom: Spacing.md,
+    paddingTop: Spacing.xs,
   },
   title: {
-    marginTop: 2,
-    marginBottom: 4,
+    marginTop: Spacing.xxs,
+    marginBottom: Spacing.xs,
   },
   countRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
+  },
+  countTitle: {
+    flexShrink: 1,
   },
   userCard: {
     marginBottom: Spacing.md,
@@ -199,7 +210,7 @@ const styles = StyleSheet.create({
   userCardTop: {
     flexDirection: 'row',
     gap: Spacing.md,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: Spacing.md,
   },
   avatarBox: {
@@ -214,18 +225,21 @@ const styles = StyleSheet.create({
   },
   userInfoCol: {
     flex: 1,
-    gap: 2,
+    gap: Spacing.xxs,
   },
   codeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
     backgroundColor: Colors.primaryBg,
     paddingHorizontal: Spacing.xs + 2,
-    paddingVertical: 2,
+    paddingVertical: Spacing.xxs,
     borderRadius: Radius.xs,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    marginTop: Spacing.xs,
+  },
+  codeBadgeText: {
+    flexShrink: 1,
   },
   userActionRow: {
     flexDirection: 'row',

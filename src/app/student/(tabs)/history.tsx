@@ -1,13 +1,13 @@
 import { Href, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { HistoryItemCard } from '@/features/attendance/components/HistoryItemCard';
 import { subscribeAllClasses } from '@/services/admin';
 import {
@@ -107,15 +107,6 @@ export default function StudentHistoryRoute() {
             Riwayat Presensi
           </AppText>
         </View>
-
-        <Pressable
-          onPress={() => router.replace('/')}
-          accessibilityRole="button"
-          accessibilityLabel="Ganti peran atau akun"
-          style={styles.avatarButton}
-        >
-          <Icon name="person" size={20} color={Colors.primary} />
-        </Pressable>
       </View>
 
       {/* Profil Mahasiswa Aktif */}
@@ -124,10 +115,10 @@ export default function StudentHistoryRoute() {
           <Icon name="school-outline" size={18} color={Colors.primary} />
         </View>
         <View style={styles.profileInfo}>
-          <AppText variant="bodySm" weight="semibold">
+          <AppText variant="bodySm" weight="semibold" numberOfLines={1}>
             {currentUser.name}
           </AppText>
-          <AppText variant="caption" color={Colors.textMuted}>
+          <AppText variant="caption" color={Colors.textMuted} numberOfLines={1}>
             NIM: {currentUser.identifier}
           </AppText>
         </View>
@@ -141,20 +132,18 @@ export default function StudentHistoryRoute() {
 
       {/* Konten Riwayat atau Status Kosong */}
       {historyRecords.length === 0 ? (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="Belum Ada Riwayat"
-            message="Anda belum pernah melakukan presensi pada sesi praktikum yang dibuka."
-            iconName="time-outline"
-            actionLabel="Lihat Jadwal Praktikum"
-            onAction={() => router.push('/student' as Href)}
-          />
-        </View>
+        <EmptyState
+          title="Belum Ada Riwayat"
+          message="Anda belum pernah melakukan presensi pada sesi praktikum yang dibuka."
+          iconName="time-outline"
+          actionLabel="Lihat Jadwal Praktikum"
+          onAction={() => router.push('/student' as Href)}
+        />
       ) : (
         <View style={styles.listSection}>
           <View style={styles.sectionHeader}>
             <AppText variant="title" style={styles.sectionTitle}>
-              Daftar Presensi ({historyRecords.length})
+              Daftar Presensi
             </AppText>
             <AppText variant="caption" color={Colors.textMuted}>
               Ketuk untuk detail
@@ -186,18 +175,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: Typography.xxl,
     marginTop: Spacing.xxs,
-  },
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   profileBadgeCard: {
     flexDirection: 'row',
@@ -207,7 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
   profileIconCircle: {
@@ -222,19 +200,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listSection: {
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.xs,
     paddingHorizontal: Spacing.xxs,
   },
   sectionTitle: {
-    fontSize: Typography.lg,
-  },
-  emptyWrapper: {
-    paddingTop: Spacing.xl,
+    flexShrink: 1,
   },
 });

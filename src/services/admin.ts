@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 
+import { normalizeCourseName } from '@/constants/courses';
 import { SessionChangeRequest } from '@/types/attendance';
 import { AuthUser } from './auth';
 import { db, isFirebaseConfigured } from './firebase';
@@ -67,6 +68,24 @@ export async function requestSessionChange(
   return newId;
 }
 
+const migratedRequestIds = new Set<string>();
+
+function normalizeSessionRequest(req: SessionChangeRequest): SessionChangeRequest {
+  const normalizedCourseName = req.courseName
+    ? normalizeCourseName(req.courseName)
+    : req.courseName;
+  if (req.courseName && normalizedCourseName !== req.courseName) {
+    if (isFirebaseConfigured && req.id && !migratedRequestIds.has(req.id)) {
+      migratedRequestIds.add(req.id);
+      updateDoc(doc(db, 'session_requests', req.id), {
+        courseName: normalizedCourseName,
+      }).catch(() => {});
+    }
+    return { ...req, courseName: normalizedCourseName };
+  }
+  return req;
+}
+
 export function subscribeSessionRequests(
   onUpdate: (requests: SessionChangeRequest[]) => void
 ): () => void {
@@ -76,10 +95,12 @@ export function subscribeSessionRequests(
       const unsub = onSnapshot(
         q,
         (snap) => {
-          const list: SessionChangeRequest[] = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<SessionChangeRequest, 'id'>),
-          }));
+          const list: SessionChangeRequest[] = snap.docs.map((d) =>
+            normalizeSessionRequest({
+              id: d.id,
+              ...(d.data() as Omit<SessionChangeRequest, 'id'>),
+            })
+          );
           list.sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -115,10 +136,10 @@ export async function reviewSessionRequest(
     try {
       const snap = await getDoc(doc(db, 'session_requests', requestId));
       if (snap.exists()) {
-        targetRequest = {
+        targetRequest = normalizeSessionRequest({
           id: snap.id,
           ...(snap.data() as Omit<SessionChangeRequest, 'id'>),
-        };
+        });
       }
     } catch (err) {
       console.warn('Gagal membaca detail permintaan sesi:', err);

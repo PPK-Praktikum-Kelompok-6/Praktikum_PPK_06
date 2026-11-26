@@ -1,12 +1,11 @@
 import { Href, Redirect, router, Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { FloatingTabBar } from '@/components/ui/FloatingTabBar';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadows } from '@/constants/theme';
 import {
   AuthUser,
   getCurrentUser as getAuthUser,
@@ -19,7 +18,6 @@ import { useCurrentUser } from '@/store/hooks';
 
 export default function AdminTabsLayout() {
   const { currentUser } = useCurrentUser();
-  const insets = useSafeAreaInsets();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
     getAuthUser()
   );
@@ -55,18 +53,33 @@ export default function AdminTabsLayout() {
     return <Redirect href="/assistant" />;
   }
 
-  const bottomOffset = Math.max(insets.bottom, Spacing.md) + 6;
-
   const handleConfirmLogout = async () => {
     setLogoutModalVisible(false);
     await signOutUser();
     router.replace('/' as Href);
   };
 
+  const logoutButton = (
+    <Pressable
+      hitSlop={4}
+      onPress={() => setLogoutModalVisible(true)}
+      accessibilityRole="button"
+      accessibilityLabel="Keluar akun admin"
+      style={({ pressed }) => [
+        styles.sideBtn,
+        pressed && styles.sideBtnPressed,
+      ]}
+    >
+      <Icon name="log-out-outline" size={20} color={Colors.danger} />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
+        tabBar={(props) => (
+          <FloatingTabBar {...props} rightAccessory={logoutButton} />
+        )}
         screenOptions={{
           headerShown: false,
         }}
@@ -112,21 +125,6 @@ export default function AdminTabsLayout() {
         />
       </Tabs>
 
-      {/* Floating Logout Pill */}
-      <View style={[styles.fabContainer, { bottom: bottomOffset }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.logoutFab,
-            pressed && styles.logoutFabPressed,
-          ]}
-          onPress={() => setLogoutModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Keluar akun admin"
-        >
-          <Icon name="log-out-outline" size={18} color={Colors.danger} />
-        </Pressable>
-      </View>
-
       <FeedbackModal
         visible={logoutModalVisible}
         type="warning"
@@ -145,26 +143,20 @@ export default function AdminTabsLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
-  fabContainer: {
-    position: 'absolute',
-    right: Spacing.md,
-    zIndex: 999,
-  },
-  logoutFab: {
+  sideBtn: {
     width: 44,
     height: 44,
     borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.dangerBg,
+    borderWidth: 1.2,
+    borderColor: Colors.dangerBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.md,
+    ...Shadows.floatingNav,
   },
-  logoutFabPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.95 }],
+  sideBtnPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.94 }],
   },
 });

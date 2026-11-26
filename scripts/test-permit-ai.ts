@@ -41,7 +41,7 @@ async function runTests() {
   console.log('\n[TEST 4] Edge Case - Alasan Terlalu Pendek (< 10 karakter)');
   const resShort = await submitPermit({
     sessionId: 'session-01',
-    courseName: 'PPK',
+    courseName: 'Pengembangan Platform Khusus',
     studentId: 'std-99',
     studentName: 'Budi Test',
     studentNim: '24060124110099',
@@ -57,7 +57,7 @@ async function runTests() {
   console.log('\n[TEST 5] Submit Valid Permit with AI integration');
   const resValid = await submitPermit({
     sessionId: 'session-99',
-    courseName: 'Praktikum Jaringan Komputer',
+    courseName: 'Jaringan Komputer',
     studentId: 'std-99',
     studentName: 'Budi Test',
     studentNim: '24060124110099',
@@ -76,7 +76,7 @@ async function runTests() {
   console.log('\n[TEST 6] Edge Case - Anti-Double Permit per Session');
   const resDouble = await submitPermit({
     sessionId: 'session-99',
-    courseName: 'Praktikum Jaringan Komputer',
+    courseName: 'Jaringan Komputer',
     studentId: 'std-99',
     studentName: 'Budi Test',
     studentNim: '24060124110099',

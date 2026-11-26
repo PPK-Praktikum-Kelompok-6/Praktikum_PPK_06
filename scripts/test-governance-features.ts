@@ -33,7 +33,7 @@ console.log('  -> PASS\n');
 console.log('[TEST 2] isSessionStartTimeReached (Future session vs Current session)');
 const futureSession: PracticalSession = {
   id: 'session-future',
-  courseName: 'Pemrograman Perangkat Keras',
+  courseName: 'Pengembangan Platform Khusus',
   classCode: 'C1',
   room: 'Lab Komputer 2',
   timeSlot: '14.00 - 16.00 WIB',
@@ -118,7 +118,7 @@ console.log('[TEST 5] Permit Attachment Contract & Validation');
 const samplePermit: PermitRequest = {
   id: 'permit-with-attachment',
   sessionId: 'session-1',
-  courseName: 'Pemrograman Perangkat Keras',
+  courseName: 'Pengembangan Platform Khusus',
   studentId: 'std-1',
   studentName: 'Bahir Ananda Wibowo',
   studentNim: '24060124140184',
@@ -156,9 +156,9 @@ console.log('  -> PASS\n');
 async function runClassroomTests() {
   console.log('[TEST 7] Google Classroom Style Codes (Create, Preview, Co-Asprak Join, Student Join & Leave)');
 
-  // Asprak X creates "Pemrograman Perangkat Keras D1"
+  // Asprak X creates "Pengembangan Platform Khusus D1"
   const createdClass = await createClassroomByAssistant({
-    courseName: 'Pemrograman Perangkat Keras',
+    courseName: 'Pengembangan Platform Khusus',
     classCode: 'D1',
     room: 'Lab Basis Data',
     assistantId: 'ast-x',

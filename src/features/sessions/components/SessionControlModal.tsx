@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { CustomButton } from '@/components/ui/CustomButton';
@@ -25,6 +26,7 @@ export function SessionControlModal({
   onConfirm,
   onCancel,
 }: SessionControlModalProps) {
+  const insets = useSafeAreaInsets();
   const isOpenAction = action === 'OPEN';
 
   const title = isOpenAction ? 'Buka Sesi Praktikum?' : 'Tutup Sesi Praktikum?';
@@ -45,7 +47,12 @@ export function SessionControlModal({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+        ]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
 
         <View style={styles.sheet}>
@@ -76,7 +83,7 @@ export function SessionControlModal({
             <CustomButton
               title="Batal"
               onPress={onCancel}
-              variant="secondary"
+              variant="outline"
               size="md"
             />
           </View>
@@ -97,6 +104,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: 380,
+    maxHeight: '85%',
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     padding: Spacing.xl,

@@ -99,6 +99,7 @@ export function LiveClock({ variant = 'light' }: LiveClockProps) {
           <AppText
             variant="caption"
             weight="medium"
+            numberOfLines={1}
             color={isHero ? Colors.textWhiteMuted : Colors.textSecondary}
           >
             {formattedDate}
@@ -125,10 +126,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.lg,
-    marginVertical: Spacing.xs,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   lightContainer: {
     backgroundColor: Colors.surface,
@@ -165,6 +168,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37, 99, 235, 0.25)',
   },
   textColumn: {
+    flex: 1,
     justifyContent: 'center',
   },
   badgeRow: {

@@ -75,15 +75,15 @@ export function LocationStatusBanner({
 
   const getBadge = () => {
     if (isChecking) {
-      return <Badge label="Memeriksa Lokasi..." variant="open" size="sm" showDot />;
+      return <Badge label="Memeriksa Lokasi..." variant="primary" size="sm" showDot />;
     }
     if (isInside) {
-      return <Badge label="Di Dalam Radius" variant="attended" size="sm" showDot />;
+      return <Badge label="Di Dalam Radius" variant="open" size="sm" showDot />;
     }
     if (isOutside) {
-      return <Badge label="Di Luar Radius" variant="closed" size="sm" showDot />;
+      return <Badge label="Di Luar Radius" variant="danger" size="sm" showDot />;
     }
-    return <Badge label="GPS Belum Siap" variant="closed" size="sm" />;
+    return <Badge label="GPS Belum Siap" variant="waiting" size="sm" />;
   };
 
   return (
@@ -96,6 +96,7 @@ export function LocationStatusBanner({
 
         {onRefresh && (
           <Pressable
+            hitSlop={8}
             onPress={onRefresh}
             disabled={isChecking}
             style={({ pressed }) => [
@@ -123,7 +124,9 @@ export function LocationStatusBanner({
       </View>
 
       <View style={styles.contentCol}>
-        {distanceMeters !== null && distanceMeters !== undefined ? (
+        {distanceMeters !== null &&
+        distanceMeters !== undefined &&
+        maxRadiusMeters > 0 ? (
           <View style={styles.distanceRow}>
             <Icon
               name="navigate-outline"
@@ -134,11 +137,12 @@ export function LocationStatusBanner({
               variant="bodySm"
               weight="bold"
               color={isInside ? Colors.success : Colors.danger}
+              style={styles.distanceText}
             >
-              Jarak: {distanceMeters} meter {labName ? `dari ${labName}` : ''}
-            </AppText>
-            <AppText variant="caption" color={Colors.textMuted}>
-              (Maks. {maxRadiusMeters} m)
+              Jarak: {distanceMeters} meter {labName ? `dari ${labName}` : ''}{' '}
+              <AppText variant="caption" color={Colors.textMuted}>
+                (Maks. {maxRadiusMeters} m)
+              </AppText>
             </AppText>
           </View>
         ) : null}
@@ -164,19 +168,23 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.xs,
   },
   iconAndBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+    flexShrink: 1,
   },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xxs,
     backgroundColor: Colors.surface,
+    minHeight: 36,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: Radius.full,
@@ -194,9 +202,11 @@ const styles = StyleSheet.create({
   },
   distanceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  distanceText: {
+    flexShrink: 1,
   },
   messageText: {
     lineHeight: 18,

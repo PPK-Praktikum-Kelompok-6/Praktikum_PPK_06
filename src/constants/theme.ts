@@ -54,11 +54,11 @@ export const Colors = {
   borderFocus: '#2563EB',
 
   // Status & Badges (WCAG AA compliant contrast ratios >= 4.5:1)
-  success: '#059669',
+  success: '#166534',
   successBg: '#ECFDF5',
   successBorder: '#A7F3D0',
 
-  warning: '#D97706',
+  warning: '#92400E',
   warningBg: '#FFFBEB',
   warningBorder: '#FDE68A',
 

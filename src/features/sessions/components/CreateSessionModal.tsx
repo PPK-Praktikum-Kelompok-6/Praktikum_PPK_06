@@ -9,11 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { OFFICIAL_COURSES } from '@/constants/courses';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { CreateSessionInput, PracticalClass } from '@/types/attendance';
 
 export interface CreateSessionModalProps {
@@ -28,14 +30,6 @@ export interface CreateSessionModalProps {
   availableClasses?: string[];
   classObjects?: PracticalClass[];
 }
-
-const PRESET_COURSES = [
-  'Pemrograman Web & Mobile',
-  'Struktur Data & Algoritma',
-  'Basis Data Lanjut',
-  'Kecerdasan Buatan',
-  'Jaringan Komputer',
-];
 
 const PRESET_ROOMS = ['Lab D', 'Lab C', 'Lab B', 'Lab AP'];
 
@@ -77,6 +71,7 @@ export function CreateSessionModal({
   availableClasses,
   classObjects,
 }: CreateSessionModalProps) {
+  const insets = useSafeAreaInsets();
   const [courseName, setCourseName] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
@@ -188,12 +183,17 @@ export function CreateSessionModal({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.overlay}
       >
         <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        <View style={styles.modalCard}>
+        <View
+          style={[
+            styles.modalCard,
+            { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+          ]}
+        >
           {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.headerTextGroup}>
@@ -206,6 +206,7 @@ export function CreateSessionModal({
             </View>
             <Pressable
               onPress={handleClose}
+              hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Tutup modal"
               style={styles.closeButton}
@@ -215,6 +216,7 @@ export function CreateSessionModal({
           </View>
 
           <ScrollView
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
@@ -235,7 +237,7 @@ export function CreateSessionModal({
               </AppText>
               <TextInput
                 style={styles.input}
-                placeholder="Contoh: Pemrograman Web & Mobile"
+                placeholder="Contoh: Pengembangan Platform Khusus"
                 placeholderTextColor={Colors.textLight}
                 value={courseName}
                 onChangeText={(text) => {
@@ -247,9 +249,10 @@ export function CreateSessionModal({
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={styles.chipsScroll}
                 contentContainerStyle={styles.chipsRow}
               >
-                {PRESET_COURSES.map((course) => (
+                {OFFICIAL_COURSES.map((course) => (
                   <Pressable
                     key={course}
                     style={[
@@ -364,9 +367,11 @@ export function CreateSessionModal({
                   <AppText
                     variant="caption"
                     weight="bold"
+                    numberOfLines={1}
+                    style={styles.modeBtnText}
                     color={deliveryMode === 'OFFLINE' ? Colors.textWhite : Colors.textSecondary}
                   >
-                    Offline (Lab Fisik)
+                    Offline (Lab)
                   </AppText>
                 </Pressable>
 
@@ -388,9 +393,11 @@ export function CreateSessionModal({
                   <AppText
                     variant="caption"
                     weight="bold"
+                    numberOfLines={1}
+                    style={styles.modeBtnText}
                     color={deliveryMode === 'ONLINE' ? Colors.textWhite : Colors.textSecondary}
                   >
-                    Online (Daring / Meet)
+                    Online (Daring)
                   </AppText>
                 </Pressable>
               </View>
@@ -442,10 +449,10 @@ export function CreateSessionModal({
             {/* Kolom Link Praktikum (Wajib jika Online, atau Link Tambahan jika Offline) */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
-                <AppText variant="label" style={styles.fieldLabel}>
+                <AppText variant="label" style={[styles.fieldLabel, styles.flexLabel]}>
                   {deliveryMode === 'ONLINE'
                     ? 'LINK PERTEMUAN PRAKTIKUM (MEET/ZOOM) *'
-                    : 'LINK / TAUTAN PRAKTIKUM (OPSIONAL)'}
+                    : 'LINK / TAUTAN PRAKTIKUM'}
                 </AppText>
                 {deliveryMode === 'OFFLINE' && (
                   <AppText variant="caption" color={Colors.textMuted}>
@@ -605,7 +612,7 @@ export function CreateSessionModal({
             {/* Deskripsi (Murni Opsional) */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
-                <AppText variant="label" style={styles.fieldLabel}>
+                <AppText variant="label" style={[styles.fieldLabel, styles.flexLabel]}>
                   DESKRIPSI PRAKTIKUM
                 </AppText>
                 <AppText variant="caption" color={Colors.textMuted}>
@@ -631,16 +638,18 @@ export function CreateSessionModal({
               title="Batal"
               variant="outline"
               size="md"
+              fullWidth={false}
               onPress={handleClose}
-              style={styles.footerButton}
+              style={styles.cancelButton}
             />
             <CustomButton
               title="Simpan Sesi"
               variant="primary"
               size="md"
+              fullWidth={false}
               loading={isSubmitting}
               onPress={handleSave}
-              style={styles.footerButton}
+              style={styles.submitButton}
               icon={<Icon name="checkmark" size={18} color={Colors.textWhite} />}
             />
           </View>
@@ -665,7 +674,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: Radius.xl,
     paddingTop: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
     maxHeight: '92%',
   },
   headerRow: {
@@ -717,6 +725,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  flexLabel: {
+    flex: 1,
   },
   fieldLabel: {
     color: Colors.textSecondary,
@@ -731,14 +743,19 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm + 4,
     paddingVertical: Spacing.sm,
-    fontSize: 14,
+    fontSize: Typography.sm,
     color: Colors.text,
   },
   textArea: {
     minHeight: 70,
   },
+  chipsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   chipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.xs,
     paddingVertical: Spacing.xxs,
   },
@@ -781,6 +798,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
+  modeBtnText: {
+    flexShrink: 1,
+  },
   datePreviewBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -811,7 +831,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
-  footerButton: {
+  cancelButton: {
     flex: 1,
+  },
+  submitButton: {
+    flex: 1.5,
   },
 });

@@ -4,10 +4,10 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
+import { BoxIcon, Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { AICategory, PermitRequest, PermitStatus } from '@/types/permit';
-import { formatTime } from '@/utils/formatTime';
+import { formatDateIndonesian, formatTime } from '@/utils/formatTime';
 
 export interface PermitStatusCardProps {
   permit: PermitRequest;
@@ -38,16 +38,17 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
     : null;
 
   return (
-    <Card variant="default" padding="md" style={styles.card}>
+    <Card variant="default" padding="md">
       {/* Header: Judul Mata Kuliah & Status Badge */}
       <View style={styles.header}>
         <View style={styles.courseWrap}>
-          <AppText variant="title" weight="bold" numberOfLines={1}>
+          <AppText variant="title" weight="bold" numberOfLines={2}>
             {permit.courseName}
             {permit.classCode ? ` (${permit.classCode})` : ''}
           </AppText>
           <AppText variant="caption" color={Colors.textSecondary}>
-            Diajukan: {formatTime(permit.submittedAt)}
+            Diajukan: {formatDateIndonesian(permit.submittedAt)} •{' '}
+            {formatTime(permit.submittedAt)}
           </AppText>
         </View>
         <Badge
@@ -89,64 +90,34 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
         </View>
       )}
 
-      {/* Widget Analisis AI (SRS-AI-01: Informasi Pendukung) */}
+      {/* Ringkasan AI Singkat */}
       <View style={styles.aiBox}>
         <View style={styles.aiBoxHeader}>
           <View style={styles.aiTag}>
             <Icon name="sparkles" size={13} color={Colors.primary} />
             <AppText variant="caption" weight="bold" color={Colors.primary}>
-              Analisis Model AI
+              Ringkasan AI
             </AppText>
           </View>
-          {aiInfo && (
-            <Badge
-              label={`${Math.round(aiInfo.confidence * 100)}% Confidence`}
-              variant="primary"
-              size="sm"
-            />
-          )}
+          {aiInfo ? (
+            <View style={styles.categoryChip}>
+              <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
+                {categoryConfig?.label || aiInfo.category}
+              </AppText>
+            </View>
+          ) : null}
         </View>
 
         {aiInfo ? (
-          <View style={styles.aiContent}>
-            <View style={styles.aiMetaRow}>
-              <View style={styles.categoryChip}>
-                <AppText variant="caption" weight="semibold" color={Colors.primaryDark}>
-                  Kategori: {categoryConfig?.label || aiInfo.category}
-                </AppText>
-              </View>
-              <View
-                style={[
-                  styles.urgencyChip,
-                  aiInfo.urgencyLevel === 'TINGGI'
-                    ? styles.urgencyHigh
-                    : aiInfo.urgencyLevel === 'SEDANG'
-                    ? styles.urgencyMedium
-                    : styles.urgencyLow,
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  weight="semibold"
-                  color={
-                    aiInfo.urgencyLevel === 'TINGGI'
-                      ? Colors.danger
-                      : aiInfo.urgencyLevel === 'SEDANG'
-                      ? Colors.warning
-                      : Colors.success
-                  }
-                >
-                  Urgensi: {aiInfo.urgencyLevel}
-                </AppText>
-              </View>
-            </View>
+          <View style={styles.aiSummaryRow}>
+            <BoxIcon name="light-bulb" size={14} color={Colors.warning} style={styles.aiSummaryIcon} />
             <AppText variant="caption" color={Colors.textSecondary} style={styles.aiSummary}>
-              💡 Ringkasan: {aiInfo.summary}
+              {aiInfo.summary}
             </AppText>
           </View>
         ) : (
           <AppText variant="caption" color={Colors.textMuted} style={styles.aiSummary}>
-            Analisis AI sedang diproses atau layanan AI sedang sibuk.
+            Ringkasan AI sedang diproses.
           </AppText>
         )}
       </View>
@@ -154,7 +125,7 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
       {/* Catatan Keputusan Asisten (Jika ada) */}
       {permit.decisionNote && (
         <View style={styles.decisionNoteBox}>
-          <Icon name="chatbubble-ellipses-outline" size={14} color={Colors.textSecondary} />
+          <Icon name="chatbubble-ellipses-outline" size={14} color={Colors.primaryDark} />
           <View style={styles.decisionNoteContent}>
             <AppText variant="caption" weight="semibold" color={Colors.text}>
               Catatan Asisten ({permit.reviewedBy || 'Asisten'}):
@@ -170,9 +141,6 @@ export function PermitStatusCard({ permit }: PermitStatusCardProps) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginBottom: Spacing.sm,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -182,12 +150,13 @@ const styles = StyleSheet.create({
   },
   courseWrap: {
     flex: 1,
+    gap: Spacing.xxs,
   },
   reasonContainer: {
     marginVertical: Spacing.xs,
   },
   reasonText: {
-    marginTop: 2,
+    marginTop: Spacing.xxs,
     fontStyle: 'italic',
   },
   aiBox: {
@@ -195,63 +164,52 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     borderRadius: Radius.md,
     marginTop: Spacing.xs,
+    gap: Spacing.xs,
   },
   aiBoxHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    gap: Spacing.xs,
   },
   aiTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  aiContent: {
-    gap: 4,
-  },
-  aiMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.xs,
-    alignItems: 'center',
+    flexShrink: 1,
   },
   categoryChip: {
     backgroundColor: Colors.primaryBg,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
     borderRadius: Radius.sm,
   },
-  urgencyChip: {
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+  aiSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
   },
-  urgencyHigh: {
-    backgroundColor: Colors.dangerBg,
-  },
-  urgencyMedium: {
-    backgroundColor: Colors.warningBg,
-  },
-  urgencyLow: {
-    backgroundColor: Colors.successBg,
+  aiSummaryIcon: {
+    marginTop: Spacing.xxs,
   },
   aiSummary: {
-    marginTop: 2,
+    flex: 1,
   },
   decisionNoteBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primaryGhost,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
-    padding: Spacing.xs,
-    borderRadius: Radius.xs,
-    marginTop: Spacing.xs,
+    padding: Spacing.sm,
+    borderRadius: Radius.sm,
+    marginTop: Spacing.sm,
     gap: Spacing.xs,
   },
   decisionNoteContent: {
     flex: 1,
+    gap: Spacing.xxs,
   },
   attachmentBox: {
     flexDirection: 'row',
@@ -263,7 +221,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs + 2,
-    marginBottom: Spacing.sm,
+    marginVertical: Spacing.xs,
   },
   attachmentIconCircle: {
     width: 28,

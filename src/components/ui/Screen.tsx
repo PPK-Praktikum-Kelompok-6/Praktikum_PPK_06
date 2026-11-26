@@ -65,6 +65,7 @@ export function Screen({
         {ambientBackground}
         <ScrollView
           style={styles.container}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: bottomPadding + Spacing.lg },
@@ -115,7 +116,7 @@ const styles = StyleSheet.create({
     right: -70,
     width: 320,
     height: 320,
-    opacity: 0.42,
+    opacity: 0.15,
   },
   ambientMeshBottom: {
     position: 'absolute',
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 320,
     height: 320,
-    opacity: 0.34,
+    opacity: 0.12,
   },
   scrollContent: {
     paddingHorizontal: Spacing.md,

@@ -1,6 +1,17 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -10,10 +21,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackModal, FeedbackType } from '@/components/ui/FeedbackModal';
 import { Icon } from '@/components/ui/Icon';
 import { Screen } from '@/components/ui/Screen';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { AttendanceTable } from '@/features/attendance/components/AttendanceTable';
-import { LabLocationConfigModal } from '@/features/attendance/components/LabLocationConfigModal';
 import { StatSummaryCard } from '@/features/attendance/components/StatSummaryCard';
+import { LatenessBadge } from '@/features/fines/components/LatenessBadge';
 import {
   SessionControlAction,
   SessionControlModal,
@@ -26,6 +37,7 @@ import {
   subscribeToSessionAttendance,
 } from '@/services/attendance';
 import { AuthUser, subscribeAllUsers } from '@/services/auth';
+import { subscribeFinesBySession } from '@/services/fines';
 import { subscribeLabs } from '@/services/labs';
 import {
   PermitRequest,
@@ -36,15 +48,28 @@ import { PracticalClass, subscribeSessionDoc } from '@/services/sessions';
 import { useAttendance, useCurrentUser, useSessions } from '@/store/hooks';
 import { canOpen, isSessionExpired } from '@/store/rules';
 import { AttendanceRecord, PracticalSession } from '@/types/attendance';
+import { FineRecord } from '@/types/fine';
 import { LabLocation } from '@/types/lab';
 import { formatDateIndonesian } from '@/utils/formatTime';
 import { isRoomMatchingLab } from '@/utils/geo';
+import {
+  DEFAULT_FINE_AMOUNT,
+  DEFAULT_GRACE_PERIOD_MINUTES,
+  formatRupiah,
+  isPresentAttendanceRecord,
+} from '@/utils/lateness';
+
+type LabWithPolicy = LabLocation & {
+  gracePeriodMinutes?: number;
+  fineAmount?: number;
+};
 
 export default function AssistantSessionDetailRoute() {
   const { currentUser } = useCurrentUser();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getSessionById, openSession, closeSession } = useSessions();
   const { getAttendanceBySession } = useAttendance();
+  const insets = useSafeAreaInsets();
 
   const [controlModalVisible, setControlModalVisible] = useState(false);
   const [controlAction, setControlAction] = useState<SessionControlAction>('OPEN');
@@ -53,6 +78,7 @@ export default function AssistantSessionDetailRoute() {
   const [allClasses, setAllClasses] = useState<PracticalClass[]>([]);
   const [allUsers, setAllUsers] = useState<AuthUser[]>([]);
   const [sessionPermits, setSessionPermits] = useState<PermitRequest[]>([]);
+  const [sessionFines, setSessionFines] = useState<FineRecord[]>([]);
   const [manualActionLoadingId, setManualActionLoadingId] = useState<string | null>(null);
 
   // State Permintaan Reschedule / Hapus Sesi (Izin Admin)
@@ -68,9 +94,8 @@ export default function AssistantSessionDetailRoute() {
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
 
-  // State Konfigurasi Lokasi & Radius Laboratorium (SRS-S3-03)
-  const [currentLab, setCurrentLab] = useState<LabLocation | null>(null);
-  const [labModalVisible, setLabModalVisible] = useState(false);
+  // Informasi Kebijakan Lokasi, Grace Period, & Denda Laboratorium (Read-Only dari Aslab — SRS-S4-03)
+  const [currentLab, setCurrentLab] = useState<LabWithPolicy | null>(null);
 
   // Real-time listener dokumen sesi praktikum dari Firestore
   useEffect(() => {
@@ -81,11 +106,14 @@ export default function AssistantSessionDetailRoute() {
     return () => unsubSession();
   }, [id]);
 
-  // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01) + kelas, user, & izin
+  // Real-time listener rekapitulasi kehadiran (SRS-SYNC-01) + kelas, user, izin, & denda (SRS-S4-04)
   useEffect(() => {
     if (!id) return;
     const unsubscribeAtt = subscribeToSessionAttendance(id, (records) => {
       setRealtimeRecords(records);
+    });
+    const unsubFines = subscribeFinesBySession(id, (fines) => {
+      setSessionFines(fines);
     });
     const unsubClasses = subscribeAllClasses((cls) => {
       setAllClasses(cls);
@@ -98,6 +126,7 @@ export default function AssistantSessionDetailRoute() {
     });
     return () => {
       unsubscribeAtt();
+      unsubFines();
       unsubClasses();
       unsubUsers();
       unsubPermits();
@@ -134,10 +163,11 @@ export default function AssistantSessionDetailRoute() {
   // Batasan peran: Praktikan tidak boleh mengakses detail dan kontrol sesi asisten
   if (currentUser.role !== 'ASSISTANT') {
     return (
-      <Screen style={styles.container}>
+      <Screen>
         <View style={styles.topNav}>
           <Pressable
             onPress={() => router.replace('/student')}
+            hitSlop={8}
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Kembali"
@@ -160,14 +190,36 @@ export default function AssistantSessionDetailRoute() {
   const attendanceRecords =
     realtimeRecords.length > 0
       ? realtimeRecords
-      : (id ? getAttendanceBySession(id) : []);
+      : id
+        ? getAttendanceBySession(id)
+        : [];
+
+  // Pisahkan peserta benar-benar hadir (ON_TIME / LATE) dari izin disetujui (EXCUSED_ABSENCE)
+  const presentRecords = attendanceRecords.filter(isPresentAttendanceRecord);
+  const onTimeCount = presentRecords.filter(
+    (r) => r.attendanceStatus !== 'LATE'
+  ).length;
+  const lateCount = presentRecords.filter(
+    (r) => r.attendanceStatus === 'LATE'
+  ).length;
+  const excusedCount = attendanceRecords.filter(
+    (r) => r.attendanceStatus === 'EXCUSED_ABSENCE'
+  ).length;
+
+  const effectiveGracePeriod =
+    session?.gracePeriodMinutes ??
+    currentLab?.gracePeriodMinutes ??
+    DEFAULT_GRACE_PERIOD_MINUTES;
+  const effectiveFineAmount =
+    session?.fineAmount ?? currentLab?.fineAmount ?? DEFAULT_FINE_AMOUNT;
 
   if (!session) {
     return (
-      <Screen style={styles.container}>
+      <Screen>
         <View style={styles.topNav}>
           <Pressable
             onPress={() => router.back()}
+            hitSlop={8}
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Kembali"
@@ -286,11 +338,12 @@ export default function AssistantSessionDetailRoute() {
   };
 
   return (
-    <Screen style={styles.container}>
+    <Screen>
       {/* Top Header Navigation */}
       <View style={styles.topNav}>
         <Pressable
           onPress={() => router.back()}
+          hitSlop={8}
           style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel="Kembali"
@@ -325,28 +378,28 @@ export default function AssistantSessionDetailRoute() {
               size={16}
               color={Colors.textWhiteMuted}
             />
-            <AppText variant="bodySm" color={Colors.textWhite}>
+            <AppText variant="bodySm" color={Colors.textWhite} style={styles.flexText}>
               {session.deliveryMode === 'ONLINE' ? 'Daring (Online)' : session.room}
             </AppText>
           </View>
 
           <View style={styles.detailRow}>
             <Icon name="time-outline" size={16} color={Colors.textWhiteMuted} />
-            <AppText variant="bodySm" color={Colors.textWhite}>
+            <AppText variant="bodySm" color={Colors.textWhite} style={styles.flexText}>
               {session.timeSlot}
             </AppText>
           </View>
 
           <View style={styles.detailRow}>
             <Icon name="calendar-outline" size={16} color={Colors.textWhiteMuted} />
-            <AppText variant="bodySm" color={Colors.textWhite}>
+            <AppText variant="bodySm" color={Colors.textWhite} style={styles.flexText}>
               {formatDateIndonesian(session.date)}
             </AppText>
           </View>
 
           <View style={styles.detailRow}>
             <Icon name="person-outline" size={16} color={Colors.textWhiteMuted} />
-            <AppText variant="bodySm" color={Colors.textWhite}>
+            <AppText variant="bodySm" color={Colors.textWhite} style={styles.flexText}>
               {session.assistantName}
             </AppText>
           </View>
@@ -428,12 +481,14 @@ export default function AssistantSessionDetailRoute() {
         </View>
       </Card>
 
-      {/* Konfigurasi Lokasi & Radius Laboratorium (SRS-S3-03) */}
+      {/* Kebijakan Lokasi, Grace Period & Denda Laboratorium (Read-Only dari Aslab — SRS-S4-03 & SRS-S4-04) */}
       <Card variant="default" padding="md" style={styles.labConfigCard}>
         <View style={styles.labConfigHeader}>
           <View style={styles.labConfigTitleRow}>
-            <Icon name="location-outline" size={18} color={Colors.primary} />
-            <AppText variant="title">Lokasi & Radius Presensi</AppText>
+            <Icon name="shield-checkmark-outline" size={18} color={Colors.primary} />
+            <AppText variant="title" style={styles.flexShrinkText}>
+              Kebijakan Lab & Keterlambatan
+            </AppText>
           </View>
           <Badge
             label={
@@ -447,48 +502,48 @@ export default function AssistantSessionDetailRoute() {
         </View>
 
         <AppText variant="caption" color={Colors.textMuted} style={styles.labConfigDesc}>
-          {session.deliveryMode === 'ONLINE'
-            ? 'Sesi ini diadakan daring (online). Validasi radius GPS praktikan dilewati.'
-            : `Praktikan wajib berada dalam radius maksimal ${
-                session.radiusMeters ?? currentLab?.radiusMeters ?? 60
-              } m dari ${currentLab?.name || session.room} untuk dapat mengisi presensi pada sesi ini.`}
+          Konfigurasi lokasi, radius, grace period, dan nominal denda ditetapkan oleh Aslab dan diterapkan otomatis pada sesi ini.
         </AppText>
 
-        {currentLab && session.deliveryMode !== 'ONLINE' ? (
-          <View style={styles.labMetaBox}>
-            <View style={styles.labMetaRow}>
-              <Icon name="business-outline" size={14} color={Colors.textMuted} />
-              <AppText variant="caption" color={Colors.textSecondary}>
-                {currentLab.building}
-              </AppText>
-            </View>
-            <View style={styles.labMetaRow}>
-              <Icon name="navigate-outline" size={14} color={Colors.textMuted} />
-              <AppText variant="caption" color={Colors.textMuted}>
-                Koordinat Lab (Tetap): {currentLab.latitude.toFixed(5)}, {currentLab.longitude.toFixed(5)}
-              </AppText>
-            </View>
+        <View style={styles.labMetaBox}>
+          <View style={styles.labMetaRow}>
+            <Icon name="time-outline" size={14} color={Colors.primary} />
+            <AppText variant="caption" color={Colors.textSecondary} weight="semibold" style={styles.flexText}>
+              Grace Period Keterlambatan: {effectiveGracePeriod} menit dari jadwal mulai
+            </AppText>
           </View>
-        ) : null}
-
-        {session.deliveryMode !== 'ONLINE' ? (
-          <View style={styles.labConfigBtnWrap}>
-            <CustomButton
-              title="Atur Radius Presensi Sesi"
-              variant="outline"
-              size="sm"
-              icon={<Icon name="locate-outline" size={16} color={Colors.primary} />}
-              onPress={() => setLabModalVisible(true)}
-            />
+          <View style={styles.labMetaRow}>
+            <Icon name="cash-outline" size={14} color={Colors.warning} />
+            <AppText variant="caption" color={Colors.textSecondary} weight="semibold" style={styles.flexText}>
+              Denda Tetap Keterlambatan: {formatRupiah(effectiveFineAmount)} / kejadian (Izin disetujui bebas denda)
+            </AppText>
           </View>
-        ) : null}
+          {currentLab && session.deliveryMode !== 'ONLINE' ? (
+            <>
+              <View style={styles.labMetaRow}>
+                <Icon name="business-outline" size={14} color={Colors.textMuted} />
+                <AppText variant="caption" color={Colors.textSecondary} style={styles.flexText}>
+                  {currentLab.name} • {currentLab.building}
+                </AppText>
+              </View>
+              <View style={styles.labMetaRow}>
+                <Icon name="navigate-outline" size={14} color={Colors.textMuted} />
+                <AppText variant="caption" color={Colors.textMuted} style={styles.flexText}>
+                  Koordinat Lab: {currentLab.latitude.toFixed(5)}, {currentLab.longitude.toFixed(5)}
+                </AppText>
+              </View>
+            </>
+          ) : null}
+        </View>
       </Card>
 
       {/* Tata Kelola Sesi: Reschedule / Hapus dengan Izin Admin */}
       <Card variant="default" padding="md" style={styles.governanceCard}>
         <View style={styles.governanceHeader}>
           <Icon name="shield-checkmark" size={18} color={Colors.primary} />
-          <AppText variant="title">Pengaturan Jadwal & Otorisasi</AppText>
+          <AppText variant="title" style={styles.flexText}>
+            Pengaturan Jadwal & Otorisasi
+          </AppText>
         </View>
         <AppText variant="caption" color={Colors.textMuted} style={styles.governanceDesc}>
           Setiap perubahan jadwal (reschedule) atau penghapusan sesi wajib mendapatkan persetujuan dari Administrator Lab.
@@ -497,7 +552,7 @@ export default function AssistantSessionDetailRoute() {
         {session.pendingChangeRequest ? (
           <View style={styles.pendingNoticeBox}>
             <Icon name="time-outline" size={16} color={Colors.warning} />
-            <AppText variant="caption" weight="semibold" color={Colors.warning}>
+            <AppText variant="caption" weight="semibold" color={Colors.warning} style={styles.flexText}>
               Sesi ini sedang menunggu persetujuan Admin untuk{' '}
               {session.pendingChangeRequest === 'DELETE' ? 'penghapusan' : 'reschedule'}.
             </AppText>
@@ -505,17 +560,19 @@ export default function AssistantSessionDetailRoute() {
         ) : (
           <View style={styles.governanceBtnRow}>
             <CustomButton
-              title="Minta Reschedule"
+              title="Reschedule"
               variant="outline"
               size="sm"
+              fullWidth={false}
               icon={<Icon name="calendar-outline" size={16} color={Colors.primary} />}
               style={styles.govBtn}
               onPress={() => handleOpenChangeModal('RESCHEDULE')}
             />
             <CustomButton
-              title="Minta Hapus Sesi"
+              title="Hapus Sesi"
               variant="outline"
               size="sm"
+              fullWidth={false}
               icon={<Icon name="trash-outline" size={16} color={Colors.danger} />}
               style={styles.govBtn}
               onPress={() => handleOpenChangeModal('DELETE')}
@@ -524,20 +581,39 @@ export default function AssistantSessionDetailRoute() {
         )}
       </Card>
 
-      {/* Attendance Ratio Summary */}
+      {/* Attendance Ratio Summary (Hanya hitung ON_TIME + LATE, tidak menghitung EXCUSED_ABSENCE) */}
       <StatSummaryCard
-        attendedCount={attendanceRecords.length}
+        attendedCount={presentRecords.length}
         totalStudents={session.totalStudents}
       />
 
-      {/* Attendance Recap Table */}
-      <AttendanceTable records={attendanceRecords} />
+      {/* Ringkasan Ketepatan Waktu, Izin Bebas Denda & Status Tagihan (SRS-S4-04) */}
+      <Card variant="flat" padding="md" style={styles.punctualityCard}>
+        <AppText variant="caption" color={Colors.textMuted} weight="bold">
+          RINGKASAN KETEPATAN WAKTU & DENDA SESI
+        </AppText>
+        <View style={styles.punctualityRow}>
+          <Badge label={`Tepat Waktu: ${onTimeCount}`} variant="open" size="sm" />
+          <Badge label={`Terlambat: ${lateCount}`} variant="waiting" size="sm" />
+          <Badge label={`Izin (Bebas Denda): ${excusedCount}`} variant="attended" size="sm" />
+          <Badge
+            label={`Denda Aktif: ${sessionFines.filter((f) => f.status === 'UNPAID' || f.status === 'PENDING').length}`}
+            variant="danger"
+            size="sm"
+          />
+        </View>
+      </Card>
+
+      {/* Attendance Recap Table (Peserta Hadir: ON_TIME & LATE) */}
+      <AttendanceTable records={presentRecords} />
 
       {/* Kontrol Override Presensi & Izin Manual oleh Asisten (Untuk Praktikan Lupa Presensi / Telat Join / Surat Dokter Fisik) */}
       <Card variant="default" padding="md" style={styles.rosterCard}>
         <View style={styles.rosterHeader}>
           <Icon name="people-outline" size={18} color={Colors.primary} />
-          <AppText variant="title">Status Peserta Kelas & Input Manual</AppText>
+          <AppText variant="title" style={styles.flexText}>
+            Status Peserta Kelas & Input Manual
+          </AppText>
         </View>
         <AppText variant="caption" color={Colors.textMuted} style={styles.rosterDesc}>
           Jika praktikan lupa presensi di aplikasi, telat bergabung kode kelas, atau menyerahkan surat izin/dokter fisik secara langsung, Asisten dapat mencatat statusnya di bawah ini:
@@ -581,6 +657,16 @@ export default function AssistantSessionDetailRoute() {
                       p.studentNim === std.identifier) &&
                     p.status !== 'REJECTED'
                 );
+                const studentFine = sessionFines.find(
+                  (f) =>
+                    f.studentId === std.uid || f.studentNim === std.identifier
+                );
+                const isExcused =
+                  attendedRec?.attendanceStatus === 'EXCUSED_ABSENCE' ||
+                  permitRec?.status === 'APPROVED';
+                const isPresent = Boolean(
+                  attendedRec && isPresentAttendanceRecord(attendedRec)
+                );
                 const isProcessing = manualActionLoadingId === std.uid;
 
                 return (
@@ -592,18 +678,24 @@ export default function AssistantSessionDetailRoute() {
                       <AppText variant="caption" color={Colors.textMuted}>
                         NIM: {std.identifier}
                       </AppText>
-                      {attendedRec ? (
-                        <Badge label="Sudah Hadir" variant="attended" size="sm" showDot />
+                      {isPresent && attendedRec ? (
+                        <LatenessBadge
+                          status={attendedRec.attendanceStatus ?? 'ON_TIME'}
+                          lateMinutes={attendedRec.lateMinutes}
+                          fineStatus={studentFine?.status}
+                          fineAmount={studentFine?.amount}
+                          size="sm"
+                        />
+                      ) : isExcused ? (
+                        <LatenessBadge
+                          status="EXCUSED_ABSENCE"
+                          fineStatus={studentFine?.status}
+                          size="sm"
+                        />
                       ) : permitRec ? (
                         <Badge
-                          label={
-                            permitRec.status === 'APPROVED'
-                              ? 'Izin Disetujui'
-                              : 'Izin Menunggu Review'
-                          }
-                          variant={
-                            permitRec.status === 'APPROVED' ? 'open' : 'waiting'
-                          }
+                          label="Izin Menunggu Review"
+                          variant="waiting"
                           size="sm"
                           showDot
                         />
@@ -616,13 +708,14 @@ export default function AssistantSessionDetailRoute() {
                       )}
                     </View>
 
-                    {!attendedRec && permitRec?.status !== 'APPROVED' ? (
-                      <View style={styles.rosterBtnCol}>
+                    {!isPresent && !isExcused ? (
+                      <View style={styles.rosterBtnRow}>
                         <CustomButton
                           title="Tandai Hadir"
                           variant="primary"
                           size="sm"
                           fullWidth={false}
+                          style={styles.rosterActionBtn}
                           loading={isProcessing}
                           onPress={async () => {
                             setManualActionLoadingId(std.uid);
@@ -646,10 +739,11 @@ export default function AssistantSessionDetailRoute() {
                           }}
                         />
                         <CustomButton
-                          title="Izin/Sakit Fisik"
+                          title="Izin Fisik"
                           variant="outline"
                           size="sm"
                           fullWidth={false}
+                          style={styles.rosterActionBtn}
                           disabled={isProcessing}
                           onPress={async () => {
                             setManualActionLoadingId(std.uid);
@@ -702,78 +796,97 @@ export default function AssistantSessionDetailRoute() {
         animationType="slide"
         onRequestClose={() => setChangeModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setChangeModalVisible(false)}
-        />
-        <View style={styles.changeModalSheet}>
-          <AppText variant="title" weight="bold">
-            {changeType === 'DELETE'
-              ? 'Ajukan Izin Hapus Sesi ke Admin'
-              : 'Ajukan Izin Reschedule Sesi ke Admin'}
-          </AppText>
-          <AppText variant="caption" color={Colors.textSecondary} style={styles.changeModalSub}>
-            Sesi praktikum {session.courseName} ({session.classCode})
-          </AppText>
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setChangeModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboardAvoid}
+          >
+            <View
+              style={[
+                styles.changeModalSheet,
+                { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+              ]}
+            >
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <AppText variant="title" weight="bold">
+                  {changeType === 'DELETE'
+                    ? 'Ajukan Izin Hapus Sesi ke Admin'
+                    : 'Ajukan Izin Reschedule Sesi ke Admin'}
+                </AppText>
+                <AppText variant="caption" color={Colors.textSecondary} style={styles.changeModalSub}>
+                  Sesi praktikum {session.courseName} ({session.classCode})
+                </AppText>
 
-          {changeType === 'RESCHEDULE' ? (
-            <>
-              <View style={styles.fieldGroup}>
-                <AppText variant="label">Jadwal Jam Baru:</AppText>
-                <TextInput
-                  value={newTimeSlot}
-                  onChangeText={setNewTimeSlot}
-                  placeholder="Contoh: 13.00 - 15.00 WIB"
-                  placeholderTextColor={Colors.textLight}
-                  style={styles.modalInput}
-                />
-              </View>
+                {changeType === 'RESCHEDULE' ? (
+                  <>
+                    <View style={styles.fieldGroup}>
+                      <AppText variant="label">Jadwal Jam Baru:</AppText>
+                      <TextInput
+                        value={newTimeSlot}
+                        onChangeText={setNewTimeSlot}
+                        placeholder="Contoh: 13.00 - 15.00 WIB"
+                        placeholderTextColor={Colors.textLight}
+                        style={styles.modalInput}
+                      />
+                    </View>
 
-              <View style={styles.fieldGroup}>
-                <AppText variant="label">Ruangan Baru (Opsional):</AppText>
-                <TextInput
-                  value={newRoom}
-                  onChangeText={setNewRoom}
-                  placeholder={session.room}
-                  placeholderTextColor={Colors.textLight}
-                  style={styles.modalInput}
-                />
-              </View>
-            </>
-          ) : null}
+                    <View style={styles.fieldGroup}>
+                      <AppText variant="label">Ruangan Baru (Opsional):</AppText>
+                      <TextInput
+                        value={newRoom}
+                        onChangeText={setNewRoom}
+                        placeholder={session.room}
+                        placeholderTextColor={Colors.textLight}
+                        style={styles.modalInput}
+                      />
+                    </View>
+                  </>
+                ) : null}
 
-          <View style={styles.fieldGroup}>
-            <AppText variant="label">
-              Alasan Pengajuan {changeType === 'DELETE' ? 'Penghapusan' : 'Reschedule'} *
-            </AppText>
-            <TextInput
-              value={changeReason}
-              onChangeText={setChangeReason}
-              placeholder="Jelaskan alasan pengajuan kepada admin lab..."
-              placeholderTextColor={Colors.textLight}
-              multiline
-              numberOfLines={3}
-              style={[styles.modalInput, styles.modalTextArea]}
-            />
-          </View>
+                <View style={styles.fieldGroup}>
+                  <AppText variant="label">
+                    Alasan Pengajuan {changeType === 'DELETE' ? 'Penghapusan' : 'Reschedule'} *
+                  </AppText>
+                  <TextInput
+                    value={changeReason}
+                    onChangeText={setChangeReason}
+                    placeholder="Jelaskan alasan pengajuan kepada admin lab..."
+                    placeholderTextColor={Colors.textLight}
+                    multiline
+                    numberOfLines={3}
+                    style={[styles.modalInput, styles.modalTextArea]}
+                  />
+                </View>
 
-          <View style={styles.changeActionRow}>
-            <CustomButton
-              title="Batal"
-              variant="outline"
-              size="md"
-              style={styles.govBtn}
-              onPress={() => setChangeModalVisible(false)}
-            />
-            <CustomButton
-              title="Kirim ke Admin"
-              variant={changeType === 'DELETE' ? 'danger' : 'primary'}
-              size="md"
-              loading={submittingChange}
-              style={styles.govBtn}
-              onPress={handleSubmitChangeRequest}
-            />
-          </View>
+                <View style={styles.changeActionRow}>
+                  <CustomButton
+                    title="Batal"
+                    variant="outline"
+                    size="md"
+                    fullWidth={false}
+                    style={styles.changeCancelBtn}
+                    onPress={() => setChangeModalVisible(false)}
+                  />
+                  <CustomButton
+                    title="Kirim"
+                    variant={changeType === 'DELETE' ? 'danger' : 'primary'}
+                    size="md"
+                    fullWidth={false}
+                    loading={submittingChange}
+                    style={styles.changeSubmitBtn}
+                    onPress={handleSubmitChangeRequest}
+                  />
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -786,35 +899,11 @@ export default function AssistantSessionDetailRoute() {
         primaryLabel="Mengerti"
         onPrimary={() => setFeedbackVisible(false)}
       />
-
-      {/* Modal Pengaturan Radius Presensi Sesi (SRS-S3-03) */}
-      <LabLocationConfigModal
-        visible={labModalVisible}
-        onClose={() => setLabModalVisible(false)}
-        initialLab={currentLab}
-        currentRoomName={session.room}
-        initialRadiusMeters={session.radiusMeters ?? currentLab?.radiusMeters ?? 60}
-        sessionId={session.id}
-        onSuccess={(newRadiusMeters) => {
-          setRealtimeSession((prev) =>
-            prev ? { ...prev, radiusMeters: newRadiusMeters } : prev
-          );
-          setFeedbackType('success');
-          setFeedbackTitle('Radius Sesi Diperbarui!');
-          setFeedbackMessage(
-            `Batas radius presensi untuk sesi ${session.courseName} (${session.classCode}) berhasil diatur ke ${newRadiusMeters} meter.`
-          );
-          setFeedbackVisible(true);
-        }}
-      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: Spacing.md,
-  },
   topNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -838,8 +927,14 @@ const styles = StyleSheet.create({
   placeholderButton: {
     width: 40,
   },
+  flexText: {
+    flex: 1,
+  },
+  flexShrinkText: {
+    flexShrink: 1,
+  },
   heroCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -859,7 +954,7 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
   },
   meetingLinkBox: {
@@ -891,32 +986,32 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   controlCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   controlHeader: {
     marginBottom: Spacing.md,
-    gap: 4,
+    gap: Spacing.xs,
   },
   actionButtonContainer: {
     width: '100%',
   },
   governanceCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   governanceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   governanceDesc: {
     marginBottom: Spacing.md,
   },
   pendingNoticeBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
     backgroundColor: Colors.warningBg,
     padding: Spacing.sm,
@@ -931,19 +1026,24 @@ const styles = StyleSheet.create({
   govBtn: {
     flex: 1,
   },
-  modalBackdrop: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  modalKeyboardAvoid: {
+    width: '100%',
   },
   changeModalSheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
     maxHeight: '85%',
   },
   changeModalSub: {
-    marginTop: 2,
+    marginTop: Spacing.xxs,
     marginBottom: Spacing.md,
   },
   fieldGroup: {
@@ -956,9 +1056,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    fontSize: 14,
+    fontSize: Typography.sm,
     color: Colors.text,
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   modalTextArea: {
     minHeight: 70,
@@ -969,38 +1069,45 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
+  changeCancelBtn: {
+    flex: 1,
+  },
+  changeSubmitBtn: {
+    flex: 1.4,
+  },
   rosterCard: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   rosterHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   rosterDesc: {
     marginBottom: Spacing.md,
   },
   rosterList: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   rosterItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.xs + 2,
+    paddingVertical: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
     gap: Spacing.sm,
   },
   rosterStudentCol: {
-    flex: 1,
+    width: '100%',
     alignItems: 'flex-start',
-    gap: 3,
+    gap: Spacing.xxs,
   },
-  rosterBtnCol: {
-    flexDirection: 'column',
-    gap: 6,
+  rosterBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    width: '100%',
+  },
+  rosterActionBtn: {
+    flex: 1,
   },
   labConfigCard: {
     marginBottom: Spacing.md,
@@ -1010,8 +1117,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.sm,
   },
   labConfigTitleRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
@@ -1023,15 +1132,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceSecondary,
     padding: Spacing.sm,
     borderRadius: Radius.md,
-    gap: Spacing.xxs,
+    gap: Spacing.xs,
     marginTop: Spacing.xxs,
   },
   labMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
   },
-  labConfigBtnWrap: {
-    marginTop: Spacing.xs,
+  punctualityCard: {
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  punctualityRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
   },
 });

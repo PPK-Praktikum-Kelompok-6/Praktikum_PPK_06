@@ -13,13 +13,16 @@ import {
   where,
 } from 'firebase/firestore';
 
-import { MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
+import { generateCoursePrefix, normalizeCourseName } from '@/constants/courses';
+import { DEFAULT_CLASSES, MOCK_SESSIONS, MOCK_USERS } from '@/data/mockData';
 import { isSessionExpired } from '@/store/rules';
 import { PracticalClass, PracticalSession, UserProfile } from '@/types/attendance';
 import { normalizeLabRoomName } from '@/utils/geo';
 import { db, isFirebaseConfigured } from './firebase';
 import { notifyScheduleChanged, notifySessionOpened } from './notifications';
 
+export { generateCoursePrefix } from '@/constants/courses';
+export { DEFAULT_CLASSES } from '@/data/mockData';
 export { PracticalClass } from '@/types/attendance';
 
 /**
@@ -35,95 +38,13 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Par
   return result;
 }
 
-export const DEFAULT_CLASSES: PracticalClass[] = [
-  {
-    id: 'class-a1',
-    classCode: 'A1',
-    courseName: 'Basis Data Lanjut',
-    room: 'Lab D',
-    assistantId: 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2',
-    assistantName: 'Crystiano Bayu Satya Alves, Herman',
-    assistantIds: ['EW1rsd5cTZR6iW0xDQdchJ4CYdd2', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
-    assistantNames: ['Crystiano Bayu Satya Alves', 'Herman'],
-    studentJoinCode: 'BDL-A1-101',
-    assistantInviteCode: 'ASP-BDL-A1-201',
-    studentIds: [
-      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
-      'JptPsdlcQPeUg9tVahmaaJGFcR23',
-      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
-    ],
-    isOpen: true,
-  },
-  {
-    id: 'class-b2',
-    classCode: 'B2',
-    courseName: 'Struktur Data & Algoritma',
-    room: 'Lab B',
-    assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
-    assistantName: 'Muhammad Zaidan Alfarizi, Herman',
-    assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'iUuzqYziLZhWndnZdh9bx4NRsSe2'],
-    assistantNames: ['Muhammad Zaidan Alfarizi', 'Herman'],
-    studentJoinCode: 'SDA-B2-102',
-    assistantInviteCode: 'ASP-SDA-B2-202',
-    studentIds: [
-      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
-      'MMu4kWP6WKaAhKvSDDiCJ5Jjhxw1',
-      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
-    ],
-    isOpen: true,
-  },
-  {
-    id: 'class-c1',
-    classCode: 'C1',
-    courseName: 'Pemrograman Perangkat Keras',
-    room: 'Lab C',
-    assistantId: 'SxbmMvFvLcRUPSEhOiyJRfNpOzg1',
-    assistantName: 'Muhammad Zaidan Alfarizi, Crystiano Bayu Satya Alves',
-    assistantIds: ['SxbmMvFvLcRUPSEhOiyJRfNpOzg1', 'EW1rsd5cTZR6iW0xDQdchJ4CYdd2'],
-    assistantNames: ['Muhammad Zaidan Alfarizi', 'Crystiano Bayu Satya Alves'],
-    studentJoinCode: 'PPK-C1-103',
-    assistantInviteCode: 'ASP-PPK-C1-203',
-    studentIds: [
-      'mDZOvU3OiKUl037f9C1DuX5O6IH3',
-      'JptPsdlcQPeUg9tVahmaaJGFcR23',
-      'MMu4kWP6WKaAhKvSDDiCJ5Jjhxw1',
-      'wgxCVH0QxiZ7VsEYPQprqW6KKAJ3',
-    ],
-    isOpen: true,
-  },
-];
-
-const STOPWORDS = new Set(['DAN', 'ATAU', 'DENGAN', 'UNTUK', 'PADA', 'DI', 'KE', 'DARI', 'OF', 'AND']);
-
-/**
- * Menghasilkan singkatan nama mata kuliah (contoh: "Pemrograman Perangkat Keras" -> "PPK",
- * "Basis Data Lanjut" -> "BDL", "Struktur Data & Algoritma" -> "SDA", "Jaringan Komputer" -> "JK").
- */
-export function generateCoursePrefix(courseName: string): string {
-  const words = courseName
-    .trim()
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .map((w) => w.toUpperCase())
-    .filter((w) => w.length > 0 && !STOPWORDS.has(w));
-
-  if (words.length >= 2) {
-    return words
-      .slice(0, 4)
-      .map((w) => w[0])
-      .join('');
-  }
-  if (words.length === 1) {
-    return words[0].slice(0, 3).toUpperCase();
-  }
-  return 'PPK';
-}
-
 function randomDigits(len: number = 3): string {
   const min = Math.pow(10, len - 1);
   const max = Math.pow(10, len) - 1;
   return String(Math.floor(min + Math.random() * (max - min + 1)));
 }
+
+const migratedClassIds = new Set<string>();
 
 /**
  * Memastikan setiap objek PracticalClass memiliki field assistantIds, assistantNames,
@@ -143,7 +64,10 @@ export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
       ? cls.assistantName.split(',').map((s) => s.trim()).filter(Boolean)
       : [];
 
-  const prefix = generateCoursePrefix(cls.courseName || 'Praktikum');
+  const normalizedCourseName = cls.courseName
+    ? normalizeCourseName(cls.courseName)
+    : cls.courseName;
+  const prefix = generateCoursePrefix(normalizedCourseName || 'Praktikum');
   const codeClean = (cls.classCode || 'A1').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // Deterministic 3-digit number fallback jika dokumen belum punya kode
@@ -157,25 +81,41 @@ export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
 
   const studentJoinCode = (
     cls.studentJoinCode || `${prefix}-${codeClean}-${deterministic3Digit}`
-  ).toUpperCase();
+  )
+    .toUpperCase()
+    .replace(/^BDL-/, 'BD-')
+    .replace(/^SDA-/, 'SD-');
   const assistantInviteCode = (
     cls.assistantInviteCode || `ASP-${prefix}-${codeClean}-${deterministicAst3Digit}`
-  ).toUpperCase();
+  )
+    .toUpperCase()
+    .replace(/^ASP-BDL-/, 'ASP-BD-')
+    .replace(/^ASP-SDA-/, 'ASP-SD-');
 
   const normalizedRoom = cls.room ? normalizeLabRoomName(cls.room) : cls.room;
-  if (
-    isFirebaseConfigured &&
-    cls.id &&
-    cls.room &&
-    normalizedRoom !== cls.room
-  ) {
-    updateDoc(doc(db, 'classes', cls.id), { room: normalizedRoom }).catch(
-      () => {}
-    );
+  if (isFirebaseConfigured && cls.id && !migratedClassIds.has(cls.id)) {
+    const patch: Partial<PracticalClass> = {};
+    if (cls.room && normalizedRoom !== cls.room) {
+      patch.room = normalizedRoom;
+    }
+    if (cls.courseName && normalizedCourseName !== cls.courseName) {
+      patch.courseName = normalizedCourseName;
+    }
+    if (cls.studentJoinCode && studentJoinCode !== cls.studentJoinCode) {
+      patch.studentJoinCode = studentJoinCode;
+    }
+    if (cls.assistantInviteCode && assistantInviteCode !== cls.assistantInviteCode) {
+      patch.assistantInviteCode = assistantInviteCode;
+    }
+    if (Object.keys(patch).length > 0) {
+      migratedClassIds.add(cls.id);
+      updateDoc(doc(db, 'classes', cls.id), patch).catch(() => {});
+    }
   }
 
   return {
     ...cls,
+    courseName: normalizedCourseName,
     room: normalizedRoom,
     assistantId: assistantIds[0] || '',
     assistantName:
@@ -189,25 +129,45 @@ export function normalizePracticalClass(cls: PracticalClass): PracticalClass {
   };
 }
 
-const migratedSessionRoomIds = new Set<string>();
+const migratedSessionIds = new Set<string>();
 
 function normalizeSessionRecord(session: PracticalSession): PracticalSession {
-  if (!session.room || session.deliveryMode === 'ONLINE') {
-    return session;
-  }
-  const normalizedRoom = normalizeLabRoomName(session.room);
-  if (normalizedRoom !== session.room) {
+  const normalizedCourseName = session.courseName
+    ? normalizeCourseName(session.courseName)
+    : session.courseName;
+  const normalizedRoom =
+    session.room && session.deliveryMode !== 'ONLINE'
+      ? normalizeLabRoomName(session.room)
+      : session.room;
+
+  const courseChanged =
+    Boolean(session.courseName) && normalizedCourseName !== session.courseName;
+  const roomChanged =
+    Boolean(session.room) && normalizedRoom !== session.room;
+
+  if (courseChanged || roomChanged) {
     if (
       isFirebaseConfigured &&
       session.id &&
-      !migratedSessionRoomIds.has(session.id)
+      !migratedSessionIds.has(session.id)
     ) {
-      migratedSessionRoomIds.add(session.id);
-      updateDoc(doc(db, 'sessions', session.id), {
-        room: normalizedRoom,
-      }).catch(() => {});
+      const patch: Partial<PracticalSession> = {};
+      if (courseChanged && normalizedCourseName) {
+        patch.courseName = normalizedCourseName;
+      }
+      if (roomChanged && normalizedRoom) {
+        patch.room = normalizedRoom;
+      }
+      if (Object.keys(patch).length > 0) {
+        migratedSessionIds.add(session.id);
+        updateDoc(doc(db, 'sessions', session.id), patch).catch(() => {});
+      }
     }
-    return { ...session, room: normalizedRoom };
+    return {
+      ...session,
+      courseName: normalizedCourseName,
+      room: normalizedRoom,
+    };
   }
   return session;
 }
@@ -423,10 +383,10 @@ export async function getSessionDoc(
     try {
       const snap = await getDoc(doc(db, 'sessions', sessionId));
       if (snap.exists()) {
-        return {
+        return normalizeSessionRecord({
           id: snap.id,
           ...(snap.data() as Omit<PracticalSession, 'id'>),
-        };
+        });
       }
     } catch {
       // Fallback
@@ -533,10 +493,12 @@ export async function createSession(
     throw new Error('Ruangan praktikum wajib diisi.');
   }
 
+  const normalizedCourse = normalizeCourseName(sessionData.courseName);
+
   if (isFirebaseConfigured) {
     const rawData = {
       ...sessionData,
-      courseName: sessionData.courseName.trim(),
+      courseName: normalizedCourse,
       classCode: (sessionData.classCode || 'A1').trim(),
       room: sessionData.room.trim(),
       deliveryMode: sessionData.deliveryMode || 'OFFLINE',
@@ -551,7 +513,7 @@ export async function createSession(
   const created: PracticalSession = {
     ...sessionData,
     id: newId,
-    courseName: sessionData.courseName.trim(),
+    courseName: normalizedCourse,
     classCode: (sessionData.classCode || 'A1').trim(),
     room: sessionData.room.trim(),
     deliveryMode: sessionData.deliveryMode || 'OFFLINE',
@@ -576,10 +538,12 @@ export async function getSessionsForAssistant(
         where('assistantId', '==', assistantId)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-      }));
+      return snapshot.docs.map((docSnap) =>
+        normalizeSessionRecord({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+        })
+      );
     } catch {
       // Fallback ke store lokal bila jaringan tidak tersedia
     }
@@ -607,10 +571,12 @@ export async function getSessionsForStudent(
           where('classCode', 'in', normalizedClasses.slice(0, 10))
         );
         const snapshot = await getDocs(q);
-        return snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-        }));
+        return snapshot.docs.map((docSnap) =>
+          normalizeSessionRecord({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+          })
+        );
       }
 
       const enrolledQ = query(
@@ -628,10 +594,12 @@ export async function getSessionsForStudent(
           where('classCode', 'in', codes.slice(0, 10))
         );
         const sessionSnap = await getDocs(sessionQ);
-        return sessionSnap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<PracticalSession, 'id'>),
-        }));
+        return sessionSnap.docs.map((docSnap) =>
+          normalizeSessionRecord({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<PracticalSession, 'id'>),
+          })
+        );
       }
     } catch {
       // Fallback ke store lokal bila jaringan tidak tersedia
@@ -759,10 +727,12 @@ export async function getClasses(
         ? query(ref, where('assistantId', '==', assistantId))
         : ref;
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<PracticalClass, 'id'>),
-      }));
+      return snapshot.docs.map((docSnap) =>
+        normalizePracticalClass({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<PracticalClass, 'id'>),
+        })
+      );
     } catch {
       // Fallback ke store lokal
     }
@@ -920,7 +890,7 @@ export async function createClassroomByAssistant(input: {
   assistantId: string;
   assistantName: string;
 }): Promise<PracticalClass> {
-  const trimmedCourse = input.courseName.trim();
+  const trimmedCourse = normalizeCourseName(input.courseName);
   const trimmedCode = input.classCode.trim().toUpperCase();
   const trimmedRoom = input.room.trim();
 

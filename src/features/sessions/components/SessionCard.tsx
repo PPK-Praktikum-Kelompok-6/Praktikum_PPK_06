@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Badge, BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { GestureIcon, Icon, IconName } from '@/components/ui/Icon';
+import { BoxIcon, GestureIcon, Icon, IconName } from '@/components/ui/Icon';
 import { Colors, Radius, Spacing, StatusLabel } from '@/constants/theme';
 import { PracticalSession, SessionStatus } from '@/types/attendance';
 
@@ -52,7 +52,7 @@ function resolveBadge(
 ): { label: string; variant: BadgeVariant; dotColor: string; showDot: boolean } {
   if (attended) {
     return {
-      label: 'Status Absen Berhasil',
+      label: StatusLabel.attended,
       variant: 'attended',
       dotColor: Colors.success,
       showDot: true,
@@ -159,14 +159,6 @@ export function SessionCard({
                 Asisten: {session.assistantName}
               </AppText>
             ) : null}
-            {attended ? (
-              <View style={styles.heroAttendedBadge}>
-                <Icon name="checkmark-circle" size={13} color={Colors.success} />
-                <AppText variant="caption" weight="bold" color={Colors.textWhite}>
-                  Kelas {session.classCode} • Status Absen Berhasil
-                </AppText>
-              </View>
-            ) : null}
           </View>
         </View>
 
@@ -261,47 +253,49 @@ export function SessionCard({
         </View>
 
         <View style={styles.details}>
-          <AppText variant="title" numberOfLines={1}>
-            {session.courseName}
-          </AppText>
-          <AppText variant="caption" color={Colors.textMuted}>
-            Kelas {session.classCode} · {session.deliveryMode === 'ONLINE' ? '🌐 Daring' : '🏢 ' + session.room}
-          </AppText>
+          <View style={styles.cardHeaderRow}>
+            <AppText variant="title" numberOfLines={2} style={styles.courseTitle}>
+              {session.courseName}
+            </AppText>
+            <Badge
+              label={badge.label}
+              variant={badge.variant}
+              size="sm"
+              showDot={badge.showDot}
+              style={styles.statusBadge}
+            />
+          </View>
 
-          {attended ? (
-            <View style={styles.attendedSuccessBadge}>
-              <Icon name="checkmark-circle" size={13} color={Colors.success} />
-              <AppText variant="caption" weight="bold" color={Colors.success}>
-                Kelas {session.classCode} • Status Absen Berhasil
-              </AppText>
-            </View>
-          ) : permitStatus === 'APPROVED' ? (
-            <View style={styles.permitApprovedBadge}>
-              <Icon name="document-text" size={13} color={Colors.primary} />
-              <AppText variant="caption" weight="bold" color={Colors.primaryDark}>
-                Kelas {session.classCode} • Izin Praktikum Disetujui
-              </AppText>
-            </View>
-          ) : (
-            <View style={styles.metaRow}>
-              <Icon name="time-outline" size={14} color={Colors.textMuted} />
-              <AppText
-                variant="caption"
-                color={Colors.textMuted}
-                style={styles.metaText}
-              >
-                {session.timeSlot}
-              </AppText>
-            </View>
-          )}
+          <View style={styles.classMetaRow}>
+            <AppText variant="caption" color={Colors.textMuted}>
+              Kelas {session.classCode} ·
+            </AppText>
+            <BoxIcon
+              name={session.deliveryMode === 'ONLINE' ? 'globe' : 'buildings'}
+              size={13}
+              color={Colors.textMuted}
+            />
+            <AppText
+              variant="caption"
+              color={Colors.textMuted}
+              numberOfLines={1}
+              style={styles.classMetaText}
+            >
+              {session.deliveryMode === 'ONLINE' ? 'Daring' : session.room}
+            </AppText>
+          </View>
+
+          <View style={styles.metaRow}>
+            <Icon name="time-outline" size={14} color={Colors.textMuted} />
+            <AppText
+              variant="caption"
+              color={Colors.textMuted}
+              style={styles.metaText}
+            >
+              {session.timeSlot}
+            </AppText>
+          </View>
         </View>
-
-        <Badge
-          label={badge.label}
-          variant={badge.variant}
-          size="sm"
-          showDot={badge.showDot}
-        />
       </View>
     </Card>
   );
@@ -403,7 +397,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   dateBadge: {
     width: 50,
@@ -418,45 +412,33 @@ const styles = StyleSheet.create({
   },
   details: {
     flex: 1,
-    marginRight: Spacing.sm,
+    gap: Spacing.xxs,
   },
-  attendedSuccessBadge: {
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
+  },
+  courseTitle: {
+    flex: 1,
+  },
+  statusBadge: {
+    flexShrink: 0,
+    marginTop: Spacing.xxs,
+  },
+  classMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginTop: 4,
-    backgroundColor: Colors.successBg,
-    paddingHorizontal: Spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: Radius.xs,
-    alignSelf: 'flex-start',
   },
-  permitApprovedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: 4,
-    backgroundColor: Colors.primaryBg,
-    paddingHorizontal: Spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: Radius.xs,
-    alignSelf: 'flex-start',
-  },
-  heroAttendedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: 'rgba(34, 197, 94, 0.25)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginTop: Spacing.xs,
-    alignSelf: 'flex-start',
+  classMetaText: {
+    flexShrink: 1,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
+    marginTop: Spacing.xxs,
   },
   metaText: {
     marginLeft: Spacing.xs,
