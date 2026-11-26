@@ -1,180 +1,141 @@
 # Panduan Tugas — Muhammad Zaidan Alfarizi (24060124130102)
-## Modul Sprint 3: Halaman Khusus Presensi, Validasi Lokasi (Geofencing), & Pengelolaan Lokasi Laboratorium
+## Modul Sprint 4 (Pertemuan 9): Manajemen Laboratorium oleh Aslab (Role Baru) & Dashboard Keberlangsungan Laboratorium
 
-> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG (SPRINT 3):**  
-> ⚠️ **Sprint 1 & Sprint 2 SELESAI:** Jangan membongkar ulang sistem Auth (`services/auth.ts`), UI Design System (`src/components/ui/*`, `src/constants/theme.ts`), maupun modul Izin & AI (`src/features/permits/*`, `src/services/permits.ts`).  
-> Fokus Anda di Sprint 3 **HANYA** pada modul Geolocation Check-In, Halaman Khusus Presensi terpisah, dan CRUD Lokasi/Radius Laboratorium di Firestore (**Objektif Demo 1**).  
-> Modul Maps Interaktif dan Push Notification dikerjakan oleh **Ferdy** ([docs/TUGAS_FERDY.md](TUGAS_FERDY.md)).
-
----
-
-## 1. Product Requirements Document (PRD) — Sprint 3 Zaidan
-
-### 1.1 Objektif Utama (Alur Demo 1)
-Memastikan presensi praktikan tidak lagi dapat dilakukan dari sembarang tempat dengan menambahkan **halaman khusus presensi terpisah dari detail sesi**, **validasi lokasi perangkat terhadap radius laboratorium** yang terintegrasi langsung pada proses pencatatan Firestore (bukan sekadar tampilan visual), serta **pengelolaan titik koordinat dan radius laboratorium** oleh Asisten yang tersimpan persisten di Cloud Firestore.
-
-### 1.2 User Stories & Pemetaan SRS Sprint 3
-- **`SRS-S3-01` (Halaman Khusus Presensi + Opsional QR Code):**  
-  Sebagai Praktikan, saya dapat mengakses **halaman khusus untuk melakukan presensi (`/student/check-in/[id]`) yang terpisah dari halaman detail sesi (`/student/attendance/[id]`)**, guna melihat informasi sesi, status sesi, hasil pemeriksaan lokasi saya, serta menekan tombol presensi *(opsional: memindai QR Code yang ditampilkan asisten)*.
-- **`SRS-S3-02` (Validasi Lokasi Presensi / Geofencing Radius):**  
-  Sebagai Sistem, saya memeriksa koordinat GPS perangkat praktikan terhadap koordinat dan radius laboratorium menggunakan perhitungan jarak (Haversine). Presensi **hanya boleh dicatat** ke Firestore apabila **sesi berstatus `OPEN` DAN praktikan berada di dalam radius yang diizinkan** (serta belum pernah presensi pada sesi yang sama). Apabila di luar radius atau lokasi tidak diperoleh, tampilkan informasi jarak/status secara jelas dan tolak pencatatan presensi.
-- **`SRS-S3-03` (Pengelolaan Lokasi & Radius Laboratorium di Firestore):**  
-  Sebagai Asisten, saya dapat menentukan lokasi laboratorium (koordinat `latitude`, `longitude`) dan `radiusMeters` yang berlaku untuk kegiatan praktikum, dan menyimpannya di koleksi **Cloud Firestore (`labs` / `sessions`)** agar digunakan secara konsisten oleh seluruh pengguna terkait (bukan *local storage*).
+> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG (SPRINT 4):**  
+> ⚠️ **Sprint 1, 2, & 3 SELESAI:** Jangan membongkar ulang UI Design System (`src/components/ui/*`, `src/constants/theme.ts`), modul Peta & Push Notification milik Ferdy, maupun alur sesi Asprak & perhitungan denda milik Bayu.  
+> Fokus Anda di Sprint 4 adalah **Role Baru Aslab (`ASLAB`)**, **Manajemen Laboratorium (termasuk 3 Bulk/Single Insert Terpisah + Template Download + Staging ScrollView + Perpindahan Anggota + Konfigurasi Lokasi/Radius/Keterlambatan)**, serta **Dashboard Keberlangsungan Laboratorium** (`SRS-S4-01` & `SRS-S4-02`).
 
 ---
 
-## 2. Referensi Teknis & Paket Expo SDK 58
+## 1. Product Requirements Document (PRD) — Sprint 4 Zaidan
 
-- **Referensi Resmi Asisten Praktikum (Geolocation & Maps Tracking):**  
-  https://medium.com/@silverskytechnology/implementing-google-maps-and-routes-tracking-in-react-native-a-starter-guide-9768282594b8
-- **Adaptasi Expo SDK 58 (Managed / Continuous Native Generation):**
-  - Pasang library lokasi menggunakan perintah resmi Expo (bukan `npm install`):
-    ```bash
-    npx expo install expo-location
-    # Opsional jika mengimplementasikan QR Code:
-    npx expo install expo-camera
-    ```
-  - Konfigurasikan deskripsi izin lokasi (`NSLocationWhenInUseUsageDescription`, `ACCESS_FINE_LOCATION`) melalui plugin `expo-location` di `app.json` — **jangan** membuat atau mengedit folder `android/` atau `ios/` secara manual.
-  - Gunakan `Location.requestForegroundPermissionsAsync()` dan `Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })` sebagai padanan resmi Expo untuk `@react-native-community/geolocation` pada artikel referensi.
+### 1.1 Objektif Utama
+Membangun ruang kerja khusus peran **Asisten Laboratorium (`ASLAB`)** yang berwenang penuh mengelola data laboratorium, distribusi praktikan & asprak per mata kuliah (baik *single* maupun *bulk insert* terpisah dengan pratinjau interaktif), perpindahan anggota antar laboratorium, konfigurasi cakupan lokasi presensi serta batas keterlambatan waktu, dan **Dashboard Keberlangsungan Laboratorium** secara *real-time* berbasis Cloud Firestore.
+
+### 1.2 User Stories & Pemetaan SRS Sprint 4
+- **`SRS-S4-01` (Manajemen Laboratorium oleh Aslab — Role Baru):**  
+  Sebagai Aslab, saya ingin mengelola data laboratorium (single/bulk insert lab, praktikan, dan asprak secara terpisah, template download, staging editor dalam `ScrollView`, perpindahan anggota, serta konfigurasi lokasi, radius presensi, dan batas keterlambatan) agar distribusi praktikum per mata kuliah terorganisir dengan rapi.
+- **`SRS-S4-02` (Dashboard Keberlangsungan Laboratorium):**  
+  Sebagai Aslab, saya ingin memantau dashboard keberlangsungan laboratorium secara real-time (jumlah lab/praktikan, status kegiatan, informasi lokasi & waktu, jadwal berlangsung & mendatang, riwayat kegiatan, dan riwayat keuangan denda dengan filter harian/mingguan/bulanan) agar seluruh aktivitas praktikum dapat diawasi secara terstruktur.
 
 ---
 
-## 3. File yang Dikerjakan Zaidan (Sprint 3)
+## 2. Rincian Kebutuhan Fungsional Wajib
 
-> Aturan struktur & batas impor: [docs/ARCHITECTURE.md](ARCHITECTURE.md) §2, §3, dan §8.
+### 2.1 Manajemen Laboratorium (`SRS-S4-01`)
+1. **CRUD Data Laboratorium:** Menambah, mengubah, dan mengelola nama lab, mata kuliah terkait, lokasi/gedung, koordinat (`latitude`, `longitude`), **cakupan lokasi / radius validasi presensi** (`radiusMeters`), serta **batasan keterlambatan waktu** (`gracePeriodMinutes` & nominal denda tetap `fineAmount`).
+2. **3 Opsi Bulk / Single Insert TERPISAH** *(WAJIB dipisah menjadi 3 menu/tab tersendiri, BUKAN satu bulk gabungan)*:
+   - **Opsi A — Insert Laboratorium (per 1 Mata Kuliah):** Membuat satu atau sejumlah laboratorium sekaligus berdasarkan satu mata kuliah yang dipilih.
+   - **Opsi B — Insert Praktikan ke Laboratorium Tertentu:** Menambahkan satu atau banyak praktikan ke laboratorium target.
+   - **Opsi C — Insert Asprak ke Laboratorium Tertentu:** Menambahkan satu atau banyak asprak ke laboratorium target.
+3. **Downloadable File Template:** Setiap opsi bulk insert menyediakan tombol **Unduh Template** (format `.csv`) berisi header kolom yang valid agar Aslab mudah mengisi data massal.
+4. **Interactive Bulk Staging (`ScrollView`):**
+   - Setelah file diunggah/diparsing, **tiap baris (row) data berubah menjadi item kartu di dalam `ScrollView`** (bukan langsung masuk database).
+   - Aslab dapat mengatur tiap baris secara fleksibel: **Accept / Deny** per baris, **edit/update** nilai field, serta **mengisi data yang masih kosong** (dengan indikator validasi visual untuk field wajib yang kosong) sebelum menekan tombol *Simpan Data yang Disetujui* ke Firestore.
+5. **Perpindahan Anggota (Tanpa Perpindahan Jadwal):**
+   - Memindahkan **praktikan** dari satu laboratorium ke laboratorium lainnya.
+   - Memindahkan **aslab / asprak** antar laboratorium.
+   - **Tidak perlu** membuat fitur perpindahan jadwal praktikum.
+
+### 2.2 Dashboard Keberlangsungan Laboratorium (`SRS-S4-02`)
+Memanfaatkan data jadwal, sesi, lab, dan denda yang tersimpan di **Cloud Firestore**, menampilkan minimal:
+- **Jumlah laboratorium dan jumlah praktikan** yang dikelola.
+- **Status kegiatan praktikum pada setiap laboratorium** (`OPEN` / berlangsung, `NOT_STARTED` / menunggu, `CLOSED` / selesai).
+- **Informasi lokasi dan waktu pelaksanaan** tiap kegiatan.
+- **Jadwal praktikum yang sedang berlangsung maupun yang akan datang.**
+- **Riwayat kegiatan laboratorium** yang telah selesai.
+- **Riwayat keuangan hasil dari denda praktikum** (membaca koleksi `fines` / `payments` dengan status `PAID` / `success`).
+- **Filter Periode Waktu:** `Hari` | `Minggu` | `Bulan` yang memfilter jadwal, riwayat kegiatan, dan ringkasan keuangan denda secara konsisten.
+
+---
+
+## 3. File yang Dikerjakan Zaidan (Sprint 4)
+
+> Aturan struktur & batas impor: [docs/ARCHITECTURE.md](ARCHITECTURE.md) §2, §3, dan §9.  
+> ⚠️ **Koordinasi ESLint:** Pastikan `'labs'` terdaftar pada array `features` di `eslint.config.js` bersama PM (Bahir).
 
 ```text
 src/
 ├── types/
-│   └── lab.ts                                      <-- [BARU] Tipe LabLocation, Coordinates, LocationValidationResult
+│   └── lab.ts                                      <-- [UPDATE] Tambah courseName, gracePeriodMinutes, fineAmount, assignedStudentIds, assignedAssistantIds
 ├── utils/
-│   └── geo.ts                                      <-- [BARU] Fungsi murni Haversine (calculateDistanceMeters & validateRadius)
+│   └── bulkTemplate.ts                             <-- [BARU] Generator CSV template + parser 3 jenis bulk insert + validasi baris kosong
 ├── services/
-│   ├── labs.ts                                     <-- [BARU] CRUD Firestore koleksi `labs` (koordinat & radius lab)
-│   └── attendance.ts                               <-- [UPDATE] Validasi wajib lokasi & radius di submitAttendanceToFirestore()
+│   └── labs.ts                                     <-- [UPDATE] Single/bulk insert terpisah, transfer praktikan/aslab, & agregasi dashboard
 ├── features/
-│   └── attendance/components/
-│       ├── LocationStatusBanner.tsx                <-- [BARU] Indikator visual jarak meter (Dalam Radius / Di Luar Radius / GPS Error)
-│       └── LabLocationConfigModal.tsx              <-- [BARU] Modal asisten atur koordinat & radius lab ke Firestore
+│   └── labs/components/                            <-- [BARU] Komponen domain Aslab
+│       ├── LabDashboardStats.tsx                   <-- Ringkasan jumlah lab/praktikan, status lab, & riwayat keuangan denda
+│       ├── LabPeriodFilter.tsx                     <-- Segmented filter: Hari | Minggu | Bulan
+│       ├── LabConfigModal.tsx                      <-- Form lokasi, koordinat, cakupan radius presensi, grace period & nominal denda
+│       ├── BulkInsertStagingList.tsx               <-- List ScrollView per row: Accept/Deny, inline Edit, indikator & pengisian field kosong
+│       └── MemberTransferCard.tsx                  <-- Panel pindah praktikan antar lab & pindah aslab/asprak
 └── app/
-    ├── assistant/
-    │   └── session/[id].tsx                        <-- [UPDATE] Tambah tombol/panel konfigurasi lokasi lab & radius sesi
-    └── student/
-        ├── attendance/[id].tsx                     <-- [UPDATE] Halaman Detail Sesi (tampilkan info sesi + tombol "Menuju Halaman Presensi")
-        └── check-in/[id].tsx                       <-- [BARU] Halaman Khusus Presensi Terpisah (SRS-S3-01 & SRS-S3-02)
+    ├── index.tsx                                   <-- [UPDATE] Auto-redirect role 'ASLAB' ke '/aslab'
+    └── aslab/                                      <-- [BARU] Rute khusus role ASLAB
+        └── (tabs)/
+            ├── _layout.tsx                         <-- Guard role ASLAB + FloatingTabBar (Dashboard | Lab | Bulk | Pindah)
+            ├── index.tsx                           <-- Dashboard Keberlangsungan Laboratorium (SRS-S4-02)
+            ├── labs.tsx                            <-- Daftar & Pengelolaan Lab + Konfigurasi Radius/Keterlambatan
+            ├── bulk.tsx                            <-- 3 Tab Bulk/Single Insert Terpisah + Download Template + Staging ScrollView
+            └── transfer.tsx                        <-- Perpindahan Praktikan & Aslab/Asprak antar Lab
 ```
-
-> 💡 **Koordinasi dengan Ferdy:** Ferdy akan mengonsumsi `LabLocation` (`src/types/lab.ts`) dan `subscribeLabs` / `getLabs` (`src/services/labs.ts`) untuk merender *marker* dan radius *circle* di halaman Maps. Pastikan kontrak data di §4 tidak berubah tanpa kesepakatan bersama!
 
 ---
 
 ## 4. Spesifikasi Teknis & Kontrak Data
 
-### 4.1 Kontrak Tipe Lokasi Laboratorium (`src/types/lab.ts`)
+### 4.1 Ekstensi `LabLocation` (`src/types/lab.ts`)
 ```typescript
-export interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
-
 export interface LabLocation {
-  id: string;            // misal: "lab-komputer-1", "lab-komputer-2", "lab-basis-data"
-  name: string;          // harus cocok dengan field `room` di PracticalSession, misal: "Lab Komputer 2"
-  building: string;      // misal: "Gedung E Departemen Informatika"
+  id: string;
+  name: string;
+  building: string;
+  courseName?: string;              // Mata kuliah yang dikelola di lab ini
   latitude: number;
   longitude: number;
-  radiusMeters: number;  // default misal: 50 (meter)
+  radiusMeters: number;             // Cakupan lokasi presensi (meter)
+  gracePeriodMinutes: number;       // Batasan keterlambatan waktu (menit), dikonsumsi Bayu
+  fineAmount: number;               // Nominal denda tetap per keterlambatan (IDR), dikonsumsi Bayu & Ferdy
+  assignedStudentIds?: string[];    // Daftar praktikan di lab ini
+  assignedAssistantIds?: string[];  // Daftar asprak di lab ini
+  aslabId?: string;                 // UID Aslab penanggung jawab
   updatedBy?: string;
   updatedAt?: string;
 }
+```
 
-export type LocationCheckStatus =
-  | 'IDLE'
-  | 'CHECKING'
-  | 'INSIDE_RADIUS'
-  | 'OUTSIDE_RADIUS'
-  | 'PERMISSION_DENIED'
-  | 'GPS_DISABLED'
-  | 'UNAVAILABLE';
+### 4.2 Struktur Baris Staging Bulk Insert (`src/utils/bulkTemplate.ts`)
+```typescript
+export type BulkInsertKind = 'LABS' | 'STUDENTS' | 'ASSISTANTS';
+export type BulkRowDecision = 'PENDING' | 'ACCEPTED' | 'DENIED';
 
-export interface LocationValidationResult {
-  allowed: boolean;
-  status: LocationCheckStatus;
-  distanceMeters: number | null;
-  maxRadiusMeters: number;
-  userCoords?: Coordinates;
-  message: string;
+export interface BulkStagingRow<T extends Record<string, string>> {
+  rowId: string;
+  data: T;
+  decision: BulkRowDecision;
+  missingFields: string[];
 }
 ```
+- **Template 1 (`LABS`):** `name,building,latitude,longitude,radiusMeters,gracePeriodMinutes,fineAmount` (dikaitkan dengan 1 mata kuliah yang dipilih di UI).
+- **Template 2 (`STUDENTS`):** `studentName,studentNim,email` (dimasukkan ke 1 laboratorium target).
+- **Template 3 (`ASSISTANTS`):** `assistantName,assistantCode,email` (dimasukkan ke 1 laboratorium target).
 
-### 4.2 Utilitas Perhitungan Jarak Murni (`src/utils/geo.ts`)
-```typescript
-import { Coordinates, LabLocation, LocationValidationResult } from '@/types/lab';
-
-/**
- * Menghitung jarak antara dua titik koordinat (dalam meter) menggunakan rumus Haversine.
- */
-export function calculateDistanceMeters(from: Coordinates, to: Coordinates): number;
-
-/**
- * Memvalidasi apakah posisi praktikan berada di dalam radius laboratorium yang diizinkan.
- */
-export function validateStudentLocation(
-  userCoords: Coordinates | null,
-  lab: Pick<LabLocation, 'latitude' | 'longitude' | 'radiusMeters' | 'name'>
-): LocationValidationResult;
+### 4.3 Paket Expo yang Direkomendasikan (CNG)
+Pasang hanya via `npx expo install`:
+```bash
+npx expo install expo-document-picker expo-file-system expo-sharing
 ```
-
-### 4.3 Service Firestore Lokasi Laboratorium (`src/services/labs.ts`)
-Koleksi Firestore: **`labs`** (dan opsional field `labId` / `radiusMeters` pada dokumen **`sessions`**).
-```typescript
-import { LabLocation } from '@/types/lab';
-
-/** Mengambil seluruh daftar laboratorium dari Firestore (seed default lab Informatika jika kosong). */
-export async function getLabs(): Promise<LabLocation[]>;
-
-/** Real-time listener daftar laboratorium (dipakai juga oleh Ferdy di halaman Maps). */
-export function subscribeLabs(onUpdate: (labs: LabLocation[]) => void): () => void;
-
-/** Mencari data lokasi lab berdasarkan nama ruangan (`session.room`) atau ID lab. */
-export async function getLabByRoomName(roomName: string): Promise<LabLocation | null>;
-
-/** Asisten menyimpan/memperbarui koordinat & radius laboratorium ke Cloud Firestore (SRS-S3-03). */
-export async function upsertLabLocation(lab: Omit<LabLocation, 'updatedAt'>): Promise<void>;
-```
-
-### 4.4 Penegakan Validasi Lokasi di Pencatatan Presensi (`src/services/attendance.ts`)
-Perhatikan aturan wajib dari memo asisten praktikum:
-> *"Validasi lokasi harus menjadi bagian dari proses pencatatan presensi, bukan sekadar informasi visual pada antarmuka. Presensi yang tidak memenuhi ketentuan sesi atau lokasi tidak boleh dicatat sebagai kehadiran berhasil."*
-
-Perluas parameter `submitAttendanceToFirestore` agar menerima `userCoords?: Coordinates` dan `labLocation?: LabLocation` (atau membaca lokasi lab dari Firestore berdasarkan `session.room`):
-1. Jika koordinat pengguna tidak tersedia $\rightarrow$ return `{ success: false, message: 'Lokasi perangkat tidak dapat diperoleh. Aktifkan GPS dan coba lagi.' }`.
-2. Hitung `calculateDistanceMeters(userCoords, lab)` $\rightarrow$ jika `distanceMeters > lab.radiusMeters`, **tolak transaksi** dan return `{ success: false, message: 'Anda berada di luar radius laboratorium (Jarak: XX m, maks: YY m).' }`.
-3. Jika `session.status === 'OPEN'`, `distanceMeters <= lab.radiusMeters`, dan belum pernah presensi $\rightarrow$ simpan dokumen presensi ke Firestore beserta metadata `distanceMeters` dan `latitude`/`longitude` saat presensi.
+Sediakan fallback yang aman untuk platform web (`Platform.OS === 'web'`) saat mengunduh/membaca file CSV.
 
 ---
 
-## 5. Checklist Eksekusi Step-by-Step (Sprint 3 Zaidan)
+## 5. Checklist Eksekusi Step-by-Step (Sprint 4)
 
-- [x] **Langkah 1**: Buat branch `feat/zaidan/location-checkin-labs` dari `main`/`dev` terbaru.
-- [x] **Langkah 2**: Jalankan `npx expo install expo-location` dan tambahkan konfigurasi plugin izin lokasi di `app.json`.
-- [x] **Langkah 3**: Buat `src/types/lab.ts` dan fungsi murni Haversine di `src/utils/geo.ts`.
-- [x] **Langkah 4**: Buat `src/services/labs.ts` untuk CRUD & *real-time listener* koleksi Firestore `labs` (lengkap dengan titik koordinat awal laboratorium Informatika).
-- [x] **Langkah 5**: Buat modal `src/features/attendance/components/LabLocationConfigModal.tsx` dan pasang di `src/app/assistant/session/[id].tsx` agar Asisten dapat mengatur koordinat (termasuk tombol *"Gunakan Lokasi Saat Ini"*) dan radius (meter) untuk lab/sesi praktikum.
-- [x] **Langkah 6**: Perbarui `submitAttendanceToFirestore()` di `src/services/attendance.ts` agar memvalidasi radius lokasi secara ketat sebelum menulis dokumen ke Firestore (anti-bypass & anti-double attendance).
-- [x] **Langkah 7**: Buat komponen `src/features/attendance/components/LocationStatusBanner.tsx` yang menampilkan jarak aktual (meter), status validasi, serta tombol *"Periksa Ulang Lokasi"*.
-- [x] **Langkah 8**: Pisahkan alur detail sesi dan halaman presensi (`SRS-S3-01`):
-  - Perbarui `src/app/student/attendance/[id].tsx` agar fokus sebagai **Halaman Detail Sesi** dengan tombol **"Masuk ke Halaman Presensi"** menuju `/student/check-in/${session.id}`.
-  - Buat **Halaman Khusus Presensi** baru di `src/app/student/check-in/[id].tsx` yang menampilkan info sesi, status sesi, `LocationStatusBanner`, dan `AttendanceForm` / `RippleCheckIn` *(serta opsional QR Code)*.
-- [x] **Langkah 9**: Uji skenario **Alur Demo 1**:
-  1. Asisten atur lokasi/radius lab & buka sesi (`OPEN`).
-  2. Praktikan di **luar radius** $\rightarrow$ presensi ditolak + jarak tampil jelas.
-  3. Praktikan di **dalam radius** $\rightarrow$ presensi tercatat di Firestore + muncul real-time di rekap Asisten + presensi ke-2 ditolak (*anti-double*).
-- [x] **Langkah 10**: Jalankan `npx tsc --noEmit` & `npx expo lint` (0 errors), lalu ajukan Pull Request.
-
----
-
-## 6. Arsip Rekam Jejak Sprint 1 & Sprint 2 (Selesai ✅)
-
-- **Sprint 1 (Core Architecture & Asisten Workflow):** `src/types/attendance.ts`, `src/data/mockData.ts`, `src/store/*`, `RoleSelectorModal.tsx`, `assistant/(tabs)/{index,recap}.tsx`, `assistant/session/[id].tsx`, `CreateSessionModal.tsx` — **100% Selesai ✅**.
-- **Sprint 2 (Project Manager, QA Lead, & Integrasi Role Admin / Firestore Sync):** Review PR Bayu/Bahir/Ferdy, role `ADMIN` (`src/app/admin/**`, `src/services/admin.ts`), `scripts/seed-firebase.mjs`, dan sinkronisasi real-time Firestore — **100% Selesai ✅**.
+- [ ] **Langkah 1**: Buat branch `feat/zaidan/aslab-lab-management-dashboard` dari `dev`.
+- [ ] **Langkah 2**: Perbarui `src/types/lab.ts` sesuai kontrak bersama (koordinasi dengan Bayu & Ferdy terkait `gracePeriodMinutes` & `fineAmount`).
+- [ ] **Langkah 3**: Buat `src/utils/bulkTemplate.ts` untuk 3 template CSV terpisah, parser baris, dan deteksi field kosong.
+- [ ] **Langkah 4**: Perluas `src/services/labs.ts` untuk single/bulk insert terpisah, transfer praktikan & aslab/asprak antar lab, dan query dashboard berdasarkan periode (`day` | `week` | `month`).
+- [ ] **Langkah 5**: Bangun komponen di `src/features/labs/components/` menggunakan primitif `src/components/ui/*` dan token `Colors.*` (`src/constants/theme.ts`).
+- [ ] **Langkah 6**: Implementasikan seluruh rute di `src/app/aslab/(tabs)/` dan tambahkan redirect `ASLAB` di `src/app/index.tsx`.
+- [ ] **Langkah 7**: Verifikasi bahwa ketiga bulk insert terpisah, download template berfungsi, `ScrollView` staging mendukung accept/deny/edit/isi field kosong, dan filter dashboard Hari/Minggu/Bulan berjalan akurat.
+- [ ] **Langkah 8**: Jalankan `npx tsc --noEmit` & `npx expo lint`, lalu ajukan Pull Request ke `dev`.

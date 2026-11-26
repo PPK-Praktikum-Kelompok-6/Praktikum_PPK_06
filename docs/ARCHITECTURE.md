@@ -290,7 +290,173 @@ Because this repository uses **Expo Continuous Native Generation (CNG)** (no com
 
 ---
 
-## 9. Why this structure
+## 9. Sprint 4 (Pertemuan 9) — Manajemen Lab (Aslab), Keterlambatan/Denda, & Midtrans Payment Gateway
+
+> Sprint 1, 2, dan 3 sudah selesai dan stabil. Sprint 4 menambahkan peran baru **Aslab (`ASLAB`)**, pemisahan wewenang **Asprak (`ASSISTANT`)**, sistem **keterlambatan (*grace period*) & denda**, serta **integrasi Payment Gateway Midtrans (Sandbox)** dengan arsitektur *client–server–webhook*.
+
+### 9.1 New files & folders (Sprint 4)
+
+```text
+Praktikum_PPK_06/
+├── backend/                                        # Backend Payment Server (Ferdy) — Node.js / Express atau Firebase Functions
+│   ├── src/
+│   │   ├── index.ts                                # Express app / HTTP endpoints
+│   │   ├── midtrans.ts                             # Midtrans Snap client (MIDTRANS_SERVER_KEY hanya di sini!)
+│   │   └── webhook.ts                              # Verifikasi SHA-512 signature key & update Firestore (payments + fines)
+│   ├── .env.example                                # MIDTRANS_SERVER_KEY, MIDTRANS_CLIENT_KEY, FIREBASE_SERVICE_ACCOUNT
+│   └── package.json
+└── src/
+    ├── types/
+    │   ├── attendance.ts                           # [UPDATE] UserRole tambah 'ASLAB'; AttendanceStatus: 'ON_TIME' | 'LATE' | 'EXCUSED_ABSENCE'
+    │   ├── lab.ts                                  # [UPDATE] courseName, gracePeriodMinutes, fineAmount, assignedStudentIds, assignedAssistantIds
+    │   ├── notification.ts                         # [UPDATE] tambah 'FINE_CREATED' | 'PAYMENT_SUCCESS' | 'PAYMENT_FAILED'
+    │   └── fine.ts                                 # [BARU] FineRecord, FineStatus, PaymentTransaction, PaymentStatus (Bayu & Ferdy)
+    ├── utils/
+    │   ├── bulkTemplate.ts                         # [BARU] Generator template CSV + parser row untuk 3 jenis bulk insert terpisah (Zaidan)
+    │   └── lateness.ts                             # [BARU] Pure function evaluateLateness(checkInIso, sessionStartIso, gracePeriodMinutes) (Bayu)
+    ├── services/
+    │   ├── labs.ts                                 # [UPDATE] Bulk/single insert terpisah, transfer anggota (praktikan/aslab), dashboard agregasi (Zaidan)
+    │   ├── fines.ts                                # [BARU] Generator 1 tagihan denda idempotent (`fine_${sessionId}_${studentId}`) & exempt izin (Bayu)
+    │   ├── payments.ts                             # [BARU] Client call ke backend (`createPaymentTransaction`), subscribe riwayat pembayaran Firestore (Ferdy)
+    │   └── notifications.ts                        # [UPDATE] Channel & dispatcher notifikasi denda/pembayaran (Ferdy)
+    └── features/
+        ├── labs/components/                        # [BARU] Daftarkan 'labs' di eslint.config.js (Zaidan)
+        │   ├── LabDashboardStats.tsx               # Ringkasan jumlah lab/praktikan, status tiap lab, riwayat keuangan denda
+        │   ├── LabPeriodFilter.tsx                 # Filter dashboard: Hari | Minggu | Bulan
+        │   ├── BulkInsertStagingList.tsx           # ScrollView interaktif per baris (accept/deny, edit, isi field kosong)
+        │   ├── LabConfigModal.tsx                  # Konfigurasi nama, lokasi, koordinat, radius presensi, grace period & denda
+        │   └── MemberTransferCard.tsx              # Pindah praktikan antar lab & pindah aslab/asprak (tanpa pindah jadwal)
+        └── fines/components/                       # [BARU] Daftarkan 'fines' di eslint.config.js (Bayu & Ferdy)
+            ├── LatenessBadge.tsx                   # Badge status: Tepat Waktu / Terlambat (+X mnt) / Izin (Bayu)
+            ├── FineCard.tsx                        # Kartu rincian tagihan denda & tombol Bayar (Ferdy)
+            ├── PaymentStatusBadge.tsx              # Badge status pembayaran: pending / success / failed (Ferdy)
+            └── PaymentHistoryItem.tsx              # Item riwayat pembayaran persisten (Ferdy)
+```
+
+### 9.2 New routes (Sprint 4)
+
+| Route | Purpose | Owner |
+|---|---|---|
+| `app/aslab/(tabs)/_layout.tsx` | Tab shell & RBAC guard khusus `ASLAB` (Dashboard \| Kelola Lab \| Bulk Insert \| Pindah Anggota) | Zaidan |
+| `app/aslab/(tabs)/index.tsx` | Dashboard keberlangsungan lab (filter hari/minggu/bulan + riwayat kegiatan & keuangan denda) | Zaidan |
+| `app/aslab/(tabs)/labs.tsx` | Manajemen daftar lab (single insert, edit lokasi/koordinat/radius/grace period/denda) | Zaidan |
+| `app/aslab/(tabs)/bulk.tsx` | 3 tab/opsi bulk insert terpisah (Lab per MK, Praktikan ke Lab, Asprak ke Lab) + download template + ScrollView staging | Zaidan |
+| `app/aslab/(tabs)/transfer.tsx` | Perpindahan praktikan antar lab & perpindahan aslab/asprak (tanpa perpindahan jadwal) | Zaidan |
+| `app/student/(tabs)/fines.tsx` | Daftar tagihan denda aktif & halaman riwayat pembayaran persisten praktikan | Ferdy |
+| `app/student/payment/[fineId].tsx` | Halaman checkout Midtrans Sandbox (Snap WebView/Browser) & polling/listener status pembayaran | Ferdy |
+
+### 9.3 RBAC Matrix (Sprint 4)
+
+| Hak Akses / Fitur | `ASLAB` (Baru) | `ASSISTANT` (Asprak) | `STUDENT` (Praktikan) | `ADMIN` |
+|---|:---:|:---:|:---:|:---:|
+| Kelola Lab (CRUD, Koordinat, Radius, Grace Period, Denda) | ✅ | ❌ | ❌ | ✅ |
+| 3 Bulk/Single Insert (Lab, Praktikan, Asprak) + Template | ✅ | ❌ | ❌ | ✅ |
+| Pindah Praktikan antar Lab & Pindah Aslab/Asprak | ✅ | ❌ | ❌ | ✅ |
+| Dashboard Keberlangsungan Lab & Keuangan Denda | ✅ | ❌ | ❌ | ✅ |
+| Lihat Kelas/Jadwal/Sesi Tanggung Jawab & Buka/Tutup Sesi | ❌ (Pantau saja) | ✅ | ❌ (Lihat saja) | ✅ |
+| Pantau/Kelola Presensi & Setujui Izin (`EXCUSED_ABSENCE`) | ❌ (Pantau saja) | ✅ | ❌ | ✅ |
+| Presensi Geofencing, Ajukan Izin, Bayar Denda & Riwayat Bayar | ❌ | ❌ | ✅ | ❌ |
+
+### 9.4 Data Contract Sprint 4 (`src/types/fine.ts` & ekstensi)
+
+```ts
+// src/types/attendance.ts (tambahan Sprint 4)
+export type UserRole = 'ADMIN' | 'ASLAB' | 'ASSISTANT' | 'STUDENT';
+export type AttendancePunctuality = 'ON_TIME' | 'LATE' | 'EXCUSED_ABSENCE';
+
+// Field tambahan di AttendanceRecord:
+// attendanceStatus?: AttendancePunctuality;
+// lateMinutes?: number;
+// fineId?: string | null;
+
+// src/types/lab.ts (tambahan Sprint 4 di LabLocation)
+// courseName?: string;
+// gracePeriodMinutes: number;   // default misal 15 menit (dikonfigurasi Aslab)
+// fineAmount: number;           // nominal denda tetap per keterlambatan, misal 10000 (IDR)
+// assignedStudentIds?: string[];
+// assignedAssistantIds?: string[];
+
+// src/types/fine.ts (BARU Sprint 4)
+export type FineStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'WAIVED';
+export type PaymentStatus = 'pending' | 'success' | 'failed';
+
+export interface FineRecord {
+  id: string;                    // Deterministik: `fine_${sessionId}_${studentId}` (1 tagihan per kejadian)
+  studentId: string;
+  studentName: string;
+  studentNim: string;
+  sessionId: string;
+  sessionName: string;
+  classCode: string;
+  labId?: string;
+  attendanceId: string;
+  lateMinutes: number;
+  amount: number;                // Nominal tetap (IDR)
+  status: FineStatus;
+  createdAt: string;             // ISO string
+  paidAt?: string;
+  latestPaymentId?: string;
+}
+
+export interface PaymentTransaction {
+  id: string;                    // order_id Midtrans, misal: `PAY-${fineId}-${timestamp}`
+  fineId: string;
+  studentId: string;
+  sessionId: string;
+  sessionName: string;
+  amount: number;
+  status: PaymentStatus;         // 'pending' | 'success' | 'failed' (HANYA diverifikasi backend webhook)
+  paymentType?: string;          // e.g. 'gopay', 'bank_transfer', 'qris'
+  snapToken?: string;
+  snapRedirectUrl?: string;
+  midtransTransactionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 9.5 Payment Gateway Security Flow (Client–Server–Webhook)
+
+```mermaid
+sequenceDiagram
+    participant RN as React Native App (Student)
+    participant BE as Backend Server
+    participant MT as Midtrans Sandbox
+    participant FS as Cloud Firestore
+
+    RN->>BE: POST /api/payments/create { fineId, studentId }
+    BE->>FS: Validasi fineId ada & status != PAID
+    BE->>MT: Create Snap Transaction (SERVER_KEY di Backend)
+    MT-->>BE: { token, redirect_url }
+    BE->>FS: Simpan payments/{orderId} (status: 'pending') & fines/{fineId} (status: 'PENDING')
+    BE-->>RN: { orderId, snapToken, redirectUrl }
+    RN->>MT: Buka halaman pembayaran Snap (WebView/Browser)
+    MT->>BE: POST /api/payments/webhook (notification payload)
+    BE->>BE: Verifikasi SHA-512 signature_key (order_id + status_code + gross_amount + SERVER_KEY)
+    BE->>FS: Update payments/{orderId} -> 'success' | 'failed' | 'pending'
+    BE->>FS: Update fines/{fineId} -> 'PAID' (attendanceStatus TIDAK berubah!)
+    BE->>FS: Tulis notifications/{id} (PAYMENT_SUCCESS / PAYMENT_FAILED)
+    FS-->>RN: Real-time onSnapshot update UI & Push Notification
+```
+
+### 9.6 ESLint & Native Rules (Sprint 4)
+- Daftarkan `'labs'` dan `'fines'` pada `const features` di `eslint.config.js`.
+- `features/labs` dan `features/fines` **tidak boleh saling mengimpor** (gabungkan hanya di route file `src/app/`).
+- Pasang paket tambahan wajib melalui `npx expo install` (mis. `expo-document-picker`, `expo-file-system`, `expo-sharing`, `react-native-webview`).
+- **Dilarang** menyimpan `MIDTRANS_SERVER_KEY` di `src/` atau variabel `EXPO_PUBLIC_*`.
+
+### 9.7 Ownership Sprint 4 (Zero Merge Conflict)
+
+| Member | Files |
+|---|---|
+| **Zaidan** (`SRS-S4-01`, `SRS-S4-02`) | `types/lab.ts` (ekstensi), `utils/bulkTemplate.ts`, `services/labs.ts` (bulk/single insert terpisah, transfer anggota, agregasi dashboard), `features/labs/components/*`, `app/aslab/**`, `app/index.tsx` (redirect `ASLAB` → `/aslab`) |
+| **Bayu** (`SRS-S4-03`, `SRS-S4-04`) | `types/attendance.ts` (ekstensi punctuality & role), `utils/lateness.ts`, `services/fines.ts`, `services/attendance.ts` (integrasi evaluasi grace period & trigger 1 tagihan denda), `services/permits.ts` (izin `APPROVED` → `EXCUSED_ABSENCE` & bebas denda), `features/fines/components/LatenessBadge.tsx`, `app/assistant/**` (fokus wewenang Asprak, sembunyikan kontrol distribusi/konfigurasi seluruh lab), `app/student/check-in/[id].tsx` (tampilkan status tepat waktu/terlambat) |
+| **Ferdy** (`SRS-S4-05`, `SRS-S4-06`) | `backend/**` (server transaksi Midtrans Sandbox + verifikasi webhook), `types/fine.ts`, `types/notification.ts` (tambah event fine/payment), `services/payments.ts`, `services/notifications.ts` (trigger notif tagihan baru, bayar sukses, bayar gagal), `features/fines/components/{FineCard,PaymentStatusBadge,PaymentHistoryItem}.tsx`, `app/student/(tabs)/fines.tsx`, `app/student/payment/[fineId].tsx`, `app/student/(tabs)/_layout.tsx` (tambah tab Denda/Bayar) |
+| **Bahir** (PM & QA Lead) | `docs/*`, `firestore.rules` (koleksi `fines`, `payments`, RBAC `ASLAB` vs `ASSISTANT`), `eslint.config.js` (register `'labs'`, `'fines'`), review kontrak data, finalisasi konsistensi UI, & verifikasi E2E |
+
+---
+
+## 10. Why this structure
 
 | Option | Decision | Reason |
 |---|---|---|

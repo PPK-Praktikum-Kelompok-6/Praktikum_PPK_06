@@ -1,119 +1,134 @@
 # Software Requirements Specification (SRS)
-## Sistem Presensi Praktikum — Sprint 1 (Selesai), Sprint 2 (Selesai), & Sprint 3 (Geolocation, Maps & Push Notification)
+## Sistem Presensi Praktikum — Sprint 1–3 (Selesai) & Sprint 4 / Pertemuan 9 (Manajemen Lab Aslab, Denda Keterlambatan, & Payment Gateway Midtrans)
 
 **Proyek:** Aplikasi Presensi Kegiatan Praktikum  
-**Platform:** React Native (Expo SDK 58, Expo Router)  
-**Target Pengguna:** Praktikan, Asisten Praktikum, & Admin  
-**Metodologi:** Scrum / Agile (Sprint 1 → Sprint 2 → Sprint 3)
+**Platform:** React Native (Expo SDK 58, Expo Router) + Cloud Firestore + Backend Payment Server (Midtrans Sandbox)  
+**Target Pengguna:** Praktikan (`STUDENT`), Asisten Praktikum / Asprak (`ASSISTANT`), Asisten Laboratorium / Aslab (`ASLAB`), & Admin (`ADMIN`)  
+**Metodologi:** Scrum / Agile (Sprint 1 → Sprint 2 → Sprint 3 → Sprint 4)
 
 ---
 
 ## 1. Pendahuluan
 
 ### 1.1 Tujuan
-Dokumen ini mendefinisikan spesifikasi kebutuhan perangkat lunak (SRS) untuk tiga sprint pengembangan aplikasi presensi praktikum:
+Dokumen ini mendefinisikan spesifikasi kebutuhan perangkat lunak (SRS) untuk seluruh tahapan pengembangan aplikasi presensi praktikum:
 - **Sprint 1 ✅ SELESAI** — UI Design System, navigasi, dan simulasi interaksi berbasis *in-memory state* (dummy data).
 - **Sprint 2 ✅ SELESAI** — Integrasi Firebase (Auth, Firestore, Security Rules), role Admin/Asisten/Praktikan, presensi *real-time*, dan sistem izin berbasis AI.
-- **Sprint 3 🚀 AKTIF** — Presensi berbasis lokasi fisik (*Geolocation* & *Geofencing* radius laboratorium), halaman khusus presensi terpisah dari detail sesi, peta laboratorium interaktif (*Maps*) dengan informasi praktikum *real-time*, *Push Notification* terarah, serta penanganan *permissions* & kondisi perangkat.
+- **Sprint 3 ✅ SELESAI** — Presensi berbasis lokasi fisik (*Geolocation* & *Geofencing* radius laboratorium), halaman khusus presensi terpisah dari detail sesi, peta laboratorium interaktif (*Maps*) dengan informasi praktikum *real-time*, *Push Notification* terarah, serta penanganan *permissions* & kondisi perangkat.
+- **Sprint 4 (Pertemuan 9) 🚀 AKTIF** — Penyempurnaan manajemen laboratorium oleh **Aslab (Role Baru)** termasuk 3 alur *bulk/single insert* terpisah dengan *template download* & *staging editor*, dashboard keberlangsungan laboratorium, fokus wewenang **Asprak**, perhitungan keterlambatan berbasis *grace period* & denda tetap, integrasi **Payment Gateway Midtrans (Sandbox)** dengan arsitektur *client–server–webhook*, notifikasi & riwayat pembayaran persisten, serta finalisasi konsistensi antarmuka.
 
 ### 1.2 Lingkup Masalah (Problem Statement)
-Setelah Sprint 2 selesai, sistem autentikasi, manajemen sesi, presensi, kelas, dan pengajuan izin telah terintegrasi secara *real-time* dengan Firebase. Namun terdapat dua permasalahan baru yang harus diselesaikan pada Sprint 3:
-1. **Presensi belum memvalidasi lokasi fisik:** Praktikan masih dapat melakukan presensi dari mana saja selama sesi berstatus `OPEN`.
-2. **Belum ada pemberitahuan proaktif & pemetaan lab:** Pengguna masih harus membuka aplikasi secara manual untuk mengetahui sesi yang baru dibuka, perubahan jadwal, atau keputusan pengajuan izin, serta belum tersedia peta interaktif persebaran laboratorium Informatika beserta aktivitas praktikumnya.
+Setelah Sprint 3 selesai, presensi berbasis lokasi, peta laboratorium, dan push notification telah berfungsi. Namun pada operasional praktikum nyata masih terdapat kebutuhan lanjutan yang diselesaikan pada Sprint 4:
+1. **Pemisahan wewenang pengelolaan lab vs pelaksanaan sesi:** Sebelumnya manajemen lab, distribusi praktikan, dan pembukaan sesi masih tercampur di satu peran. Diperlukan peran baru **Aslab** khusus manajemen laboratorium & distribusi anggota, sementara **Asprak** fokus menjalankan sesi praktikum.
+2. **Kebutuhan input massal yang fleksibel:** Penambahan banyak laboratorium per mata kuliah, praktikan, dan asprak satu per satu tidak efisien; dibutuhkan *bulk insert* terpisah dilengkapi file template dan pratinjau interaktif (*ScrollView* untuk accept/deny/edit/isi data kosong).
+3. **Belum ada mekanisme sanksi keterlambatan & pembayaran digital:** Belum tersedia perhitungan keterlambatan dengan *grace period*, pencatatan denda nominal tetap (beserta pembebasan denda untuk izin disetujui), serta integrasi pembayaran online yang aman melalui Payment Gateway (Midtrans Sandbox) dengan verifikasi webhook backend.
+4. **Pemantauan menyeluruh & finalisasi UI:** Aslab memerlukan dashboard keberlangsungan lab (termasuk riwayat keuangan denda dengan filter harian/mingguan/bulanan), dan seluruh peran memerlukan tampilan modern yang konsisten.
 
 ### 1.3 Batasan Sistem
 
-#### Sprint 1 & Sprint 2 (Selesai)
-- Autentikasi dan penyimpanan data utama menggunakan Firebase Authentication dan Cloud Firestore (bukan *local storage*).
+#### Sprint 1, 2, & 3 (Selesai)
+- Autentikasi dan penyimpanan data utama menggunakan Firebase Authentication dan Cloud Firestore.
 - Antarmuka responsif berbasis Flexbox menggunakan token `src/constants/theme.ts` dan primitif `src/components/ui/*`.
-- Firebase Security Rules melindungi akses baca/tulis sesuai identitas dan peran.
+- Validasi lokasi geofencing berjalan di dalam proses pencatatan presensi ke Firestore dengan anti-double attendance ketat (`attendance_${sessionId}_${studentId}`).
+- Push notification terarah menggunakan `expo-notifications` / FCM + koleksi Firestore `notifications`.
 
-#### Sprint 3 (Aktif)
-- **Geolocation & Maps:** Menggunakan `expo-location` dan `react-native-maps` (dikonfigurasi melalui `app.json` sesuai Expo SDK 58 CNG).
-- **Validasi Lokasi Wajib di Proses Pencatatan:** Validasi radius laboratorium harus dieksekusi di dalam proses pencatatan presensi ke Firestore, bukan sekadar indikator visual di antarmuka. Presensi yang tidak memenuhi ketentuan sesi (`OPEN`) atau lokasi (`jarak <= radius`) **tidak boleh** dicatat sebagai kehadiran berhasil.
-- **Push Notification Terarah:** Menggunakan Firebase Cloud Messaging (FCM) / `expo-notifications` + event Firestore; notifikasi hanya dikirim ke pengguna yang berkepentingan.
-- **Anti-Double Attendance:** Tetap memastikan pengguna tidak dapat melakukan presensi lebih dari satu kali pada sesi yang sama.
+#### Sprint 4 (Aktif)
+- **Pemisahan 3 Bulk Insert:** Bulk insert laboratorium (berdasarkan 1 mata kuliah), bulk insert praktikan ke lab, dan bulk insert asprak ke lab **harus dipisah** (bukan satu fitur bulk gabungan) serta masing-masing menyediakan *downloadable file template*.
+- **Tanpa Perpindahan Jadwal Praktikum:** Fitur perpindahan hanya mencakup perpindahan **praktikan** (antar lab) dan **aslab/asprak** saja, tidak perlu perpindahan jadwal praktikum.
+- **Arsitektur Client–Server–Payment Gateway:** Integrasi Midtrans menggunakan lingkungan **Sandbox** (tanpa uang asli). **Secret Key / Server Key Midtrans tidak boleh disimpan di aplikasi React Native.** Status pembayaran **tidak boleh** ditentukan hanya dari respons sisi client, melainkan wajib diverifikasi oleh **backend melalui callback/webhook** yang valid.
+- **Integritas Status Kehadiran vs Denda:**
+  - Pembayaran denda **tidak boleh** mengubah status kehadiran praktikan (tetap terlambat).
+  - Izin yang disetujui Asprak tetap dicatat sebagai **tidak hadir dengan izin (`EXCUSED_ABSENCE`)** dan **dibebaskan dari denda keterlambatan**; keputusan izin tidak boleh mengubah status menjadi hadir.
+  - Setiap kejadian keterlambatan hanya boleh menghasilkan **tepat satu tagihan**.
 
 ---
 
 ## 2. Kebutuhan Pengguna & Skenario Alur
 
 ### 2.1 Peran Pengguna (User Roles)
-1. **Asisten Praktikum (Assistant):**
-   - Mengelola sesi (menambah, membuka, menutup, dan mengubah jadwal sesi praktikum).
-   - Menentukan lokasi laboratorium (koordinat) dan radius presensi yang berlaku di Cloud Firestore.
-   - Memantau rekapitulasi kehadiran praktikan secara *real-time*.
-   - Meninjau pengajuan izin praktikan beserta klasifikasi AI dan memberikan keputusan manual (memicu notifikasi ke praktikan terkait).
-   - Melihat peta laboratorium interaktif beserta aktivitas praktikum.
-2. **Praktikan (Student):**
-   - Login dengan akun Firebase dan melihat jadwal sesi sesuai kelas/akunnya.
-   - Melihat detail sesi, lalu masuk ke **halaman khusus presensi** untuk melakukan presensi berbasis lokasi (dalam radius lab saat sesi `OPEN`).
-   - Membuka **halaman Maps** untuk melihat posisi diri secara *live* dan memilih marker lab guna melihat praktikum berlangsung & berikutnya.
-   - Mengajukan izin ketidakhadiran dan menerima *push notification* ketika sesi dibuka, jadwal berubah, atau izin diterima/ditolak.
-   - Melihat riwayat kehadiran pribadi.
-3. **Admin (Pengelola Sistem — Sprint 2):**
-   - Mengelola kelas, persetujuan pendaftaran akun, serta persetujuan perubahan/penghapusan jadwal sesi.
+1. **Asisten Laboratorium / Aslab (`ASLAB` — Role Baru Sprint 4):**
+   - Mengelola data laboratorium (nama, lokasi, koordinat, radius/cakupan lokasi presensi, dan batasan keterlambatan waktu / *grace period* & nominal denda).
+   - Melakukan single/bulk insert terpisah untuk: (1) sejumlah laboratorium berdasarkan 1 mata kuliah, (2) praktikan ke lab tertentu, dan (3) asprak ke lab tertentu, dengan *downloadable template* dan pratinjau `ScrollView` interaktif (accept/deny, update, isi data kosong).
+   - Memindahkan praktikan antar laboratorium serta perpindahan aslab/asprak (tanpa perpindahan jadwal).
+   - Memantau **Dashboard Keberlangsungan Laboratorium** (jumlah lab & praktikan, status kegiatan tiap lab, lokasi & waktu, jadwal berlangsung & mendatang, riwayat kegiatan lab, riwayat keuangan hasil denda) dengan filter **hari, minggu, dan bulan**.
+2. **Asisten Praktikum / Asprak (`ASSISTANT`):**
+   - Difokuskan pada pelaksanaan praktikum di kelas/laboratorium yang menjadi tanggung jawabnya.
+   - Melihat daftar kelas, jadwal, dan sesi praktikum tanggung jawabnya.
+   - Membuka sesi saat praktikum dimulai, memantau & mengelola presensi praktikan (termasuk status tepat waktu/terlambat dan persetujuan izin → `EXCUSED_ABSENCE`), dan menutup sesi saat selesai secara *real-time*.
+   - **Tidak memiliki kewenangan** mengelola distribusi praktikan antar lab maupun konfigurasi seluruh laboratorium.
+3. **Praktikan (`STUDENT`):**
+   - Melihat jadwal sesi, melakukan check-in berbasis lokasi, mengajukan izin, dan melihat riwayat kehadiran.
+   - Melihat daftar tagihan denda keterlambatan beserta rinciannya.
+   - Melakukan pembayaran denda melalui Midtrans Sandbox (via backend) dan memantau status (`pending`, `success`, `failed`).
+   - Menerima notifikasi saat tagihan baru dibuat, pembayaran berhasil, atau pembayaran gagal.
+   - Melihat **Halaman Riwayat Pembayaran** yang tersimpan persisten di Firestore.
+4. **Admin (`ADMIN`):**
+   - Pengelola hak akses tingkat sistem & persetujuan administratif.
 
-### 2.2 Skenario Alur Utama Sprint 3 (3 Objektif Demo)
+### 2.2 Skenario Alur Utama Sprint 4
 
-**Alur 1 — Presensi Berbasis Lokasi (Zaidan)**
+**Alur 1 — Manajemen Lab, Bulk Insert Terpisah, & Dashboard Aslab (Zaidan)**
 ```
-[Asisten]                          [Praktikan]
-    │                                   │
-    ▼                                   │
-1. Atur Lokasi Lab & Radius             │
-   + Buka Sesi (status = OPEN)          │
-    │ (Tersimpan di Firestore)          │
-    │                                   ▼
-    │                            2. Buka Detail Sesi
-    │                               → Masuk Halaman Khusus Presensi
-    │                                   │
-    │                                   ▼
-    │                            3. Aplikasi Cek GPS & Radius Lab
-    │                               (Validasi: OPEN && dalam radius)
-    │                                   │
-    │ (Real-time onSnapshot)            ▼
-    ▼                            4. Presensi Tercatat di Firestore
-5. Asisten Lihat Rekap              (atau ditolak jika di luar radius)
-   Kehadiran Real-Time
-```
-
-**Alur 2 — Peta & Informasi Laboratorium Interaktif (Ferdy)**
-```
-[Pengguna (Praktikan / Asisten)]
+[Aslab (Role Baru)]
     │
-    ▼
-1. Buka Halaman Maps
+    ├──► 1. Unduh Template Bulk Insert (Lab / Praktikan / Asprak — terpisah)
+    │         → Unggah file → Tiap baris tampil sebagai list interaktif (ScrollView)
+    │         → Aslab review: Accept / Deny / Edit / Isi data kosong → Simpan ke Firestore
     │
-    ▼
-2. Aplikasi Minta Izin Lokasi → Tampilkan Marker Lab Informatika
-   + Marker Posisi Pengguna (Live Tracking)
+    ├──► 2. Konfigurasi Lab: Lokasi, Koordinat, Cakupan Radius Presensi,
+    │         Batasan Keterlambatan (Grace Period) & Nominal Denda
+    │         + Pindahkan Praktikan / Aslab antar Lab (tanpa pindah jadwal)
     │
-    ▼
-3. Pengguna Ketuk Salah Satu Marker Laboratorium
-    │
-    ▼
-4. Tampilkan Info Aktivitas Lab dari Firestore:
-   • Praktikum Sedang Berlangsung (OPEN)
-   • Praktikum Berikutnya (NOT_STARTED)
-   (Nama Praktikum, Kelas, Waktu, Status Sesi)
+    └──► 3. Pantau Dashboard Keberlangsungan Lab (Filter: Hari / Minggu / Bulan)
+              → Jumlah Lab & Praktikan, Status Tiap Lab, Lokasi & Waktu,
+                Jadwal Berlangsung & Mendatang, Riwayat Kegiatan & Keuangan Denda
 ```
 
-**Alur 3 — Push Notification Kegiatan Terarah (Ferdy)**
+**Alur 2 — Pengelolaan Sesi Asprak, Grace Period, Denda & Excused Absence (Bayu)**
 ```
-[Asisten]                                [Praktikan Terkait]
-    │                                            │
-    ▼                                            │
-1. Buka Sesi / Ubah Jadwal /                     │
-   Terima atau Tolak Pengajuan Izin              │
-    │                                            │
-    ▼                                            │
-2. Sistem Memicu Event Notifikasi                │
-   (Targeted hanya ke praktikan terkait)         │
-    │                                            ▼
-    └────────────── Push Notification ───► 3. Terima Pemberitahuan
-                   (FCM / Expo Notif)         → Ketuk Notif (Deep Link)
-                                              → Masuk Halaman Terkait
+[Asprak]                                     [Praktikan]
+    │                                             │
+    ▼                                             │
+1. Buka Sesi Praktikum (Real-Time Sync)           │
+   (Mulai = T0, Grace Period = G menit)           │
+    │                                             ▼
+    │                                      2. Lakukan Presensi (Waktu = T_absen)
+    │                                             │
+    │                                      ┌──────┴────────────────────────┐
+    │                                      ▼                               ▼
+    │                            T_absen <= T0 + G               T_absen > T0 + G
+    │                            Status: ON_TIME                 Status: LATE
+    │                            (Tanpa Denda)                   → Generate 1 Tagihan Denda
+    │                                                              (Nominal Tetap, ID unik)
+    │                                                              → Trigger Notif Tagihan Baru
+    ▼
+3. Jika Praktikan Ajukan Izin & Disetujui Asprak:
+   → Status: EXCUSED_ABSENCE (Tidak Hadir dengan Izin, BUKAN Hadir)
+   → Dibebaskan dari Denda Keterlambatan
+```
+
+**Alur 3 — Pembayaran Denda Midtrans Sandbox & Notifikasi (Ferdy)**
+```
+[Praktikan App (RN)]          [Backend Server]             [Midtrans Sandbox]
+        │                            │                             │
+        │── 1. Request Bayar ───────►│                             │
+        │      (fineId, studentId)   │── 2. Create Snap Tx ───────►│
+        │                            │      (pakai SERVER_KEY)     │
+        │◄── 3. snapToken / URL ─────│◄─ 4. Snap Redirect URL ─────│
+        │                            │                             │
+        │── 5. Selesaikan Pembayaran di Halaman Midtrans ─────────►│
+        │                            │                             │
+        │                            │◄─ 6. HTTP Webhook Callback ─│
+        │                            │   (Verifikasi Signature Key)│
+        │                            │                             │
+        │                            │── 7. Update Firestore:      │
+        │                            │   • payment status          │
+        │                            │     (pending/success/failed)│
+        │                            │   • fine status (PAID/dll)  │
+        │                            │   • status hadir TIDAK ubah │
+        │◄── 8. Push Notification ───│   • kirim notif hasil bayar │
+        │    + Riwayat Pembayaran    │                             │
+        │      Tersimpan Permanen    │                             │
 ```
 
 ---
@@ -152,89 +167,119 @@ Setelah Sprint 2 selesai, sistem autentikasi, manajemen sesi, presensi, kelas, d
 | **SRS-IZIN-02** | Review Izin oleh Asisten + Keputusan Manual | Asisten | Asisten melihat hasil klasifikasi AI dan memutuskan terima/tolak manual. ✅ | Ferdy |
 | **SRS-UI-01** | Penanganan Kondisi Kegagalan & Edge Cases | Sistem | Feedback UI ramah untuk input tidak valid, data kosong, & fallback AI. ✅ | Ferdy |
 
-### 3.3 Sprint 3 — Aktif 🚀 (Pembagian Khusus Zaidan & Ferdy)
+### 3.3 Sprint 3 — Selesai ✅
 
 | Kode SRS | Deskripsi | Peran | Kriteria Penerimaan | Pemilik |
 |---|---|---|---|---|
-| **SRS-S3-01** | **Halaman Khusus Presensi** *(+ Opsional QR Code)* | Praktikan | Tersedia halaman khusus presensi (`/student/check-in/[id]`) yang terpisah dari halaman detail sesi (`/student/attendance/[id]`). Menampilkan info sesi, status sesi, hasil pemeriksaan lokasi, dan aksi presensi *(opsional: QR Code ditampilkan asisten & dipindai praktikan)*. | **Zaidan** |
-| **SRS-S3-02** | **Validasi Lokasi Presensi (Geofencing Radius)** | Praktikan & Sistem | Menggunakan GPS perangkat & rumus jarak untuk memvalidasi apakah praktikan berada di dalam radius lab. Presensi hanya tercatat jika sesi `OPEN` **dan** berada dalam radius yang diizinkan. Menampilkan hasil pemeriksaan lokasi (di dalam radius, di luar radius + jarak meter, atau lokasi tidak diperoleh). | **Zaidan** |
-| **SRS-S3-03** | **Pengelolaan Lokasi & Radius Laboratorium (Firestore)** | Asisten | Setiap lab memiliki koordinat (`latitude`, `longitude`) dan `radiusMeters` di Cloud Firestore (`labs` / `sessions`). Asisten dapat menentukan/mengubah lokasi lab dan radius yang berlaku untuk sesi praktikum. | **Zaidan** |
-| **SRS-S3-04** | **Peta Laboratorium Interaktif (Maps + Live User Marker)** | Praktikan & Asisten | Halaman Maps menampilkan marker seluruh laboratorium Informatika dan marker lokasi pengguna yang diperbarui secara langsung mengikuti perubahan lokasi perangkat selama halaman dibuka. Pengguna dapat memilih marker lab. | **Ferdy** |
-| **SRS-S3-05** | **Informasi Aktivitas Laboratorium di Peta (Real-Time)** | Praktikan & Asisten | Memilih marker lab menampilkan **praktikum yang sedang berlangsung** dan **praktikum berikutnya** dari Firestore (nama praktikum, kelas, waktu pelaksanaan, status sesi). Perubahan jadwal/status sesi langsung tercermin pada info lab. | **Ferdy** |
-| **SRS-S3-06** | **Push Notification Kegiatan Terarah (FCM / Expo Notif)** | Sistem & Praktikan | Mengirim push notification khusus kepada pengguna terkait saat: (1) sesi praktikum dibuka, (2) jadwal praktikum berubah, dan (3) pengajuan izin diterima/ditolak oleh asisten. Mendukung Android Channels, foreground/background handling, dan deep link ke layar tujuan. | **Ferdy** |
-| **SRS-S3-07** | **Penanganan Izin Akses & Kondisi Perangkat** | Semua | Meminta izin akses lokasi dan notifikasi sesuai kebutuhan. Menangani dan menampilkan informasi UI yang jelas saat izin ditolak, GPS tidak aktif, lokasi belum tersedia, koneksi gangguan, atau notifikasi tidak dapat diterima (*in-app fallback*). | **Ferdy** |
+| **SRS-S3-01** | Halaman Khusus Presensi *(+ Opsional QR Code)* | Praktikan | Halaman `/student/check-in/[id]` terpisah dari detail sesi `/student/attendance/[id]`. ✅ | Zaidan |
+| **SRS-S3-02** | Validasi Lokasi Presensi (Geofencing Radius) | Praktikan & Sistem | Validasi jarak GPS (Haversine) dalam proses pencatatan Firestore. ✅ | Zaidan |
+| **SRS-S3-03** | Pengelolaan Lokasi & Radius Laboratorium (Firestore) | Asisten | Koordinat & radius lab tersimpan di Cloud Firestore (`labs` / `sessions`). ✅ | Zaidan |
+| **SRS-S3-04** | Peta Laboratorium Interaktif (Maps + Live User Marker) | Praktikan & Asisten | Marker seluruh lab Informatika + live user tracking. ✅ | Ferdy |
+| **SRS-S3-05** | Informasi Aktivitas Laboratorium di Peta (Real-Time) | Praktikan & Asisten | Ketuk marker lab menampilkan praktikum berlangsung & berikutnya dari Firestore. ✅ | Ferdy |
+| **SRS-S3-06** | Push Notification Kegiatan Terarah (FCM / Expo Notif) | Sistem & Praktikan | Notifikasi terarah saat sesi dibuka, jadwal berubah, dan izin diputuskan. ✅ | Ferdy |
+| **SRS-S3-07** | Penanganan Izin Akses & Kondisi Perangkat | Semua | Penanganan izin lokasi/notifikasi ditolak, GPS mati, offline, & fallback UI. ✅ | Ferdy |
+
+### 3.4 Sprint 4 (Pertemuan 9) — Aktif 🚀
+
+| Kode SRS | Deskripsi | Peran | Kriteria Penerimaan | Pemilik |
+|---|---|---|---|---|
+| **SRS-S4-01** | **Manajemen Laboratorium oleh Aslab (Role Baru `ASLAB`)** | Aslab | Sebagai Aslab, saya dapat: (1) menambah & mengelola data lab (nama, lokasi, koordinat, cakupan/radius presensi, batasan keterlambatan waktu & nominal denda); (2) melakukan **3 bulk/single insert terpisah** — lab per satu mata kuliah, praktikan ke lab tertentu, dan asprak ke lab tertentu — masing-masing disertai **downloadable file template**; (3) meninjau hasil parsing bulk dalam **list `ScrollView` interaktif** (accept/deny per baris, edit/update, mengisi field kosong) sebelum simpan; (4) memindahkan praktikan antar lab serta memindahkan aslab/asprak tanpa perpindahan jadwal praktikum. | **Zaidan** |
+| **SRS-S4-02** | **Dashboard Keberlangsungan Laboratorium** | Aslab | Sebagai Aslab, saya dapat memantau seluruh lab yang dikelola dari data jadwal & sesi Firebase secara real-time, menampilkan: (1) jumlah laboratorium dan praktikan, (2) status kegiatan praktikum pada tiap lab, (3) informasi lokasi dan waktu pelaksanaan, (4) jadwal praktikum berlangsung maupun yang akan datang, (5) riwayat kegiatan laboratorium, dan (6) riwayat keuangan hasil dari denda praktikum; dilengkapi filter **hari, minggu, dan bulan**. | **Zaidan** |
+| **SRS-S4-03** | **Pengelolaan Sesi Real-Time oleh Asprak** | Asprak (`ASSISTANT`) | Sebagai Asprak, saya difokuskan untuk: (1) melihat daftar kelas, jadwal, dan sesi praktikum yang menjadi tanggung jawab saya, (2) membuka sesi saat praktikum dimulai, (3) memantau & mengelola presensi praktikan, dan (4) menutup sesi saat selesai dengan sinkronisasi real-time ke aplikasi praktikan. Asprak **tidak memiliki akses** ke manajemen distribusi praktikan antar lab maupun konfigurasi seluruh laboratorium. | **Bayu** |
+| **SRS-S4-04** | **Perhitungan Keterlambatan (Grace Period) & Pengelolaan Denda** | Sistem & Asprak | Sistem menghitung keterlambatan dari `timestamp` presensi vs waktu mulai sesi dengan mekanisme **grace period** yang dapat dikonfigurasi (`<= batas toleransi` → `ON_TIME`; `> batas toleransi` → `LATE`). Setiap kejadian keterlambatan menghasilkan **tepat satu tagihan denda nominal tetap** yang terhubung ke praktikan, sesi, dan catatan presensi. Pembayaran denda **tidak mengubah status kehadiran**. Praktikan dengan izin disetujui Asprak dicatat sebagai **`EXCUSED_ABSENCE`** (tidak hadir dengan izin, bukan hadir) dan **dibebaskan dari denda**. | **Bayu** |
+| **SRS-S4-05** | **Integrasi Payment Gateway Midtrans (Sandbox)** | Praktikan & Sistem | Menampilkan daftar tagihan dan rincian nominal denda praktikan; membuat transaksi pembayaran melalui **backend server** (secret key hanya di backend); mengarahkan praktikan ke halaman/metode pembayaran Midtrans Sandbox; menangani respons & **verifikasi callback/webhook** di backend; menampilkan status pembayaran (`pending`, `success`, `failed`); memperbarui status tagihan hanya berdasarkan hasil verifikasi backend; menyediakan riwayat transaksi praktikan. | **Ferdy** |
+| **SRS-S4-06** | **Notifikasi & Riwayat Pembayaran Persisten** | Praktikan & Sistem | Terintegrasi dengan sistem notifikasi Sprint 3 agar praktikan menerima pemberitahuan saat: (1) tagihan denda baru dibuat, (2) pembayaran berhasil, dan (3) pembayaran gagal/butuh penyelesaian lanjutan. Menyediakan halaman **Riwayat Pembayaran** yang menampilkan informasi sesi, tanggal tagihan, nominal, waktu transaksi, dan status pembayaran secara persisten (tetap ada setelah aplikasi ditutup dan dibuka kembali). | **Ferdy** |
 
 ---
 
 ## 4. Kebutuhan Non-Fungsional
 
-1. **Usability & UX:**
-   - Antarmuka tetap konsisten menggunakan primitif `src/components/ui/*` dan token `Colors.*` di `src/constants/theme.ts` (tanpa hardcoded hex).
-   - Pesan status lokasi, jarak meter, dan panduan aktivasi izin/GPS ditampilkan jelas dalam Bahasa Indonesia.
-2. **Performance & Real-Time Consistency:**
-   - Seluruh data lab, jadwal, sesi, presensi, dan notifikasi bersumber dari Cloud Firestore agar konsisten antar perangkat.
-   - *Location watcher* (`watchPositionAsync`) dan Firestore `onSnapshot` wajib di-*cleanup* (`remove()` / `unsubscribe()`) saat layar *unmount* untuk menghindari kebocoran memori dan boros baterai.
-3. **Security & Validation Integrity:**
-   - Validasi radius lokasi dilakukan di level logika pencatatan presensi (`submitAttendanceToFirestore`), bukan hanya menonaktifkan tombol UI.
-   - Anti-double attendance tetap berlaku ketat (`attendance_${sessionId}_${studentId}`).
-4. **Maintainability:**
-   - Mengikuti arsitektur *Pragmatic Feature-Based* (`docs/ARCHITECTURE.md`) dan aturan `eslint.config.js`.
+1. **Usability & Finalisasi Antarmuka:**
+   - Tampilan modern, konsisten, dan mudah digunakan oleh seluruh peran (`ASLAB`, `ASSISTANT`, `STUDENT`, `ADMIN`) menggunakan primitif `src/components/ui/*` dan token `src/constants/theme.ts` (tanpa hardcoded hex).
+   - Pesan status keterlambatan, rincian denda, status pembayaran, dan pratinjau bulk insert tampil jelas dalam Bahasa Indonesia.
+2. **Payment Security (Client–Server–Webhook):**
+   - `MIDTRANS_SERVER_KEY` dan kredensial sensitif backend **wajib** disimpan hanya di server/backend environment, dilarang keras tersimpan di bundle React Native.
+   - Pembaruan status tagihan (`UNPAID` → `PAID` / `FAILED`) hanya sah setelah verifikasi *signature key* webhook Midtrans di backend.
+3. **Data Integrity & Idempotency:**
+   - Pembuatan tagihan denda menggunakan ID deterministik (`fine_${sessionId}_${studentId}`) sehingga satu kejadian keterlambatan mustahil menghasilkan tagihan ganda.
+   - Pembayaran denda dan persetujuan izin tidak melanggar aturan status kehadiran.
+4. **Performance & Real-Time Consistency:**
+   - Seluruh data lab, jadwal, sesi, presensi, denda, dan riwayat pembayaran tersimpan di Cloud Firestore dan di-cleanup dengan benar (`unsubscribe()`).
+5. **Maintainability:**
+   - Mematuhi arsitektur *Pragmatic Feature-Based* (`docs/ARCHITECTURE.md`) dan aturan impor `eslint.config.js`.
 
 ---
 
-## 5. Arsitektur Informasi & Susunan Navigasi (Sprint 1–3)
+## 5. Arsitektur Informasi & Susunan Navigasi (Sprint 1–4)
 
-> Detail lengkap, aturan import, dan kepemilikan file: [ARCHITECTURE.md](ARCHITECTURE.md).
+> Detail lengkap, aturan import, kontrak data, dan kepemilikan file: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```text
-src/
-├── app/                              (RUTE saja, tanpa logika bisnis)
-│   ├── _layout.tsx                   (Root Stack + Provider + Notification Listener)
-│   ├── index.tsx                     (Login / Registrasi Firebase + Auto-Redirect RBAC)
-│   ├── admin/(tabs)/                 (Dashboard Admin, Kelas, Approvals)
-│   ├── assistant/
-│   │   ├── (tabs)/_layout.tsx        (Tab Asisten: Jadwal | Rekap | Izin | 📍 Peta Lab)
-│   │   ├── (tabs)/index.tsx          (Daftar Jadwal & Manajemen Sesi)
-│   │   ├── (tabs)/recap.tsx          (Rekap Keseluruhan Real-Time)
-│   │   ├── (tabs)/permits.tsx        (Daftar Izin Praktikan + Review)
-│   │   ├── (tabs)/maps.tsx           (📋 BARU S3 Ferdy: Peta Lab Interaktif & Aktivitas)
-│   │   └── session/[id].tsx          (Detail Sesi + Buka/Tutup + Konfigurasi Lokasi/Radius Lab)
-│   └── student/
-│       ├── (tabs)/_layout.tsx        (Tab Praktikan: Jadwal | Riwayat | Izin | 📍 Peta Lab)
-│       ├── (tabs)/index.tsx          (Jadwal Praktikum Aktif)
-│       ├── (tabs)/history.tsx        (Riwayat Kehadiran Pribadi)
-│       ├── (tabs)/permit.tsx         (Form & Status Izin Praktikan)
-│       ├── (tabs)/maps.tsx           (📋 BARU S3 Ferdy: Peta Lab Interaktif & Aktivitas)
-│       ├── attendance/[id].tsx       (Detail Sesi Praktikan → Tombol ke Halaman Presensi)
-│       └── check-in/[id].tsx         (📋 BARU S3 Zaidan: Halaman Khusus Presensi + Validasi Lokasi)
-├── features/
-│   ├── role/components/              (RoleSelectorModal)
-│   ├── sessions/components/          (SessionCard, StatusBadge, SessionControlModal, CreateSessionModal)
-│   ├── attendance/components/        (AttendanceForm, AttendanceSuccessCard, AttendanceTable, HistoryItemCard,
-│   │                                  📋 S3 Zaidan: LocationStatusBanner, LabLocationConfigModal)
-│   ├── permits/components/           (PermitForm, PermitStatusCard, PermitReviewCard)
-│   └── maps/components/              (📋 BARU S3 Ferdy: InteractiveLabMap, LabActivitySheet, PermissionAlertCard)
-├── services/                         (firebase, auth, admin, sessions, attendance, permits, ai,
-│                                      📋 S3 Zaidan: labs.ts | 📋 S3 Ferdy: permissions.ts, notifications.ts)
-├── types/                            (attendance.ts, permit.ts,
-│                                      📋 S3 Zaidan: lab.ts | 📋 S3 Ferdy: notification.ts)
-└── utils/                            (formatTime.ts, 📋 S3 Zaidan: geo.ts)
+Praktikum_PPK_06/
+├── backend/                          (📋 BARU S4 Ferdy: Server Payment Gateway Midtrans + Webhook Handler)
+└── src/
+    ├── app/                          (RUTE saja, tanpa logika bisnis)
+    │   ├── _layout.tsx               (Root Stack + Provider + Notification Listener)
+    │   ├── index.tsx                 (Login / Registrasi Firebase + Auto-Redirect RBAC termasuk ASLAB)
+    │   ├── admin/(tabs)/             (Dashboard Admin, Kelas, Approvals)
+    │   ├── aslab/                    (📋 BARU S4 Zaidan: Role Aslab)
+    │   │   ├── (tabs)/_layout.tsx    (Tab Aslab: Dashboard | Kelola Lab | Bulk Insert | Pindah Anggota)
+    │   │   ├── (tabs)/index.tsx      (Dashboard Keberlangsungan Lab + Filter Hari/Minggu/Bulan + Keuangan Denda)
+    │   │   ├── (tabs)/labs.tsx       (CRUD Lab: Lokasi, Koordinat, Radius Presensi, Batas Keterlambatan & Denda)
+    │   │   ├── (tabs)/bulk.tsx       (3 Opsi Bulk Insert Terpisah + Template Download + Staging ScrollView)
+    │   │   └── (tabs)/transfer.tsx   (Perpindahan Praktikan antar Lab & Perpindahan Aslab/Asprak)
+    │   ├── assistant/                (Fokus Asprak — diperjelas wewenang oleh Bayu S4)
+    │   │   ├── (tabs)/_layout.tsx    (Tab Asprak: Jadwal | Rekap | Izin | Peta Lab)
+    │   │   ├── (tabs)/index.tsx      (Kelas, Jadwal, & Sesi Tanggung Jawab Asprak)
+    │   │   ├── (tabs)/recap.tsx      (Rekap Real-Time: Tepat Waktu / Terlambat / Izin + Status Denda)
+    │   │   ├── (tabs)/permits.tsx    (Review Izin → EXCUSED_ABSENCE & Bebas Denda)
+    │   │   ├── (tabs)/maps.tsx       (Peta Lab Interaktif)
+    │   │   └── session/[id].tsx      (Detail Sesi + Buka/Tutup Real-Time + Kelola Presensi Praktikan)
+    │   └── student/
+    │       ├── (tabs)/_layout.tsx    (Tab Praktikan: Jadwal | Riwayat | Izin | Peta Lab | Denda/Bayar)
+    │       ├── (tabs)/index.tsx      (Jadwal Praktikum Aktif)
+    │       ├── (tabs)/history.tsx    (Riwayat Kehadiran + Indikator Tepat Waktu / Terlambat / Izin)
+    │       ├── (tabs)/permit.tsx     (Form & Status Izin)
+    │       ├── (tabs)/maps.tsx       (Peta Lab Interaktif)
+    │       ├── (tabs)/fines.tsx      (📋 BARU S4 Ferdy: Daftar Tagihan Denda & Riwayat Pembayaran Persisten)
+    │       ├── attendance/[id].tsx   (Detail Sesi Praktikan)
+    │       ├── check-in/[id].tsx     (Halaman Khusus Presensi + Geofencing + Evaluasi Keterlambatan)
+    │       └── payment/[fineId].tsx  (📋 BARU S4 Ferdy: Checkout Midtrans Sandbox & Status Pembayaran)
+    ├── features/
+    │   ├── role/components/          (RoleSelectorModal)
+    │   ├── sessions/components/      (SessionCard, StatusBadge, SessionControlModal, CreateSessionModal)
+    │   ├── attendance/components/    (AttendanceForm, AttendanceSuccessCard, AttendanceTable, HistoryItemCard,
+    │   │                              LocationStatusBanner, LabLocationConfigModal)
+    │   ├── permits/components/       (PermitForm, PermitStatusCard, PermitReviewCard)
+    │   ├── maps/components/          (InteractiveLabMap, LabActivitySheet, PermissionAlertCard)
+    │   ├── labs/components/          (📋 BARU S4 Zaidan: LabDashboardCards, LabFilterBar, LabConfigForm,
+    │   │                              BulkInsertStagingList, MemberTransferPanel)
+    │   └── fines/components/         (📋 BARU S4 Bayu/Ferdy: LatenessBadge, FineSummaryCard,
+    │                                  PaymentStatusBadge, PaymentHistoryCard)
+    ├── services/                     (firebase, auth, admin, sessions, attendance, permits, ai, labs,
+    │                                  permissions, notifications,
+    │                                  📋 S4 Bayu: fines.ts | 📋 S4 Ferdy: payments.ts)
+    ├── types/                        (attendance.ts, permit.ts, lab.ts, notification.ts,
+    │                                  📋 S4 Bersama: fine.ts)
+    └── utils/                        (formatTime.ts, geo.ts,
+                                       📋 S4 Zaidan: bulkTemplate.ts | 📋 S4 Bayu: lateness.ts)
 ```
 
 ---
 
-## 6. Referensi Teknis Sprint 3 (Dari Asisten Praktikum)
+## 6. Kriteria Keberhasilan (Target Demo Sprint 4 🚀)
 
-1. **Rich Push Notifications in React Native (Silversky Technology):**  
-   https://medium.com/@silverskytechnology/rich-push-notifications-in-react-native-a-complete-guide-797dd9747366
-2. **Implementing Google Maps and Routes Tracking in React Native (Silversky Technology):**  
-   https://medium.com/@silverskytechnology/implementing-google-maps-and-routes-tracking-in-react-native-a-starter-guide-9768282594b8
-
----
-
-## 7. Kriteria Keberhasilan (Target Demo Sprint 3 🚀)
-
-1. **Alur 1 — Presensi Berbasis Lokasi (Zaidan):** Asisten mengatur lokasi/radius lab dan membuka sesi → Praktikan membuka detail sesi lalu masuk ke **halaman khusus presensi** → Aplikasi memeriksa lokasi perangkat & radius laboratorium → Presensi berhasil dicatat ke Firestore apabila dalam radius (dan ditolak bila di luar radius) → Asisten melihat rekap kehadiran secara real-time.
-2. **Alur 2 — Peta & Informasi Laboratorium (Ferdy):** Pengguna membuka halaman **Maps** → Aplikasi menampilkan posisi perangkat pengguna secara *live* dan marker laboratorium Informatika → Pengguna mengetuk salah satu marker lab → Aplikasi menampilkan praktikum yang sedang berlangsung dan praktikum berikutnya dari data Cloud Firestore.
-3. **Alur 3 — Notifikasi Kegiatan (Ferdy):** Asisten membuka sesi, mengubah jadwal, atau memberikan keputusan izin → Sistem mengirimkan *push notification* terarah → Pengguna terkait menerima pemberitahuan mengenai perubahan tersebut.
-4. **Penanganan Permissions & Integrasi Penuh:** Penolakan izin lokasi/notifikasi, GPS mati, atau gangguan jaringan ditangani dengan feedback UI yang jelas, dan seluruh fitur Sprint 1, 2, serta 3 terintegrasi konsisten di Firebase tanpa error.
+1. **Alur 1 — Manajemen Lab & Dashboard Aslab (Zaidan):**
+   - Login sebagai `ASLAB` → Unduh template bulk insert (Lab / Praktikan / Asprak terpisah) → Import file → Baris data tampil di `ScrollView` interaktif (bisa accept, deny, edit, isi field kosong) → Simpan ke Firestore.
+   - Aslab mengatur lokasi, koordinat, radius presensi, dan batas keterlambatan (*grace period*) + nominal denda, serta memindahkan praktikan/aslab antar lab.
+   - Dashboard Aslab menampilkan statistik real-time (jumlah lab & praktikan, status lab, jadwal berlangsung/mendatang, riwayat kegiatan, riwayat keuangan denda) dan merespons filter **Hari / Minggu / Bulan**.
+2. **Alur 2 — Pengelolaan Sesi Asprak, Keterlambatan, & Denda (Bayu):**
+   - Login sebagai `ASSISTANT` (Asprak) → Melihat hanya kelas/sesi tanggung jawabnya (tanpa akses manajemen lab/distribusi praktikan) → Membuka & menutup sesi secara real-time.
+   - Praktikan presensi sebelum/tepat akhir *grace period* tercatat `ON_TIME` (tanpa denda); presensi melewati *grace period* tercatat `LATE` dan menghasilkan **tepat 1 tagihan denda nominal tetap**.
+   - Praktikan dengan izin yang disetujui Asprak tercatat `EXCUSED_ABSENCE` (tidak diubah menjadi hadir) dan bebas dari denda.
+3. **Alur 3 — Pembayaran Midtrans Sandbox, Webhook, & Notifikasi (Ferdy):**
+   - Praktikan menerima notifikasi tagihan baru → Membuka daftar tagihan → Membayar via Midtrans Sandbox yang dibuat oleh backend server (tanpa secret key di RN).
+   - Backend memverifikasi callback/webhook Midtrans → Status pembayaran (`pending`/`success`/`failed`) dan status tagihan terbarui otomatis → Status kehadiran praktikan tetap tidak berubah (`LATE`).
+   - Praktikan menerima notifikasi hasil pembayaran dan dapat melihat riwayat pembayaran secara persisten meskipun aplikasi ditutup dan dibuka kembali.
+4. **Finalisasi UI & Integrasi Penuh (Bahir — PM/QA):**
+   - Seluruh layar untuk 4 peran konsisten dengan `docs/DESIGN.md`, `firestore.rules` memproteksi koleksi baru (`fines`, `payments`) & hak akses `ASLAB` vs `ASSISTANT`, serta `npx tsc --noEmit` dan `npx expo lint` lolos tanpa error.

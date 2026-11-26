@@ -12,7 +12,8 @@
 | Peran | Nama Pengguna | Alamat Email | Kata Sandi | Identitas (NIM / Kode) | Kelas Terdaftar / Wewenang |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 👑 **Administrator** | Administrator Lab PPK | `admin@praktikum.ac.id` | `password123` | `ADM-01` | Pengelola Hak Akses, Persetujuan Sesi, Plotting Asisten |
-| 🛡️ **Asisten 1** | Muhammad Zaidan Alfarizi | `zaidan@praktikum.ac.id` | `password123` | `AST-01` | Pengampu Kelas C1, B2 |
+| 🧪 **Aslab (Baru S4)** | Asisten Laboratorium PPK | `aslab@praktikum.ac.id` | `password123` | `ASL-01` | Manajemen Lab (Single/Bulk Insert), Distribusi & Pindah Anggota, Radius & Denda, Dashboard Lab *(disiapkan pada Sprint 4)* |
+| 🛡️ **Asisten 1 (Asprak)** | Muhammad Zaidan Alfarizi | `zaidan@praktikum.ac.id` | `password123` | `AST-01` | Pengampu Kelas C1, B2 |
 | 🛡️ **Asisten 2** | Crystiano Bayu Satya Alves | `bayu@praktikum.ac.id` | `password123` | `AST-02` | Pengampu Kelas A1 |
 | 🛡️ **Asisten 3** | Herman | `herman@praktikum.ac.id` | `password123` | `AST-03` | Asisten Lab (Siap Ditugaskan) |
 | 🎓 **Praktikan 1** | Bahir Ananda Wibowo | `bahir@student.ac.id` | `password123` | `24060124140184` | Kelas A1, B2, C1 |
@@ -77,3 +78,32 @@ Jika penguji ingin menguji registrasi akun baru mandiri:
 2. Sistem akan menampilkan dialog konfirmasi:  
    *"Apakah Anda yakin ingin keluar dari akun?"*
 3. Klik **"Batal"** untuk membatalkan, atau klik **"Ya, Keluar"** untuk mengakhiri sesi dan kembali ke halaman login.
+
+---
+
+## 5. Skenario Pengujian Sprint 4 (Pertemuan 9)
+
+### Skenario D: Login sebagai Aslab (`ASLAB` — Role Baru)
+1. Login dengan akun Aslab (`aslab@praktikum.ac.id` / `password123`) → diarahkan otomatis ke `/aslab`.
+2. **Manajemen Lab & 3 Bulk Insert Terpisah:**
+   - Unduh template CSV masing-masing untuk Lab (per 1 mata kuliah), Praktikan ke Lab, dan Asprak ke Lab.
+   - Import file CSV → pastikan tiap baris tampil sebagai list di dalam `ScrollView` yang dapat diatur (Accept / Deny / Edit / Isi field kosong) sebelum disimpan ke Firestore.
+   - Uji konfigurasi lokasi, koordinat, cakupan radius presensi, *grace period* keterlambatan, dan nominal denda tetap.
+   - Uji perpindahan praktikan antar lab serta perpindahan aslab/asprak (tanpa perpindahan jadwal).
+3. **Dashboard Keberlangsungan Lab:**
+   - Verifikasi tampilan jumlah lab & praktikan, status tiap lab, lokasi & waktu, jadwal berlangsung & mendatang, riwayat kegiatan, dan riwayat keuangan hasil denda.
+   - Ganti filter **Hari / Minggu / Bulan** dan pastikan data berubah sesuai periode.
+
+### Skenario E: Pengelolaan Sesi Asprak, Keterlambatan (Grace Period), Denda & Excused Absence
+1. Login sebagai Asprak (`zaidan@praktikum.ac.id`) → pastikan hanya kelas/sesi tanggung jawabnya yang tampil dan **tidak ada** menu manajemen distribusi/konfigurasi seluruh lab.
+2. Buka sesi praktikum → verifikasi perubahan status `OPEN` langsung tersinkron real-time di perangkat Praktikan.
+3. **Presensi Tepat Waktu:** Praktikan absen sebelum/tepat akhir *grace period* → status `ON_TIME`, tidak ada tagihan denda.
+4. **Presensi Terlambat:** Praktikan absen melewati *grace period* → status `LATE`, terbentuk **tepat 1 tagihan denda** nominal tetap di Firestore, dan praktikan menerima notifikasi tagihan baru.
+5. **Izin Disetujui (*Excused Absence*):** Asprak menyetujui izin praktikan → status tercatat `EXCUSED_ABSENCE` (bukan hadir) dan praktikan dibebaskan dari denda.
+
+### Skenario F: Pembayaran Denda Midtrans Sandbox, Webhook, & Riwayat Persisten
+1. Login sebagai Praktikan yang memiliki tagihan denda → buka tab **Denda / Pembayaran**.
+2. Tekan **Bayar Sekarang** → aplikasi memanggil backend server untuk membuat transaksi Snap Sandbox → buka halaman pembayaran Midtrans Sandbox.
+3. Simulasikan pembayaran melalui Midtrans Sandbox Simulator (uji status `pending`, `success`/settlement, dan `failed`/expire).
+4. Verifikasi backend menerima webhook & memverifikasi signature → status tagihan dan pembayaran terbarui di Firestore, **status kehadiran praktikan tetap `LATE`**, dan praktikan menerima notifikasi hasil pembayaran.
+5. Tutup total aplikasi lalu buka kembali → pastikan **Riwayat Pembayaran** (sesi, tanggal tagihan, nominal, waktu transaksi, status) tetap tampil persisten.

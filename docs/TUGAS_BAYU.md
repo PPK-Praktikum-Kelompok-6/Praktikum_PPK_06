@@ -1,107 +1,133 @@
 # Panduan Tugas — Crystiano Bayu Satya Alves (24060124140130)
-## Modul: Fondasi Autentikasi, RBAC, dan Manajemen Data Utama (Sprint 2)
+## Modul Sprint 4 (Pertemuan 9): Pengelolaan Sesi oleh Asprak, Perhitungan Keterlambatan (Grace Period), & Pengelolaan Denda
 
-> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG:**  
-> ⚠️ **Sprint 1 SELESAI & FREEZE:** Komponen UI dasar (`CustomButton`, `Card`, `EmptyState`, `FeedbackModal`, `theme.ts`) sudah selesai dan **JANGAN DIUBAH**.  
-> Fokus Anda **HANYA** pada modul baru Sprint 2: Firebase Authentication, Routing RBAC, dan Firestore CRUD.
-
----
-
-## 1. Product Requirements Document (PRD) — Sprint 2 Bayu
-
-### 1.1 Objektif
-Menghubungkan aplikasi ke Firebase Authentication dan Cloud Firestore sehingga pengguna memiliki identitas resmi, login terarah sesuai peran (*Role-Based Access Control* / RBAC), serta asisten dapat mengelola data Kelas, Peserta, dan Jadwal secara persisten di database cloud.
-
-### 1.2 User Stories & Pemetaan SRS
-- **SRS-AUTH-01 :** Sebagai pengguna, saya dapat melakukan registrasi dan login menggunakan Firebase Authentication agar memiliki identitas yang valid di dalam sistem.
-- **SRS-AUTH-02 :** Sebagai sistem, saya dapat mengarahkan (*routing*) pengguna ke halaman yang tepat berdasarkan peran mereka (Asisten atau Praktikan) setelah berhasil login.
-- **SRS-CRUD-01 :** Sebagai Asisten, saya dapat melakukan operasi Create, Read, Update, dan Delete (CRUD) pada data Kelas, Peserta, dan Jadwal menggunakan Cloud Firestore.
-- **SRS-CRUD-02 :** Sebagai Praktikan, saya dapat melihat daftar jadwal dan informasi sesi praktikum yang hanya berkaitan dengan akun saya.
+> **PETUNJUK KHUSUS AI ASSISTANT / PENGEMBANG (SPRINT 4):**  
+> ⚠️ **Sprint 1, 2, & 3 SELESAI:** Jangan membongkar ulang fondasi UI Design System (`src/components/ui/*`, `src/constants/theme.ts`), modul Manajemen Lab & Dashboard Aslab milik Zaidan (`src/app/aslab/**`, `src/features/labs/*`), maupun modul Payment Gateway Midtrans & Riwayat Pembayaran milik Ferdy (`backend/**`, `src/services/payments.ts`, `src/app/student/(tabs)/fines.tsx`).  
+> Fokus Anda di Sprint 4 adalah **Pengelolaan Sesi Real-Time oleh Asprak (pemisahan wewenang RBAC vs Aslab)**, **Perhitungan Keterlambatan berbasis Grace Period**, serta **Pengelolaan Denda Nominal Tetap & Excused Absence** (`SRS-S4-03` & `SRS-S4-04`).
 
 ---
 
-## 2. File yang Dikerjakan Bayu (Sprint 2)
+## 1. Product Requirements Document (PRD) — Sprint 4 Bayu
 
-```
+### 1.1 Objektif Utama
+1. **Memfokuskan peran Asprak (`ASSISTANT`):** Memastikan Asprak hanya melihat dan mengelola pelaksanaan praktikum (kelas, jadwal, buka/tutup sesi *real-time*, pemantauan & pengelolaan presensi praktikan) di kelas/lab tanggung jawabnya — tanpa wewenang mengelola distribusi praktikan antar lab maupun konfigurasi seluruh laboratorium (yang kini menjadi wewenang `ASLAB`).
+2. **Membangun logika keterlambatan & denda yang presisi:** Menghitung keterlambatan presensi dengan mekanisme *grace period* terkonfigurasi, menghasilkan tepat satu tagihan denda nominal tetap per kejadian terlambat, menjaga agar pembayaran denda tidak mengubah status kehadiran, serta memastikan izin yang disetujui Asprak tercatat sebagai **`EXCUSED_ABSENCE`** dan dibebaskan dari denda.
+
+### 1.2 User Stories & Pemetaan SRS Sprint 4
+- **`SRS-S4-03` (Pengelolaan Sesi oleh Asprak):**  
+  Sebagai Asprak, saya ingin melihat jadwal/kelas tanggung jawab saya, membuka/menutup sesi praktikum secara real-time, serta memantau dan mengelola presensi praktikan agar pelaksanaan praktikum berjalan tertib (tanpa akses distribusi praktikan maupun konfigurasi seluruh laboratorium).
+- **`SRS-S4-04` (Perhitungan Keterlambatan & Pengelolaan Denda):**  
+  Sebagai Sistem/Asprak, saya ingin menghitung keterlambatan presensi berdasarkan *grace period*, menghasilkan satu tagihan denda nominal tetap secara otomatis bagi yang terlambat, serta membebaskan denda bagi praktikan yang disetujui izinnya (*excused absence*) tanpa mengubah status kehadiran.
+
+---
+
+## 2. Aturan Bisnis Wajib (Tidak Boleh Dilanggar)
+
+1. **Evaluasi Grace Period (`src/utils/lateness.ts`):**
+   - Ambil waktu mulai sesi (`sessionStartTime` — dari jadwal/waktu buka sesi) dan `gracePeriodMinutes` (dari konfigurasi sesi/lab yang diatur Aslab, dengan fallback default kebijakan praktikum).
+   - Hitung batas akhir toleransi: `deadline = sessionStartTime + gracePeriodMinutes * 60_000`.
+   - Jika `checkInTime <= deadline` → status **`ON_TIME`** (`lateMinutes = 0`), **tidak ada denda**.
+   - Jika `checkInTime > deadline` → status **`LATE`** (`lateMinutes = Math.ceil((checkInTime - deadline) / 60_000)`), **wajib membuat tagihan denda**.
+2. **Aturan Tagihan Denda (`src/services/fines.ts`):**
+   - Nominal denda bersifat **tetap** (`fineAmount` dari konfigurasi lab/sesi, misal Rp 10.000 per kejadian).
+   - **Idempotent / Maksimal 1 Tagihan per Kejadian:** Gunakan ID dokumen deterministik `fine_${sessionId}_${studentId}` dengan transaksi/pengecekan keberadaan dokumen agar satu kejadian keterlambatan **tidak pernah** menghasilkan lebih dari satu tagihan.
+   - Setiap tagihan wajib menyimpan relasi lengkap: `studentId`, `studentName`, `studentNim`, `sessionId`, `sessionName`, `classCode`, dan `attendanceId`.
+   - Setelah tagihan dibuat, panggil helper notifikasi milik Ferdy (`notifyFineCreated`) agar praktikan mendapat pemberitahuan tagihan baru.
+   - **Pembayaran denda tidak mengubah status kehadiran:** Di layar rekap Asprak maupun riwayat Praktikan, status kehadiran praktikan yang sudah membayar denda tetap tampil sebagai **Terlambat (`LATE`)** (bukan berubah menjadi `ON_TIME`).
+3. **Aturan Izin Disetujui (*Excused Absence*):**
+   - Saat Asprak menyetujui pengajuan izin (`APPROVED`) pada `src/services/permits.ts`:
+     - Catat/tandai status kehadiran praktikan pada sesi tersebut sebagai **`EXCUSED_ABSENCE`** (*Tidak Hadir dengan Izin*) — **TIDAK BOLEH** mengubah status menjadi hadir (`ON_TIME`/`LATE`).
+     - **Bebaskan dari denda keterlambatan:** Jangan buat tagihan denda, dan jika sebelumnya sempat ada tagihan denda belum dibayar untuk sesi tersebut, ubah status denda menjadi `WAIVED`.
+4. **Pembatasan Wewenang Asprak (`ASSISTANT`):**
+   - Di antarmuka Asprak (`src/app/assistant/**`), sembunyikan/hapus akses konfigurasi global seluruh laboratorium dan perpindahan distribusi praktikan antar lab (kewenangan tersebut dipindahkan ke `ASLAB`).
+   - Filter daftar kelas, jadwal, dan sesi secara ketat hanya untuk kelas/lab yang menjadi tanggung jawab Asprak yang sedang login, dengan sinkronisasi status sesi (`NOT_STARTED` → `OPEN` → `CLOSED`) *real-time* (`onSnapshot`) ke aplikasi praktikan.
+
+---
+
+## 3. File yang Dikerjakan Bayu (Sprint 4)
+
+> Aturan struktur & batas impor: [docs/ARCHITECTURE.md](ARCHITECTURE.md) §2, §3, dan §9.
+
+```text
 src/
-├── services/                               <-- FOLDER BARU SPRINT 2
-│   ├── firebase.ts                         <-- Inisialisasi Firebase App, Auth, dan Firestore
-│   ├── auth.ts                             <-- signIn, signUp, signOut, getCurrentUser, getUserProfile
-│   └── sessions.ts                         <-- CRUD Firestore: Kelas, Peserta, Jadwal praktikum
+├── types/
+│   └── attendance.ts                               <-- [UPDATE] Tambah 'ASLAB' di UserRole; tambah AttendancePunctuality & field lateMinutes/fineId
+├── utils/
+│   └── lateness.ts                                 <-- [BARU] Pure function evaluateLateness(checkInIso, sessionStartIso, gracePeriodMinutes)
+├── services/
+│   ├── fines.ts                                    <-- [BARU] createLateFineIfNotExists(), waiveFineForExcusedAbsence(), query fines per sesi
+│   ├── attendance.ts                               <-- [UPDATE] Evaluasi grace period saat submitAttendanceToFirestore() + panggil createLateFineIfNotExists()
+│   └── permits.ts                                  <-- [UPDATE] Saat izin APPROVED → catat EXCUSED_ABSENCE (bukan hadir) + panggil waiveFineForExcusedAbsence()
+├── features/
+│   └── fines/components/
+│       └── LatenessBadge.tsx                       <-- [BARU] Badge status: Tepat Waktu | Terlambat (+X mnt) | Izin (Bebas Denda)
 └── app/
-    ├── index.tsx                           <-- Update: Form login/registrasi + Auto-redirect RBAC
-    ├── assistant/(tabs)/_layout.tsx        <-- Update: Proteksi sesi login & guard asisten
-    └── student/(tabs)/_layout.tsx          <-- Update: Proteksi sesi login & guard praktikan
+    ├── assistant/
+    │   ├── (tabs)/index.tsx                        <-- [UPDATE] Fokus kelas/jadwal/sesi tanggung jawab Asprak (tanpa akses manajemen semua lab)
+    │   ├── (tabs)/recap.tsx                        <-- [UPDATE] Tampilkan status Tepat Waktu / Terlambat / Izin + status denda per praktikan
+    │   └── session/[id].tsx                        <-- [UPDATE] Buka/tutup sesi real-time, pantau & kelola presensi, sembunyikan config lab global
+    └── student/
+        └── check-in/[id].tsx                       <-- [UPDATE] Tampilkan informasi hasil evaluasi keterlambatan & info tagihan jika terlambat
 ```
-
-> 💡 **File Lama yang TIDAK PERLU DIUBAH:** `src/components/ui/*`, `src/constants/theme.ts`, `src/store/*`.
 
 ---
 
-## 3. Spesifikasi Teknis & Kontrak Data
+## 4. Spesifikasi Teknis & Kontrak Data
 
-### 3.1 Inisialisasi Firebase (`src/services/firebase.ts`)
-Gunakan konfigurasi Firebase Web SDK / React Native modular:
+### 4.1 Pure Helper Keterlambatan (`src/utils/lateness.ts`)
 ```typescript
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { AttendancePunctuality } from '@/types/attendance';
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
-
-export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-```
-
-### 3.2 Service Autentikasi (`src/services/auth.ts`)
-```typescript
-export interface AuthUser {
-  uid: string;
-  email: string;
-  name: string;
-  role: 'ASSISTANT' | 'STUDENT';
-  identifier: string; // NIM atau Kode Asisten
+export interface LatenessEvaluation {
+  status: Extract<AttendancePunctuality, 'ON_TIME' | 'LATE'>;
+  isLate: boolean;
+  lateMinutes: number;
+  graceDeadlineIso: string;
 }
 
-// Method yang harus disediakan:
-export async function signUpUser(email: string, password: string, profile: Omit<AuthUser, 'uid'>): Promise<AuthUser>;
-export async function signInUser(email: string, password: string): Promise<AuthUser>;
-export async function signOutUser(): Promise<void>;
-export async function getUserProfile(uid: string): Promise<AuthUser | null>;
+/**
+ * Pure business rule (tanpa React/Firestore):
+ * - checkIn <= sessionStart + gracePeriodMinutes  => ON_TIME (isLate: false)
+ * - checkIn >  sessionStart + gracePeriodMinutes  => LATE (isLate: true)
+ */
+export function evaluateLateness(
+  checkInIso: string,
+  sessionStartIso: string,
+  gracePeriodMinutes: number
+): LatenessEvaluation;
 ```
 
-### 3.3 Service CRUD Firestore (`src/services/sessions.ts`)
-Koleksi Firestore: `classes`, `sessions`, `users`.
+### 4.2 Service Denda (`src/services/fines.ts`)
+Mengonsumsi kontrak `FineRecord` dari `src/types/fine.ts` (berkoordinasi dengan Ferdy):
 ```typescript
-import { PracticalSession } from '@/types/attendance';
+import { FineRecord } from '@/types/fine';
 
-// CRUD Jadwal & Sesi
-export async function createSession(sessionData: Omit<PracticalSession, 'id'>): Promise<string>;
-export async function getSessionsForAssistant(assistantId: string): Promise<PracticalSession[]>;
-export async function getSessionsForStudent(studentId: string, studentClasses: string[]): Promise<PracticalSession[]>;
-export async function updateSession(sessionId: string, updates: Partial<PracticalSession>): Promise<void>;
-export async function deleteSession(sessionId: string): Promise<void>;
+/**
+ * Membuat tepat 1 tagihan denda dengan ID deterministik `fine_${sessionId}_${studentId}`.
+ * Jika dokumen sudah ada, tidak membuat duplikat.
+ */
+export async function createLateFineIfNotExists(
+  input: Omit<FineRecord, 'id' | 'status' | 'createdAt'>
+): Promise<FineRecord>;
+
+/**
+ * Membebaskan denda (status: 'WAIVED') jika praktikan memperoleh persetujuan izin dari Asprak.
+ */
+export async function waiveFineForExcusedAbsence(
+  sessionId: string,
+  studentId: string
+): Promise<void>;
 ```
 
 ---
 
-## 4. Alur Kerja & Checklist Implementasi
+## 5. Checklist Eksekusi Step-by-Step (Sprint 4)
 
-- [ ] **Langkah 1**: Buat branch `feat/bayu/auth-firestore-crud` dari `dev`.
-- [ ] **Langkah 2**: Buat file konfigurasi `src/services/firebase.ts`.
-- [ ] **Langkah 3**: Buat file `src/services/auth.ts` (fungsi registrasi, login, dan pembacaan role user dari Firestore `users/{uid}`).
-- [ ] **Langkah 4**: Perbarui `src/app/index.tsx` dengan UI input Email & Password (tetap memakai komponen UI dari `@/components/ui/`).
-- [ ] **Langkah 5**: Implementasikan auto-routing di `index.tsx`:
-  - Jika `role === 'ASSISTANT'` $\rightarrow$ redirect ke `/assistant`.
-  - Jika `role === 'STUDENT'` $\rightarrow$ redirect ke `/student`.
-- [ ] **Langkah 6**: Buat `src/services/sessions.ts` untuk operasi CRUD data sesi di Firestore.
-- [ ] **Langkah 7**: Jalankan `npx tsc --noEmit` & `npx expo lint`.
-- [ ] **Langkah 8**: Ajukan Pull Request ke `dev`.
+- [ ] **Langkah 1**: Buat branch `feat/bayu/asprak-session-lateness-fines` dari `dev`.
+- [ ] **Langkah 2**: Perbarui `src/types/attendance.ts` (tambah `'ASLAB'`, `AttendancePunctuality`, serta field `attendanceStatus`, `lateMinutes`, `fineId`).
+- [ ] **Langkah 3**: Buat pure function `src/utils/lateness.ts` untuk evaluasi *grace period* (pastikan kasus batas tepat di akhir masa toleransi tetap `ON_TIME`).
+- [ ] **Langkah 4**: Buat `src/services/fines.ts` dengan proteksi ID deterministik `fine_${sessionId}_${studentId}` (1 kejadian = 1 tagihan) dan fungsi pembebasan denda `WAIVED`.
+- [ ] **Langkah 5**: Integrasikan evaluasi keterlambatan & pembuatan denda ke `src/services/attendance.ts` serta *excused absence* ke `src/services/permits.ts`.
+- [ ] **Langkah 6**: Buat komponen `src/features/fines/components/LatenessBadge.tsx` menggunakan token `Colors.*` di `src/constants/theme.ts`.
+- [ ] **Langkah 7**: Rapikan ruang kerja Asprak (`src/app/assistant/**`) agar fokus pada kelas/sesi tanggung jawabnya, real-time sync buka/tutup sesi, dan menghapus akses distribusi praktikan / konfigurasi seluruh lab.
+- [ ] **Langkah 8**: Jalankan `npx tsc --noEmit` & `npx expo lint`, lalu ajukan Pull Request ke `dev`.
