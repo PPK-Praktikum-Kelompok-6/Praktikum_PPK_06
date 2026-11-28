@@ -173,6 +173,19 @@ export default function StudentTabsLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="fines"
+          options={{
+            title: 'Denda',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Icon
+                name={focused ? 'card' : 'card-outline'}
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
       </Tabs>
 
       <FeedbackModal

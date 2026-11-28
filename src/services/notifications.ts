@@ -29,6 +29,7 @@ export const NOTIFICATION_CHANNELS = {
   SESSION_OPENED: 'session-opened',
   SCHEDULE_UPDATES: 'schedule-updates',
   PERMIT_DECISIONS: 'permit-decisions',
+  FINES_PAYMENTS: 'fines-payments',
 } as const;
 
 let foregroundHandlerConfigured = false;
@@ -65,6 +66,10 @@ function getChannelIdForEvent(type: NotificationEventType): string {
     case 'PERMIT_APPROVED':
     case 'PERMIT_REJECTED':
       return NOTIFICATION_CHANNELS.PERMIT_DECISIONS;
+    case 'FINE_CREATED':
+    case 'PAYMENT_SUCCESS':
+    case 'PAYMENT_FAILED':
+      return NOTIFICATION_CHANNELS.FINES_PAYMENTS;
   }
 }
 
@@ -374,6 +379,66 @@ export async function notifyPermitReviewed(
     route: '/student/permit',
     sessionId: permit.sessionId,
     permitId: permit.id,
+  });
+}
+
+/**
+ * 4. Mengirim notifikasi terarah ketika tagihan denda keterlambatan baru dibuat (SRS-S4-06).
+ */
+export async function notifyFineCreated(params: {
+  fineId: string;
+  studentId: string;
+  sessionId: string;
+  sessionName: string;
+  classCode: string;
+  lateMinutes: number;
+  amount: number;
+}): Promise<void> {
+  if (!params.studentId) return;
+
+  const formattedAmount = `Rp ${params.amount.toLocaleString('id-ID')}`;
+  await dispatchTargetedNotification({
+    type: 'FINE_CREATED',
+    title: 'Tagihan Denda Keterlambatan',
+    body: `Anda terlambat ${params.lateMinutes} menit pada ${params.sessionName} (${params.classCode}). Tagihan denda sebesar ${formattedAmount} telah diterbitkan.`,
+    targetUserIds: [params.studentId],
+    targetClassCode: params.classCode,
+    route: '/student/fines',
+    sessionId: params.sessionId,
+    fineId: params.fineId,
+  });
+}
+
+/**
+ * 5. Mengirim notifikasi terarah hasil verifikasi pembayaran dari webhook Midtrans (SRS-S4-06).
+ */
+export async function notifyPaymentResult(params: {
+  fineId: string;
+  paymentId: string;
+  studentId: string;
+  sessionId: string;
+  sessionName: string;
+  amount: number;
+  status: 'success' | 'failed';
+}): Promise<void> {
+  if (!params.studentId) return;
+
+  const formattedAmount = `Rp ${params.amount.toLocaleString('id-ID')}`;
+  const isSuccess = params.status === 'success';
+
+  await dispatchTargetedNotification({
+    type: isSuccess ? 'PAYMENT_SUCCESS' : 'PAYMENT_FAILED',
+    title: isSuccess
+      ? 'Pembayaran Denda Berhasil'
+      : 'Pembayaran Denda Gagal / Kedaluwarsa',
+    body: isSuccess
+      ? `Pembayaran denda ${params.sessionName} sebesar ${formattedAmount} telah berhasil diverifikasi.`
+      : `Pembayaran denda ${params.sessionName} sebesar ${formattedAmount} gagal atau kedaluwarsa. Silakan coba bayar ulang.`,
+    targetUserIds: [params.studentId],
+    route: isSuccess ? '/student/fines' : `/student/payment/${params.fineId}`,
+    sessionId: params.sessionId,
+    fineId: params.fineId,
+    paymentId: params.paymentId,
   });
 }
 

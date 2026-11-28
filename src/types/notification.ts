@@ -2,7 +2,10 @@ export type NotificationEventType =
   | 'SESSION_OPENED'
   | 'SCHEDULE_CHANGED'
   | 'PERMIT_APPROVED'
-  | 'PERMIT_REJECTED';
+  | 'PERMIT_REJECTED'
+  | 'FINE_CREATED'
+  | 'PAYMENT_SUCCESS'
+  | 'PAYMENT_FAILED';
 
 export interface AppNotification {
   id: string;
@@ -14,6 +17,8 @@ export interface AppNotification {
   route: string; // Deep link Expo Router, misal: "/student/attendance/session-1" atau "/student/permit"
   sessionId?: string;
   permitId?: string;
+  fineId?: string;
+  paymentId?: string;
   createdAt: string;
   readBy?: string[];
 }
